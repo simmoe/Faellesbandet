@@ -272,6 +272,13 @@ select {
 .no-bass-tabs .pdf-bass {
 	visibility: hidden !important;
 }
+/* Sektions-labelen echo'es i højre kolonne ud for hver form-header. Når
+ * bas-tabs er fravalgt skal højre kolonne være helt tom — også for
+ * form-angivelserne — så vi skjuler echoen sammen med bas-indholdet. */
+.no-bass-tabs .section-header-echo {
+	visibility: hidden !important;
+	pointer-events: none !important;
+}
 .no-bass-tabs .editable-song.chord-grid {
 	grid-template-columns: minmax(0, 1fr) 4em !important;
 	column-gap: 0.6em !important;
