@@ -4,8 +4,13 @@
 
 SvelteKit 2 + Svelte 5 (runes) + Firebase static app ("Fællesbandet" songbook). Standard scripts live in `package.json` (`dev`, `check`, `build`, `dev:emu`, `dev:all`) and `functions/package.json` (`build`); setup/deploy notes are in `README.md`. Notes below cover only non-obvious things.
 
+### Workflow (important — read first)
+- **Work directly on `master`.** NEVER create separate branches or pull requests unless the user *explicitly* asks for one. Commit straight to `master` and push to `origin/master`.
+- **Ship to live, not local dev.** The user iterates directly on the deployed (production) Firebase Hosting site — not local emulators/dev. Do NOT proactively spin up local dev servers or Firebase emulators to test. After a change, build and deploy hosting to live (`npm run deploy:web`, i.e. `npm run build && firebase deploy --only hosting`), and let the user verify on the live site.
+- Deploy safety still applies: only `--only hosting` (this app's own `faellesbandet` site). NEVER broad-deploy functions/rules (see the Deploy safety section below).
+
 ### Testing preferences (important)
-- For visual / UI issues (print & PDF layout, CSS, the bass-tabs right column, styling, spacing), do NOT proactively spin up a full end-to-end test scenario (Firebase emulators + seeded data + dev server + browser automation) just to reproduce the problem. The user prefers to send a screenshot of the issue. Make the targeted code/CSS change and let the user verify from the screenshot, unless they explicitly ask for a full reproduction/test.
+- For visual / UI issues (print & PDF layout, CSS, the bass-tabs right column, styling, spacing), do NOT build a full end-to-end reproduction scenario (emulators + seeded data + dev server + browser automation). The user sends a screenshot of the issue and verifies the fix on the live site. Make the targeted code/CSS change, deploy, and let the user confirm.
 
 ### Services / how to run
 - Web (SvelteKit dev): `npm run dev` → http://localhost:5173. This is the main app.
