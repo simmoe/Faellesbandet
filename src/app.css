@@ -283,12 +283,12 @@ select {
 .no-bass-tabs .editable-song .song-section-end {
 	display: none !important;
 }
-/* Behold en tom højre kolonne, så hover-rækken bliver ved
- * tekst/bass-renden i stedet for at sidde midt i teksten
- * eller smutte helt ud til højre kant. */
 .no-bass-tabs .editable-song .song-section-grid {
-	grid-template-columns: minmax(0, 1fr) minmax(12em, 28%) !important;
-	column-gap: 1em !important;
+	grid-template-columns: minmax(0, 1fr) !important;
+	column-gap: 0 !important;
+}
+.no-bass-tabs .editable-song .line-actions {
+	right: clamp(10em, 24%, 20em);
 }
 .no-bass-tabs .pdf-section-grid {
 	grid-template-columns: minmax(0, 1fr) 12mm !important;

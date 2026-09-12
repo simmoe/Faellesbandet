@@ -1518,7 +1518,7 @@
 		gap: 0.4em;
 		min-width: 0;
 		min-height: 1.65em;
-		padding: 0 13.75em 0.28em 0;
+		padding: 0 0.15em 0.28em 0;
 		color: var(--section-accent);
 		font-size: 0.78em;
 		font-weight: 800;
@@ -1534,7 +1534,6 @@
 	.editable-song .song-line-wrap {
 		position: relative;
 		min-width: 0;
-		padding-right: 13.75em;
 	}
 	.editable-song .line-actions {
 		position: absolute;
