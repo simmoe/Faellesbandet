@@ -1546,20 +1546,30 @@
 	}
 	.editable-song .line-actions {
 		position: absolute;
-		top: 2px;
-		bottom: 2px;
-		left: 50%;
-		left: 50cqi;
+		top: 0;
+		bottom: 0;
+		left: 60%;
+		left: 60cqi;
 		right: auto;
 		z-index: 4;
 		display: flex;
 		align-items: stretch;
 		gap: 0.3em;
+		padding: 2px 0.45em;
 		transform: translateX(-50%);
+		isolation: isolate;
+		background: #fff;
+		box-shadow: 0 0 0 6px #fff;
 		opacity: 0;
 		pointer-events: none;
-		box-shadow: 0 0 10px 6px #fff;
 		transition: opacity 80ms ease;
+	}
+	.editable-song .line-actions::before {
+		content: '';
+		position: absolute;
+		inset: -2px -8px;
+		z-index: -1;
+		background: #fff;
 	}
 	.editable-song .song-line-wrap:hover:not(:has(.song-line:focus)) .line-actions,
 	.editable-song .song-section-label:hover:not(:has(.section-header-edit:focus)) .line-actions,
