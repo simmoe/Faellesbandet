@@ -888,6 +888,7 @@
 
 	function showRowToolbar(rowIdx: number): void {
 		if (readOnly || sectionDrag) return;
+		if (window.matchMedia('(hover: none), (pointer: coarse)').matches) return;
 		hoveredRow = rowIdx;
 	}
 
@@ -1618,6 +1619,14 @@
 	}
 	.editable-song.read-only .row-gutter {
 		display: none;
+	}
+	@media (hover: none), (pointer: coarse) {
+		.editable-song .row-gutter {
+			display: none;
+		}
+		.editable-song.chord-grid {
+			grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
+		}
 	}
 	.editable-song .lyrics-cell,
 	.editable-song .section-header-edit {

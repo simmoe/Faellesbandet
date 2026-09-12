@@ -286,6 +286,11 @@ select {
 .no-bass-tabs .editable-song.read-only.chord-grid {
 	grid-template-columns: minmax(0, 1fr) 4em !important;
 }
+@media (hover: none), (pointer: coarse) {
+	.no-bass-tabs .editable-song.chord-grid {
+		grid-template-columns: minmax(0, 1fr) 4em !important;
+	}
+}
 .no-bass-tabs .pdf-section-grid {
 	grid-template-columns: minmax(0, 1fr) 12mm !important;
 	column-gap: calc(2mm * var(--pdf-layout-scale, 1)) !important;
