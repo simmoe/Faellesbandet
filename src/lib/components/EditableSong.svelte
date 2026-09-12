@@ -54,7 +54,6 @@
 	}: Props = $props();
 
 	let hoveredRow = $state<number | null>(null);
-	let hoverToolbar = $state<{ rowIdx: number; top: number; left: number; width: number } | null>(null);
 	let rows = $state<Row[]>([]);
 	let lastEmitted = $state<Row[] | null>(null);
 
@@ -652,8 +651,10 @@
 	let dragInfo = $state<{ rowIdx: number; col: DragCol } | null>(null);
 	let dropTarget = $state<{ rowIdx: number; col: DragCol } | null>(null);
 	let sectionDrag = $state<{ headerIdx: number } | null>(null);
+	let sectionDragCompact = $state(false);
 	let sectionDropTarget = $state<{ headerIdx: number; place: SectionDropPlace } | null>(null);
 	let sectionDragCopy = $state(false);
+	let compactTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function headerIdxForRow(rowIdx: number): number {
 		const row = rows[rowIdx];
@@ -811,11 +812,6 @@
 	}
 
 	function onSectionDragStart(e: DragEvent, headerIdx: number) {
-		const target = e.target as HTMLElement | null;
-		if (target?.closest?.('[contenteditable]:not([contenteditable="false"])')) {
-			e.preventDefault();
-			return;
-		}
 		if (!e.dataTransfer || headerIdx < 0) {
 			e.preventDefault();
 			return;
@@ -824,13 +820,36 @@
 		e.dataTransfer.effectAllowed = 'copyMove';
 		e.dataTransfer.setData('application/x-song-section', String(headerIdx));
 		e.dataTransfer.setData('text/plain', sections[headerIdx]?.headerText ?? 'Formstykke');
+		const block = document.querySelector(
+			`.editable-song [data-section-block="${headerIdx}"]`
+		) as HTMLElement | null;
+		if (block) {
+			const ghost = block.cloneNode(true) as HTMLElement;
+			ghost.style.position = 'absolute';
+			ghost.style.top = '-2000px';
+			ghost.style.left = '0';
+			ghost.style.width = `${Math.max(block.getBoundingClientRect().width, 160)}px`;
+			ghost.style.background = 'rgba(15, 23, 42, 0.06)';
+			document.body.appendChild(ghost);
+			e.dataTransfer.setDragImage(ghost, 24, 16);
+			setTimeout(() => ghost.remove(), 0);
+		}
 		sectionDrag = { headerIdx };
 		sectionDragCopy = e.altKey;
 		sectionDropTarget = null;
+		sectionDragCompact = false;
+		clearTimeout(compactTimer);
+		// Vent til browseren har låst drag — ellers dør HTML5-trækket
+		// når vi klapper de andre formstykker sammen.
+		compactTimer = setTimeout(() => {
+			sectionDragCompact = true;
+		}, 0);
 	}
 
 	function onSectionDragEnd() {
+		clearTimeout(compactTimer);
 		sectionDrag = null;
+		sectionDragCompact = false;
 		sectionDropTarget = null;
 		sectionDragCopy = false;
 	}
@@ -850,7 +869,9 @@
 			sectionModeFromEvent(e) === 'copy' || sectionDragCopy ? 'copy' : 'move';
 		const targetHeaderIdx = sectionDropTarget?.headerIdx ?? fallbackHeaderIdx;
 		const place = sectionDropTarget?.place ?? 'after';
+		clearTimeout(compactTimer);
 		sectionDrag = null;
+		sectionDragCompact = false;
 		sectionDropTarget = null;
 		sectionDragCopy = false;
 		if (sourceHeaderIdx === undefined || !Number.isInteger(sourceHeaderIdx)) return;
@@ -865,35 +886,18 @@
 		});
 	}
 
-	function showRowToolbar(e: MouseEvent, rowIdx: number): void {
-		if (readOnly) return;
+	function showRowToolbar(rowIdx: number): void {
+		if (readOnly || sectionDrag) return;
 		hoveredRow = rowIdx;
-		const rowEl = e.currentTarget as HTMLElement;
-		const rowRect = rowEl.getBoundingClientRect();
-		const hasBass = canHaveBass(rowIdx) && !!bassLines[String(rowIdx)]?.trim();
-		const toolbarWidth = hasBass ? 180 : 128;
-		const cursorGap = 12;
-		const viewportPadding = 8;
-		hoverToolbar = {
-			rowIdx,
-			top: Math.max(8, rowRect.top - 4),
-			left: Math.min(
-				window.innerWidth - toolbarWidth - viewportPadding,
-				Math.max(viewportPadding, e.clientX + cursorGap)
-			),
-			width: toolbarWidth
-		};
 	}
 
 	function hideRowToolbar(): void {
-		hoverToolbar = null;
 		hoveredRow = null;
 	}
 
 	function hideRowToolbarSoon(): void {
 		requestAnimationFrame(() => {
-			if (document.querySelector('.floating-row-toolbar:hover')) return;
-			hoverToolbar = null;
+			if (document.querySelector('.row-gutter:hover')) return;
 			hoveredRow = null;
 		});
 	}
@@ -904,11 +908,77 @@
 
 {#snippet rowGutter(i: number)}
 	{@const currentKind = rowKindToOption(rows[i])}
+	{@const hasToolbarBass = canHaveBass(i) && !!bassLines[String(i)]?.trim()}
+	{@const active = !readOnly && hoveredRow === i && !sectionDragCompact}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="row-gutter"
-		aria-hidden="true"
-	></div>
+		class:is-active={active}
+		aria-hidden={readOnly || !active ? 'true' : undefined}
+		onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
+	>
+		{#if active}
+			<div class="gutter-toolbar-row">
+				<button
+					type="button"
+					class="gutter-btn del-btn"
+					title="Slet linje (⌘⇧K)"
+					aria-label="Slet linje"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => deleteRow(i)}
+				>
+					×
+				</button>
+				{#if currentKind !== null}
+					<select
+						class="gutter-btn gutter-kind"
+						aria-label="Linjetype"
+						title="Linjetype"
+						value={currentKind}
+						onmousedown={(e) => e.stopPropagation()}
+						onchange={(e) =>
+							changeRowKind(i, (e.currentTarget as HTMLSelectElement).value as LineKind)}
+					>
+						<option value="chord">Akkord</option>
+						<option value="lyric">Lyrics</option>
+						<option value="form">Form</option>
+					</select>
+				{/if}
+				{#if hasToolbarBass}
+					<button
+						type="button"
+						class="gutter-btn bass-bars-btn"
+						title="Komprimér baslinjen parvist"
+						aria-label="Komprimér baslinjen parvist"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => regroupBassLine(i, 2)}
+					>
+						2
+					</button>
+					<button
+						type="button"
+						class="gutter-btn bass-bars-btn"
+						title="Udvid baslinjen parvist"
+						aria-label="Udvid baslinjen parvist"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => regroupBassLine(i, 4)}
+					>
+						4
+					</button>
+				{/if}
+				<button
+					type="button"
+					class="gutter-btn gutter-insert"
+					title="Indsæt tom linje ovenover"
+					aria-label="Indsæt linje ovenover"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => insertRowAbove(i)}
+				>
+					↑
+				</button>
+			</div>
+		{/if}
+	</div>
 {/snippet}
 
 {#snippet bassCell(i: number)}
@@ -948,7 +1018,7 @@
 <div
 	class="editable-song chord-grid"
 	class:read-only={readOnly}
-	class:is-section-dragging={!!sectionDrag}
+	class:is-section-dragging={sectionDragCompact}
 	class:is-section-copying={sectionDragCopy}
 	role={readOnly ? 'presentation' : 'textbox'}
 	aria-multiline={readOnly ? undefined : 'true'}
@@ -963,7 +1033,6 @@
 			{@const isCollapsed = headerIdx >= 0 && collapsedSet.has(headerIdx)}
 			{@const prevSame = headerIdx >= 0 ? findPreviousSameType(sections, headerIdx) : null}
 			{@const sectionCls = sectionRowClass(headerIdx)}
-			{@render rowGutter(i)}
 			<div
 				class="section-header-cell"
 				class:section-header-cell--collapsed={isCollapsed}
@@ -979,7 +1048,7 @@
 				ondragend={readOnly ? undefined : onSectionDragEnd}
 				ondragover={readOnly || headerIdx < 0 ? undefined : onSectionDragOver}
 				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
-				onmouseenter={readOnly ? undefined : (e) => showRowToolbar(e, i)}
+				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 			>
 				{#if headerIdx >= 0 && !readOnly}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1086,6 +1155,7 @@
 					</div>
 				{/if}
 			</div>
+			{@render rowGutter(i)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="section-header-echo"
@@ -1106,12 +1176,11 @@
 					{cleanSectionHeader(row.text)}
 				</span>
 			</div>
-		{:else if sectionDrag || isRowHidden(i)}
+		{:else if sectionDragCompact || isRowHidden(i)}
 			<!-- skjult under form-træk eller af kollapset sektion -->
 		{:else if row.kind === 'blank' || row.kind === 'lyric'}
 			{@const sectionIdx = headerIdxForRow(i)}
 			{@const sectionCls = sectionRowClass(sectionIdx)}
-			{@render rowGutter(i)}
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
@@ -1130,7 +1199,7 @@
 				onblur={readOnly ? undefined : () => onCellBlur(i)}
 				onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
 				onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
-				onmouseenter={readOnly ? undefined : (e) => showRowToolbar(e, i)}
+				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 				onfocus={readOnly ? undefined : hideRowToolbar}
 				onclick={readOnly ? undefined : hideRowToolbar}
 				ondragover={readOnly ? undefined : onSectionDragOver}
@@ -1139,11 +1208,11 @@
 				tabindex={readOnly ? undefined : 0}
 				aria-label={readOnly ? undefined : row.kind === 'blank' ? 'Tom linje' : 'Tekst-linje'}
 			></div>
+			{@render rowGutter(i)}
 			{@render bassCell(i)}
 		{:else if row.kind === 'chord'}
 			{@const sectionIdx = headerIdxForRow(i)}
 			{@const sectionCls = sectionRowClass(sectionIdx)}
-			{@render rowGutter(i)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -1166,90 +1235,16 @@
 				ondragleave={readOnly ? undefined : () => onLineDragLeave(i, 'chord')}
 				ondrop={readOnly ? undefined : (e) => onLineDrop(e, i, 'chord')}
 				onclick={readOnly ? undefined : () => { hideRowToolbar(); openChordModal(i); }}
-				onmouseenter={readOnly ? undefined : (e) => showRowToolbar(e, i)}
+				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 				role={readOnly ? 'presentation' : 'button'}
 				tabindex={readOnly ? undefined : 0}
 				aria-label={readOnly ? undefined : `Rediger akkord-linje for række ${i + 1}`}
 			>{#if row.text.trim()}{@html renderBarLine(row.text)}{:else}&nbsp;{/if}</div>
+			{@render rowGutter(i)}
 			{@render bassCell(i)}
 		{/if}
 	{/each}
 </div>
-
-{#if hoverToolbar && !readOnly}
-	{@const toolbarRowIdx = hoverToolbar.rowIdx}
-	{@const currentKind = rowKindToOption(rows[toolbarRowIdx])}
-	{@const hasToolbarBass = canHaveBass(toolbarRowIdx) && !!bassLines[String(toolbarRowIdx)]?.trim()}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="floating-row-toolbar"
-		style:top={`${hoverToolbar.top}px`}
-		style:left={`${hoverToolbar.left}px`}
-		style:width={`${hoverToolbar.width}px`}
-		onmouseenter={() => (hoveredRow = hoverToolbar?.rowIdx ?? null)}
-		onmouseleave={hideRowToolbarSoon}
-	>
-		<div class="gutter-toolbar-row">
-			<button
-				type="button"
-				class="gutter-btn del-btn"
-				title="Slet linje (⌘⇧K)"
-				aria-label="Slet linje"
-				onmousedown={(e) => e.preventDefault()}
-				onclick={() => deleteRow(toolbarRowIdx)}
-			>
-				×
-			</button>
-		{#if currentKind !== null}
-				<select
-					class="gutter-btn gutter-kind"
-					aria-label="Linjetype"
-					title="Linjetype"
-					value={currentKind}
-					onmousedown={(e) => e.stopPropagation()}
-					onchange={(e) =>
-						changeRowKind(toolbarRowIdx, (e.currentTarget as HTMLSelectElement).value as LineKind)}
-				>
-					<option value="chord">Akkord</option>
-					<option value="lyric">Lyrics</option>
-					<option value="form">Form</option>
-				</select>
-		{/if}
-			{#if hasToolbarBass}
-				<button
-					type="button"
-					class="gutter-btn bass-bars-btn"
-					title="Komprimér baslinjen parvist"
-					aria-label="Komprimér baslinjen parvist"
-					onmousedown={(e) => e.preventDefault()}
-					onclick={() => regroupBassLine(toolbarRowIdx, 2)}
-				>
-					2
-				</button>
-				<button
-					type="button"
-					class="gutter-btn bass-bars-btn"
-					title="Udvid baslinjen parvist"
-					aria-label="Udvid baslinjen parvist"
-					onmousedown={(e) => e.preventDefault()}
-					onclick={() => regroupBassLine(toolbarRowIdx, 4)}
-				>
-					4
-				</button>
-			{/if}
-			<button
-				type="button"
-				class="gutter-btn gutter-insert"
-				title="Indsæt tom linje ovenover"
-				aria-label="Indsæt linje ovenover"
-				onmousedown={(e) => e.preventDefault()}
-				onclick={() => insertRowAbove(toolbarRowIdx)}
-			>
-				↑
-			</button>
-		</div>
-	</div>
-{/if}
 
 {#if (chordModal || bassModal) && !readOnly}
 	{@const isBass = !!bassModal}
@@ -1346,8 +1341,8 @@
 		content: '' !important;
 	}
 	.editable-song.chord-grid {
-		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
-		column-gap: 2em;
+		grid-template-columns: minmax(0, 1fr) 11em minmax(8em, max-content);
+		column-gap: 0.55em;
 	}
 	.editable-song.chord-grid > .rhythm-cell {
 		justify-self: stretch;
@@ -1412,7 +1407,7 @@
 	}
 	.editable-song.is-section-dragging .section-header-echo,
 	.editable-song.is-section-dragging .section-header-actions,
-	.editable-song.is-section-dragging .section-drag-handle {
+	.editable-song.is-section-dragging .row-gutter {
 		display: none;
 	}
 	.editable-song.is-section-dragging .section-header-cell--collapsed::after {
@@ -1421,11 +1416,8 @@
 	.editable-song.is-section-dragging .section-header-edit {
 		pointer-events: none;
 	}
-	.editable-song.is-section-dragging:not(.is-section-copying) .section-header-cell.section-drag-source {
-		display: none;
-	}
-	.editable-song.is-section-dragging.is-section-copying .section-header-cell.section-drag-source {
-		opacity: 0.45;
+	.editable-song.is-section-dragging .section-header-cell.section-drag-source {
+		opacity: 0.4;
 	}
 	.editable-song.is-section-dragging .section-header-cell.section-drop-after::after,
 	.editable-song.is-section-dragging .section-header-cell.section-drop-before::before {
@@ -1501,27 +1493,27 @@
 		margin-left: 0.2em;
 	}
 	.editable-song .row-gutter {
-		display: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		align-self: center;
+		min-height: 1.25em;
+		min-width: 0;
 	}
-	.floating-row-toolbar {
-		position: fixed;
-		z-index: 500;
+	.editable-song .row-gutter .gutter-toolbar-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 5px;
+		width: 100%;
 		padding: 3px;
 		border-radius: 0.35em;
 		background: rgba(15, 23, 42, 0.78);
 		box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
 		backdrop-filter: blur(3px);
 		color: #ffffff;
-		cursor: pointer;
 	}
-	.floating-row-toolbar .gutter-toolbar-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 5px;
-		width: 100%;
-	}
-	.floating-row-toolbar .gutter-kind {
+	.editable-song .row-gutter .gutter-kind {
 		color: #ffffff;
 		border-color: rgba(255, 255, 255, 0.28);
 		background-color: rgba(255, 255, 255, 0.08);
@@ -1562,7 +1554,7 @@
 		outline: 2px solid #dc2626;
 		outline-offset: 1px;
 	}
-	.floating-row-toolbar .bass-bars-btn {
+	.editable-song .row-gutter .bass-bars-btn {
 		display: grid;
 		place-items: center;
 		padding: 0;
@@ -1576,7 +1568,7 @@
 		width: 1.45em;
 		height: 1.35em;
 	}
-	.floating-row-toolbar .bass-bars-btn:hover {
+	.editable-song .row-gutter .bass-bars-btn:hover {
 		background: #15803d;
 		color: #ffffff;
 	}
@@ -1612,6 +1604,20 @@
 	.editable-song .gutter-kind:focus-visible {
 		outline: 2px solid var(--color-accent, #f59e0b);
 		outline-offset: 1px;
+	}
+	.editable-song .row-gutter .gutter-btn {
+		color: #ffffff;
+	}
+	.editable-song .row-gutter .gutter-kind {
+		color: #ffffff;
+		border-color: rgba(255, 255, 255, 0.28);
+		background-color: rgba(255, 255, 255, 0.08);
+	}
+	.editable-song.read-only.chord-grid {
+		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
+	}
+	.editable-song.read-only .row-gutter {
+		display: none;
 	}
 	.editable-song .lyrics-cell,
 	.editable-song .section-header-edit {
@@ -1680,8 +1686,12 @@
 			background: transparent !important;
 			box-shadow: none !important;
 		}
-		.editable-song .section-drag-handle {
+		.editable-song .section-drag-handle,
+		.editable-song .row-gutter {
 			display: none;
+		}
+		.editable-song.chord-grid {
+			grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
 		}
 	}
 	.editable-song .lyric-cell {
