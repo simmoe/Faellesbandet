@@ -1466,7 +1466,9 @@
 		z-index: 3;
 		box-sizing: border-box;
 		margin: 0;
-		min-width: 7.1em;
+		width: 7.25em;
+		min-width: 7.25em;
+		max-width: 7.25em;
 		height: auto;
 		padding: 0 1.55em 0 0.7em;
 		border: 1px solid #d1d5db;
