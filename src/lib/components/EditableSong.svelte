@@ -1051,45 +1051,47 @@
 				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
 				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 			>
-				{#if headerIdx >= 0 && !readOnly}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<span
-						class="section-drag-handle"
-						title="Træk hele formstykket for at flytte · hold Alt for at kopiere"
-						draggable="true"
-						ondragstart={(e) => {
-							e.stopPropagation();
-							onSectionDragStart(e, headerIdx);
-						}}
-						ondragend={onSectionDragEnd}
-					>
-						<svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
-							<circle cx="3" cy="3" r="1.15"></circle>
-							<circle cx="9" cy="3" r="1.15"></circle>
-							<circle cx="3" cy="7" r="1.15"></circle>
-							<circle cx="9" cy="7" r="1.15"></circle>
-							<circle cx="3" cy="11" r="1.15"></circle>
-							<circle cx="9" cy="11" r="1.15"></circle>
-						</svg>
-					</span>
-				{/if}
-				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-				<div
-					class="section-header-edit section-header--{sectionHeaderType(row.text)}"
-					contenteditable={readOnly ? 'false' : 'plaintext-only'}
-					use:init={row.text}
-					data-row={i}
-					data-field="text"
-					oninput={readOnly ? undefined : (e) => onCellInput(e, i)}
-					onblur={readOnly ? undefined : () => onCellBlur(i)}
-					onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
-					onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
-					onfocus={readOnly ? undefined : hideRowToolbar}
-					onclick={readOnly ? undefined : hideRowToolbar}
-					role={readOnly ? 'presentation' : 'textbox'}
-					tabindex={readOnly ? undefined : 0}
-					aria-label={readOnly ? undefined : 'Sektionsnavn'}
-				></div>
+				<div class="section-header-pill section-header--{sectionHeaderType(row.text)}">
+					{#if headerIdx >= 0 && !readOnly}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<span
+							class="section-drag-handle"
+							title="Træk hele formstykket for at flytte · hold Alt for at kopiere"
+							draggable="true"
+							ondragstart={(e) => {
+								e.stopPropagation();
+								onSectionDragStart(e, headerIdx);
+							}}
+							ondragend={onSectionDragEnd}
+						>
+							<svg width="10" height="12" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
+								<circle cx="3" cy="3" r="1.15"></circle>
+								<circle cx="9" cy="3" r="1.15"></circle>
+								<circle cx="3" cy="7" r="1.15"></circle>
+								<circle cx="9" cy="7" r="1.15"></circle>
+								<circle cx="3" cy="11" r="1.15"></circle>
+								<circle cx="9" cy="11" r="1.15"></circle>
+							</svg>
+						</span>
+					{/if}
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<div
+						class="section-header-edit"
+						contenteditable={readOnly ? 'false' : 'plaintext-only'}
+						use:init={row.text}
+						data-row={i}
+						data-field="text"
+						oninput={readOnly ? undefined : (e) => onCellInput(e, i)}
+						onblur={readOnly ? undefined : () => onCellBlur(i)}
+						onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
+						onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
+						onfocus={readOnly ? undefined : hideRowToolbar}
+						onclick={readOnly ? undefined : hideRowToolbar}
+						role={readOnly ? 'presentation' : 'textbox'}
+						tabindex={readOnly ? undefined : 0}
+						aria-label={readOnly ? undefined : 'Sektionsnavn'}
+					></div>
+				</div>
 				{#if headerIdx >= 0 && !readOnly}
 					<div class="section-header-actions">
 						{#if prevSame}
@@ -1376,15 +1378,33 @@
 	.editable-song:not(.read-only) .section-drag-handle:active {
 		cursor: grabbing;
 	}
+	.editable-song .section-header-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.15em;
+		padding: 0.15rem 0.7rem;
+		border-radius: 999px;
+		font-size: 0.85rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #1f2937;
+		background: #eeeeee;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		min-width: 0;
+	}
+	.editable-song .section-header-pill:has(.section-drag-handle) {
+		padding-left: 0.35rem;
+	}
 	.editable-song .section-drag-handle {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		flex: 0 0 auto;
-		width: 1.15em;
-		height: 1.6em;
-		color: var(--color-ink-faint, #6b7280);
-		opacity: 0.55;
+		width: 0.95em;
+		height: 1.15em;
+		color: inherit;
+		opacity: 0.45;
 		touch-action: none;
 	}
 	.editable-song .section-header-cell:hover .section-drag-handle,
@@ -1483,7 +1503,7 @@
 	.editable-song .section-action-btn.is-active .chevron {
 		transform: rotate(-90deg);
 	}
-	.editable-song .section-header-cell--collapsed .section-header-edit {
+	.editable-song .section-header-cell--collapsed .section-header-pill {
 		opacity: 0.7;
 	}
 	.editable-song .section-header-cell--collapsed::after {
@@ -1788,15 +1808,15 @@
 	}
 	.editable-song .section-header-edit {
 		display: inline-block;
-		padding: 0.15rem 0.7rem;
-		border-radius: 999px;
-		font-size: 0.85rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: #1f2937;
-		background: #eeeeee;
-		border: 1px solid rgba(0, 0, 0, 0.06);
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		font-size: inherit;
+		font-weight: inherit;
+		letter-spacing: inherit;
+		text-transform: inherit;
+		color: inherit;
+		background: transparent;
 	}
 	.editable-song .section-header--intro { background: #e3f2fd; color: #0d47a1; }
 	.editable-song .section-header--verse { background: #e8f5e9; color: #1b5e20; }
