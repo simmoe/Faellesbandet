@@ -573,6 +573,13 @@
 		focusRow(idx - 1, prevText.length);
 	}
 
+	function insertTextRow(idx: number, place: 'before' | 'after') {
+		if (idx < 0 || idx >= rows.length) return;
+		const at = place === 'before' ? idx : idx + 1;
+		emit([...rows.slice(0, at), { kind: 'blank' }, ...rows.slice(at)]);
+		shiftBassLines(at, 1);
+	}
+
 	function insertNewSection(insertAt: number) {
 		if (insertAt < 0 || insertAt > rows.length) return;
 		const block: Row[] = [{ kind: 'header', text: '' }, { kind: 'blank' }];
@@ -1051,6 +1058,30 @@
 					<path d="M10 11v6"></path>
 					<path d="M14 11v6"></path>
 					<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+				</svg>
+			</button>
+			<button
+				type="button"
+				class="line-insert"
+				title="Indsæt linje nedenunder"
+				aria-label="Indsæt linje nedenunder"
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => insertTextRow(rowIdx, 'after')}
+			>
+				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<polyline points="6 9 12 15 18 9"></polyline>
+				</svg>
+			</button>
+			<button
+				type="button"
+				class="line-insert"
+				title="Indsæt linje ovenover"
+				aria-label="Indsæt linje ovenover"
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => insertTextRow(rowIdx, 'before')}
+			>
+				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<polyline points="18 15 12 9 6 15"></polyline>
 				</svg>
 			</button>
 			<select
@@ -1543,6 +1574,26 @@
 		border-color: #ef4444;
 		background: rgba(239, 68, 68, 0.08);
 		color: #ef4444;
+	}
+	.editable-song .line-insert {
+		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.7em;
+		margin: 0;
+		padding: 0;
+		border: 1px solid #d1d5db;
+		border-radius: 5px;
+		background: #fff;
+		color: #6b7280;
+		cursor: pointer;
+		line-height: 0;
+	}
+	.editable-song .line-insert:hover {
+		border-color: #9ca3af;
+		background: #f3f4f6;
+		color: #374151;
 	}
 	.editable-song .line-kind {
 		appearance: none;

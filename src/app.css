@@ -287,6 +287,12 @@ select {
 	grid-template-columns: minmax(0, 1fr) !important;
 	column-gap: 0 !important;
 }
+.no-bass-tabs .editable-song .line-actions {
+	left: 50%;
+	right: auto;
+	transform: translateX(-50%);
+	box-shadow: 0 0 12px 8px #fff;
+}
 .no-bass-tabs .pdf-section-grid {
 	grid-template-columns: minmax(0, 1fr) 12mm !important;
 	column-gap: calc(2mm * var(--pdf-layout-scale, 1)) !important;
