@@ -496,6 +496,25 @@
 		});
 	}
 
+	function deleteLine(idx: number) {
+		(document.activeElement as HTMLElement | null)?.blur?.();
+		const headerIdx = sections.findIndex((s) => s.headerRowIdx === idx);
+		if (headerIdx >= 0 && sectionIsEmpty(headerIdx)) {
+			deleteSection(headerIdx, false);
+			return;
+		}
+		deleteRow(idx, false);
+		if (headerIdx >= 0 && onCollapsedSectionsChange) {
+			const v = collapsedSections
+				.filter((h) => h !== headerIdx)
+				.map((h) => (h > headerIdx ? h - 1 : h))
+				.sort((a, b) => a - b);
+			if (JSON.stringify(v) !== JSON.stringify(collapsedSections)) {
+				onCollapsedSectionsChange(v);
+			}
+		}
+	}
+
 	function deleteRow(idx: number, focusPrev = false) {
 		if (idx < 0 || idx >= rows.length) return;
 		if (rows.length <= 1) {
@@ -896,6 +915,10 @@
 	}
 
 	function onSectionDragStart(e: DragEvent, headerIdx: number) {
+		if ((e.target as HTMLElement | null)?.closest?.('.line-actions')) {
+			e.preventDefault();
+			return;
+		}
 		if (!e.dataTransfer || headerIdx < 0) {
 			e.preventDefault();
 			return;
@@ -998,26 +1021,51 @@
 	{/if}
 {/snippet}
 
-{#snippet lineKindSelect(rowIdx: number)}
+{#snippet lineActions(rowIdx: number)}
 	{@const kind = rowKindToOption(rows[rowIdx])}
 	{#if !readOnly && kind && !sectionDragCompact}
-		<select
-			class="line-kind"
-			aria-label="Linjetype"
-			title="Linjetype"
-			value={kind}
-			onmousedown={(e) => {
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div
+			class="line-actions"
+			draggable="false"
+			onpointerdown={(e) => e.stopPropagation()}
+			onmousedown={(e) => e.stopPropagation()}
+			onclick={(e) => e.stopPropagation()}
+			ondragstart={(e) => {
 				e.preventDefault();
 				e.stopPropagation();
 			}}
-			onclick={(e) => e.stopPropagation()}
-			onchange={(e) =>
-				changeRowKind(rowIdx, (e.currentTarget as HTMLSelectElement).value as LineKind)}
 		>
-			<option value="chord">Akkord</option>
-			<option value="lyric">Lyrics</option>
-			<option value="form">Form</option>
-		</select>
+			<button
+				type="button"
+				class="line-delete"
+				title="Slet linje"
+				aria-label="Slet linje"
+				onmousedown={(e) => e.preventDefault()}
+				onclick={() => deleteLine(rowIdx)}
+			>
+				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<polyline points="3 6 5 6 21 6"></polyline>
+					<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+					<path d="M10 11v6"></path>
+					<path d="M14 11v6"></path>
+					<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+				</svg>
+			</button>
+			<select
+				class="line-kind"
+				aria-label="Linjetype"
+				title="Linjetype"
+				value={kind}
+				onchange={(e) =>
+					changeRowKind(rowIdx, (e.currentTarget as HTMLSelectElement).value as LineKind)}
+			>
+				<option value="chord">Akkord</option>
+				<option value="lyric">Lyrics</option>
+				<option value="form">Form</option>
+			</select>
+		</div>
 	{/if}
 {/snippet}
 
@@ -1067,7 +1115,7 @@
 				tabindex={readOnly ? undefined : 0}
 				aria-label={readOnly ? undefined : row.kind === 'blank' ? 'Tom linje' : 'Tekst-linje'}
 			></div>
-			{@render lineKindSelect(i)}
+			{@render lineActions(i)}
 		</div>
 		{@render bassCell(i)}
 	{:else if row.kind === 'chord'}
@@ -1092,7 +1140,7 @@
 				tabindex={readOnly ? undefined : 0}
 				aria-label={readOnly ? undefined : `Rediger akkord-linje for række ${i + 1}`}
 			>{#if row.text.trim()}{@html renderBarLine(row.text)}{:else}&nbsp;{/if}</div>
-			{@render lineKindSelect(i)}
+			{@render lineActions(i)}
 		</div>
 		{@render bassCell(i)}
 	{/if}
@@ -1255,7 +1303,7 @@
 							</button>
 						</div>
 					{/if}
-					{@render lineKindSelect(section.headerRowIdx)}
+					{@render lineActions(section.headerRowIdx)}
 				</div>
 				<div class="song-section-end"></div>
 				{#if !hideBody}
@@ -1424,7 +1472,7 @@
 			opacity: 0.72;
 			pointer-events: auto;
 		}
-		.editable-song .line-kind {
+		.editable-song .line-actions {
 			opacity: 0.72;
 			pointer-events: auto;
 		}
@@ -1456,30 +1504,62 @@
 		position: relative;
 		min-width: 0;
 	}
-	.editable-song .line-kind {
-		appearance: none;
-		-webkit-appearance: none;
+	.editable-song .line-actions {
 		position: absolute;
 		top: 2px;
 		bottom: 2px;
 		right: 0.35em;
-		z-index: 3;
+		z-index: 4;
+		display: flex;
+		align-items: stretch;
+		gap: 0.3em;
+		opacity: 0;
+		pointer-events: none;
+		box-shadow: -10px 0 12px 4px #fff;
+		transition: opacity 80ms ease;
+	}
+	.editable-song .song-line-wrap:hover:not(:has(.song-line:focus)) .line-actions,
+	.editable-song .song-section-label:hover:not(:has(.section-header-edit:focus)) .line-actions,
+	.editable-song .line-actions:focus-within {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	.editable-song .line-delete {
+		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.7em;
+		margin: 0;
+		padding: 0;
+		border: 1px solid #d1d5db;
+		border-radius: 5px;
+		background: #fff;
+		color: #6b7280;
+		cursor: pointer;
+		line-height: 0;
+	}
+	.editable-song .line-delete:hover {
+		border-color: #ef4444;
+		background: rgba(239, 68, 68, 0.08);
+		color: #ef4444;
+	}
+	.editable-song .line-kind {
+		appearance: none;
+		-webkit-appearance: none;
 		box-sizing: border-box;
 		margin: 0;
 		width: 7.25em;
 		min-width: 7.25em;
 		max-width: 7.25em;
 		height: auto;
-		padding: 0 1.55em 0 0.7em;
+		padding: 0 1.7em 0 0.7em;
 		border: 1px solid #d1d5db;
 		border-radius: 5px;
 		background-color: #fff;
-		background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%),
-			linear-gradient(135deg, #6b7280 50%, transparent 50%);
-		background-position:
-			calc(100% - 11px) calc(50% - 2px),
-			calc(100% - 7px) calc(50% - 2px);
-		background-size: 5px 5px, 5px 5px;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+		background-position: right 0.45em center;
+		background-size: 12px 12px;
 		background-repeat: no-repeat;
 		color: #4b5563;
 		font: 500 13px/1 var(--font-sans);
@@ -1487,24 +1567,11 @@
 		letter-spacing: 0;
 		text-transform: none;
 		cursor: pointer;
-		opacity: 0;
-		pointer-events: none;
-		box-shadow: -10px 0 12px 4px #fff;
-		transition: opacity 100ms ease, border-color 100ms ease;
 	}
 	.editable-song .line-kind option {
 		font: 500 13px/1.3 var(--font-sans);
 		text-transform: none;
 		letter-spacing: 0;
-	}
-	.editable-song .song-line-wrap:hover .line-kind,
-	.editable-song .song-line-wrap:focus-within .line-kind,
-	.editable-song .song-section-label:hover .line-kind,
-	.editable-song .song-section-label:focus-within .line-kind,
-	.editable-song .line-kind:focus,
-	.editable-song .line-kind:hover {
-		opacity: 1;
-		pointer-events: auto;
 	}
 	.editable-song .line-kind:hover,
 	.editable-song .line-kind:focus-visible {
@@ -1565,7 +1632,7 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 	.editable-song.is-section-dragging .section-header-actions,
-	.editable-song.is-section-dragging .line-kind {
+	.editable-song.is-section-dragging .line-actions {
 		display: none;
 	}
 	.editable-song.is-section-dragging .section-header-edit {
@@ -1705,7 +1772,7 @@
 		.editable-song .section-drag-handle,
 		.editable-song .section-insert,
 		.editable-song .section-header-actions,
-		.editable-song .line-kind {
+		.editable-song .line-actions {
 			display: none;
 		}
 		.editable-song .song-section-grid {
