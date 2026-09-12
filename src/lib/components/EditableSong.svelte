@@ -53,6 +53,7 @@
 	}: Props = $props();
 
 	let hoveredRow = $state<number | null>(null);
+	let toolbarSuppressed = $state(false);
 	let rows = $state<Row[]>([]);
 	let lastEmitted = $state<Row[] | null>(null);
 
@@ -457,6 +458,27 @@
 		const target = focusPrev ? Math.max(0, idx - 1) : Math.min(idx, next.length - 1);
 		focusRow(target);
 		hoveredRow = null;
+	}
+
+	function insertNewSection(insertAt: number) {
+		if (insertAt < 0 || insertAt > rows.length) return;
+		const block: Row[] = [{ kind: 'header', text: '' }, { kind: 'blank' }];
+		emit([...rows.slice(0, insertAt), ...block, ...rows.slice(insertAt)]);
+		shiftBassLines(insertAt, block.length);
+		if (onCollapsedSectionsChange) {
+			const next = collapsedSections
+				.map((h) => {
+					const s = sections[h];
+					return s && s.headerRowIdx >= insertAt ? h + 1 : h;
+				})
+				.sort((a, b) => a - b);
+			if (JSON.stringify(next) !== JSON.stringify(collapsedSections)) {
+				onCollapsedSectionsChange(next);
+			}
+		}
+		hoveredRow = null;
+		toolbarSuppressed = false;
+		focusRow(insertAt);
 	}
 
 	function insertRowAbove(idx: number) {
@@ -885,10 +907,17 @@
 		});
 	}
 
-	function showRowToolbar(rowIdx: number): void {
-		if (readOnly || sectionDrag) return;
-		if (window.matchMedia('(hover: none), (pointer: coarse)').matches) return;
-		hoveredRow = rowIdx;
+	const TOOLBAR_REVEAL_GAP = 56;
+
+	function isCoarsePointer(): boolean {
+		return window.matchMedia('(hover: none), (pointer: coarse)').matches;
+	}
+
+	function rowIdxFromTarget(target: EventTarget | null): number | null {
+		const el = (target as HTMLElement | null)?.closest?.('[data-row]') as HTMLElement | null;
+		if (!el) return null;
+		const n = Number(el.dataset.row);
+		return Number.isInteger(n) ? n : null;
 	}
 
 	function hideRowToolbar(): void {
@@ -897,9 +926,45 @@
 
 	function hideRowToolbarSoon(): void {
 		requestAnimationFrame(() => {
-			if (document.querySelector('.row-gutter:hover')) return;
+			if (document.querySelector('.row-gutter.is-active:hover, .section-insert:hover')) return;
 			hoveredRow = null;
+			toolbarSuppressed = false;
 		});
+	}
+
+	function onEditorPointerMove(e: PointerEvent) {
+		if (readOnly || sectionDrag || isCoarsePointer()) return;
+		const target = e.target as HTMLElement | null;
+		if (target?.closest('.gutter-toolbar-row, .section-insert, .bass-modal')) return;
+
+		const rowIdx = rowIdxFromTarget(e.target);
+		if (rowIdx == null) return;
+		const root = e.currentTarget as HTMLElement;
+		const slot = root.querySelector(`.bass-slot[data-row="${rowIdx}"]`) as HTMLElement | null;
+		if (!slot) {
+			if (!toolbarSuppressed && hoveredRow !== rowIdx) hoveredRow = rowIdx;
+			return;
+		}
+
+		const bassRect = slot.getBoundingClientRect();
+		const toolbar = slot.querySelector('.gutter-toolbar-row') as HTMLElement | null;
+		const toolRight = toolbar?.getBoundingClientRect().right ?? bassRect.right;
+
+		if (e.clientX > toolRight) {
+			toolbarSuppressed = true;
+			if (hoveredRow !== null) hoveredRow = null;
+			return;
+		}
+
+		if (toolbarSuppressed) {
+			if (e.clientX < bassRect.left - TOOLBAR_REVEAL_GAP) {
+				toolbarSuppressed = false;
+				hoveredRow = rowIdx;
+			}
+			return;
+		}
+
+		if (hoveredRow !== rowIdx) hoveredRow = rowIdx;
 	}
 
 	// Fælles hint vist i begge modaler.
@@ -915,7 +980,6 @@
 		class="row-gutter"
 		class:is-active={active}
 		aria-hidden={readOnly || !active ? 'true' : undefined}
-		onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 	>
 		{#if !readOnly && !sectionDragCompact}
 			<div class="gutter-toolbar-row">
@@ -981,6 +1045,31 @@
 	</div>
 {/snippet}
 
+{#snippet sectionInserts(beforeAt: number, afterAt: number)}
+	{#if !readOnly && !sectionDragCompact}
+		<button
+			type="button"
+			class="section-insert section-insert--before"
+			title="Tilføj formstykke ovenover"
+			aria-label="Tilføj formstykke ovenover"
+			onmousedown={(e) => e.preventDefault()}
+			onclick={() => insertNewSection(beforeAt)}
+		>
+			+
+		</button>
+		<button
+			type="button"
+			class="section-insert section-insert--after"
+			title="Tilføj formstykke nedenunder"
+			aria-label="Tilføj formstykke nedenunder"
+			onmousedown={(e) => e.preventDefault()}
+			onclick={() => insertNewSection(afterAt)}
+		>
+			+
+		</button>
+	{/if}
+{/snippet}
+
 {#snippet bassCell(i: number)}
 	{@const hasBass = !!bassLines[String(i)]?.trim()}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -993,14 +1082,12 @@
 		data-row={i}
 		title={readOnly ? undefined : hasBass ? 'Klik for at redigere · træk for at kopiere bass-linjen' : 'Klik for at starte en baslinje'}
 		draggable={readOnly || !hasBass ? 'false' : 'true'}
-		onmouseenter={readOnly ? undefined : hideRowToolbar}
-		onmousedown={readOnly ? undefined : hideRowToolbar}
 		ondragstart={readOnly || !hasBass ? undefined : (e) => onLineDragStart(e, i, 'bass')}
 		ondragend={readOnly ? undefined : onLineDragEnd}
 		ondragover={readOnly ? undefined : (e) => onLineDragOver(e, i, 'bass')}
 		ondragleave={readOnly ? undefined : () => onLineDragLeave(i, 'bass')}
 		ondrop={readOnly ? undefined : (e) => onLineDrop(e, i, 'bass')}
-		onclick={readOnly ? undefined : () => { hideRowToolbar(); openOrStartBassModal(i); }}
+		onclick={readOnly ? undefined : () => openOrStartBassModal(i)}
 	>
 		{#if hasBass}{@html bassHtmlFor(i)}{:else}&nbsp;{/if}
 	</div>
@@ -1022,19 +1109,18 @@
 			onblur={readOnly ? undefined : () => onCellBlur(i)}
 			onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
 			onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
-			onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
-			onfocus={readOnly ? undefined : hideRowToolbar}
-			onclick={readOnly ? undefined : hideRowToolbar}
 			ondragover={readOnly ? undefined : onSectionDragOver}
 			ondrop={readOnly ? undefined : (e) => onSectionDrop(e, resolveDropHeaderIdx(i))}
 			role={readOnly ? 'presentation' : 'textbox'}
 			tabindex={readOnly ? undefined : 0}
 			aria-label={readOnly ? undefined : row.kind === 'blank' ? 'Tom linje' : 'Tekst-linje'}
 		></div>
-		{#if !readOnly}
-			{@render rowGutter(i)}
-		{/if}
-		{@render bassCell(i)}
+		<div class="bass-slot" data-row={i}>
+			{@render bassCell(i)}
+			{#if !readOnly}
+				{@render rowGutter(i)}
+			{/if}
+		</div>
 	{:else if row.kind === 'chord'}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -1046,22 +1132,22 @@
 			data-row={i}
 			title={readOnly ? undefined : 'Klik for at redigere · træk for at kopiere til en anden linje'}
 			draggable={readOnly ? 'false' : 'true'}
-			onmousedown={readOnly ? undefined : hideRowToolbar}
 			ondragstart={readOnly ? undefined : (e) => onLineDragStart(e, i, 'chord')}
 			ondragend={readOnly ? undefined : onLineDragEnd}
 			ondragover={readOnly ? undefined : (e) => onLineDragOver(e, i, 'chord')}
 			ondragleave={readOnly ? undefined : () => onLineDragLeave(i, 'chord')}
 			ondrop={readOnly ? undefined : (e) => onLineDrop(e, i, 'chord')}
-			onclick={readOnly ? undefined : () => { hideRowToolbar(); openChordModal(i); }}
-			onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
+			onclick={readOnly ? undefined : () => openChordModal(i)}
 			role={readOnly ? 'presentation' : 'button'}
 			tabindex={readOnly ? undefined : 0}
 			aria-label={readOnly ? undefined : `Rediger akkord-linje for række ${i + 1}`}
 		>{#if row.text.trim()}{@html renderBarLine(row.text)}{:else}&nbsp;{/if}</div>
-		{#if !readOnly}
-			{@render rowGutter(i)}
-		{/if}
-		{@render bassCell(i)}
+		<div class="bass-slot" data-row={i}>
+			{@render bassCell(i)}
+			{#if !readOnly}
+				{@render rowGutter(i)}
+			{/if}
+		</div>
 	{/if}
 {/snippet}
 
@@ -1076,11 +1162,13 @@
 	aria-multiline={readOnly ? undefined : 'true'}
 	tabindex={readOnly ? undefined : -1}
 	onmouseleave={readOnly ? undefined : hideRowToolbarSoon}
+	onpointermove={readOnly ? undefined : onEditorPointerMove}
 	ondragover={readOnly ? undefined : onSectionDragOver}
 	ondrop={readOnly ? undefined : (e) => onSectionDrop(e, sectionDropTarget?.headerIdx ?? -1)}
 >
 	{#if unlabeledRowIdxs.length && !sectionDragCompact}
 		<section class="song-section song-section--unlabeled">
+			{@render sectionInserts(0, sections[0]?.headerRowIdx ?? rows.length)}
 			<div class="song-section-grid chord-grid">
 				{#each unlabeledRowIdxs as i (i)}
 					{@render songLine(i)}
@@ -1107,6 +1195,7 @@
 			ondragover={readOnly ? undefined : onSectionDragOver}
 			ondrop={readOnly ? undefined : (e) => onSectionDrop(e, headerIdx)}
 		>
+			{@render sectionInserts(section.headerRowIdx, section.bodyEnd)}
 			<div class="song-section-grid chord-grid">
 				<div
 					class="song-section-label"
@@ -1114,7 +1203,6 @@
 					draggable={readOnly ? 'false' : 'true'}
 					ondragstart={readOnly ? undefined : (e) => onSectionDragStart(e, headerIdx)}
 					ondragend={readOnly ? undefined : onSectionDragEnd}
-					onmouseenter={readOnly ? undefined : () => showRowToolbar(section.headerRowIdx)}
 				>
 					{#if !readOnly}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -1149,8 +1237,6 @@
 						onblur={readOnly ? undefined : () => onCellBlur(section.headerRowIdx)}
 						onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, section.headerRowIdx)}
 						onpaste={readOnly ? undefined : (e) => onCellPaste(e, section.headerRowIdx)}
-						onfocus={readOnly ? undefined : hideRowToolbar}
-						onclick={readOnly ? undefined : hideRowToolbar}
 						role={readOnly ? 'presentation' : 'textbox'}
 						tabindex={readOnly ? undefined : 0}
 						aria-label={readOnly ? undefined : 'Sektionsnavn'}
@@ -1224,10 +1310,12 @@
 						</div>
 					{/if}
 				</div>
-				{#if !readOnly}
-					{@render rowGutter(section.headerRowIdx)}
-				{/if}
-				<div class="song-section-end"></div>
+				<div class="bass-slot" data-row={section.headerRowIdx}>
+					<div class="song-section-end"></div>
+					{#if !readOnly}
+						{@render rowGutter(section.headerRowIdx)}
+					{/if}
+				</div>
 				{#if !hideBody}
 					{#each Array.from({ length: section.bodyEnd - section.bodyStart }, (_, offset) => section.bodyStart + offset) as i (i)}
 						{@render songLine(i)}
@@ -1343,6 +1431,57 @@
 		border-radius: 7px;
 		background: #fff;
 		padding: 0.4em 0.55em 0.45em;
+		overflow: visible;
+	}
+	.editable-song .section-insert {
+		appearance: none;
+		position: absolute;
+		left: 50%;
+		z-index: 5;
+		width: 1.35em;
+		height: 1.35em;
+		padding: 0;
+		border-radius: 50%;
+		border: 1px solid color-mix(in srgb, var(--section-accent) 45%, #d1d5db);
+		background: #fff;
+		color: var(--section-accent);
+		font-size: 1.05em;
+		font-weight: 700;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0;
+		pointer-events: none;
+		display: grid;
+		place-items: center;
+		box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+		transition: opacity 120ms ease, background-color 120ms ease, transform 120ms ease;
+	}
+	.editable-song .section-insert--before {
+		top: 0;
+		transform: translate(-50%, -50%);
+	}
+	.editable-song .section-insert--after {
+		bottom: 0;
+		transform: translate(-50%, 50%);
+	}
+	.editable-song .song-section:hover .section-insert,
+	.editable-song .section-insert:focus-visible {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	.editable-song .section-insert:hover,
+	.editable-song .section-insert:focus-visible {
+		background: var(--section-accent);
+		color: #fff;
+	}
+	.editable-song.is-section-dragging .section-insert {
+		display: none;
+	}
+	@media (hover: none), (pointer: coarse) {
+		.editable-song .section-insert {
+			opacity: 0.72;
+			pointer-events: auto;
+		}
 	}
 	.editable-song .song-section--unlabeled {
 		border-color: #cfd8dc;
@@ -1364,6 +1503,15 @@
 	}
 	.editable-song .song-section-end {
 		min-width: 0;
+		min-height: 1.2em;
+	}
+	.editable-song .bass-slot {
+		position: relative;
+		justify-self: stretch;
+		align-self: stretch;
+		min-width: 8em;
+		min-height: 1.2em;
+		overflow: visible;
 	}
 	.editable-song .song-section-ellipsis {
 		color: var(--section-accent);
@@ -1373,7 +1521,7 @@
 	}
 	.editable-song .song-section-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) 11em minmax(8em, max-content);
+		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
 		column-gap: 0.55em;
 		align-items: center;
 		width: 100%;
@@ -1418,7 +1566,7 @@
 	}
 	.editable-song.is-section-dragging .section-header-actions,
 	.editable-song.is-section-dragging .row-gutter,
-	.editable-song.is-section-dragging .song-section-end {
+	.editable-song.is-section-dragging .bass-slot {
 		display: none;
 	}
 	.editable-song.is-section-dragging .section-header-edit {
@@ -1495,14 +1643,18 @@
 		opacity: 0.82;
 	}
 	.editable-song .row-gutter {
+		position: absolute;
+		left: 0;
+		top: 50%;
+		transform: translateY(-50%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		align-self: stretch;
 		box-sizing: border-box;
+		width: 11em;
 		min-height: calc(1.55em + 6px);
-		min-width: 0;
-		width: 100%;
+		z-index: 3;
+		pointer-events: none;
 	}
 	.editable-song .row-gutter .gutter-toolbar-row {
 		display: flex;
@@ -1518,6 +1670,9 @@
 		color: #ffffff;
 		visibility: hidden;
 		pointer-events: none;
+	}
+	.editable-song .row-gutter.is-active {
+		pointer-events: auto;
 	}
 	.editable-song .row-gutter.is-active .gutter-toolbar-row {
 		visibility: visible;
@@ -1705,7 +1860,8 @@
 			box-shadow: none !important;
 		}
 		.editable-song .section-drag-handle,
-		.editable-song .row-gutter {
+		.editable-song .row-gutter,
+		.editable-song .section-insert {
 			display: none;
 		}
 		.editable-song .song-section-grid {
@@ -1806,5 +1962,10 @@
 		text-transform: inherit;
 		color: inherit;
 		background: transparent;
+	}
+	.editable-song .section-header-edit:empty::before {
+		content: 'FORM';
+		opacity: 0.35;
+		pointer-events: none;
 	}
 </style>
