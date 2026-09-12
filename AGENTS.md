@@ -10,7 +10,9 @@ SvelteKit 2 + Svelte 5 (runes) + Firebase static app ("Fællesbandet" songbook).
 - Deploy safety still applies: only `--only hosting` (this app's own `faellesbandet` site). NEVER broad-deploy functions/rules (see the Deploy safety section below).
 
 ### Testing preferences (important)
-- For visual / UI issues (print & PDF layout, CSS, the bass-tabs right column, styling, spacing), do NOT build a full end-to-end reproduction scenario (emulators + seeded data + dev server + browser automation). The user sends a screenshot of the issue and verifies the fix on the live site. Make the targeted code/CSS change, deploy, and let the user confirm.
+- **Do not test unless the user explicitly asks.** No unit tests, `svelte-check`, browser verification, emulator/dev servers, or walkthrough recordings by default. The user verifies on the live site after deploy.
+- `/no-test` is a shortcut for the same thing.
+- For visual / UI issues (print & PDF layout, CSS, the bass-tabs right column, styling, spacing), do not build a reproduction scenario. The user sends a screenshot if something is wrong and confirms the fix on live.
 
 ### Services / how to run
 - Web (SvelteKit dev): `npm run dev` → http://localhost:5173. This is the main app.
