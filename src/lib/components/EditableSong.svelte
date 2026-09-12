@@ -1357,7 +1357,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.4em;
-		border-radius: 999px;
+		border-radius: 0.35em;
 		min-width: 0;
 	}
 	.editable-song .section-header-echo {
@@ -1383,7 +1383,7 @@
 		align-items: center;
 		gap: 0.15em;
 		padding: 0.15rem 0.7rem;
-		border-radius: 999px;
+		border-radius: 0.35em;
 		font-size: 0.85rem;
 		font-weight: 700;
 		letter-spacing: 0.04em;
