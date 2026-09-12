@@ -917,7 +917,7 @@
 		aria-hidden={readOnly || !active ? 'true' : undefined}
 		onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 	>
-		{#if active}
+		{#if !readOnly && !sectionDragCompact}
 			<div class="gutter-toolbar-row">
 				<button
 					type="button"
@@ -1107,7 +1107,7 @@
 			ondragover={readOnly ? undefined : onSectionDragOver}
 			ondrop={readOnly ? undefined : (e) => onSectionDrop(e, headerIdx)}
 		>
-			<div class="song-section-label-row">
+			<div class="song-section-grid chord-grid">
 				<div
 					class="song-section-label"
 					title={readOnly ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
@@ -1227,14 +1227,13 @@
 				{#if !readOnly}
 					{@render rowGutter(section.headerRowIdx)}
 				{/if}
-			</div>
-			{#if !hideBody}
-				<div class="song-section-grid chord-grid">
+				<div class="song-section-end"></div>
+				{#if !hideBody}
 					{#each Array.from({ length: section.bodyEnd - section.bodyStart }, (_, offset) => section.bodyStart + offset) as i (i)}
 						{@render songLine(i)}
 					{/each}
-				</div>
-			{/if}
+				{/if}
+			</div>
 		</section>
 	{/each}
 </div>
@@ -1348,19 +1347,13 @@
 	.editable-song .song-section--unlabeled {
 		border-color: #cfd8dc;
 	}
-	.editable-song .song-section-label-row {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 11em;
-		column-gap: 0.55em;
-		align-items: center;
-	}
 	.editable-song .song-section-label {
 		display: flex;
 		align-items: center;
 		gap: 0.35em;
 		min-width: 0;
 		min-height: 1.45em;
-		padding: 0 0 0.15em;
+		padding: 0;
 		color: var(--section-accent);
 		font-size: 0.78em;
 		font-weight: 800;
@@ -1368,6 +1361,9 @@
 		text-transform: uppercase;
 		background: transparent;
 		line-height: 1.15;
+	}
+	.editable-song .song-section-end {
+		min-width: 0;
 	}
 	.editable-song .song-section-ellipsis {
 		color: var(--section-accent);
@@ -1379,6 +1375,7 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) 11em minmax(8em, max-content);
 		column-gap: 0.55em;
+		align-items: center;
 		width: 100%;
 	}
 	.editable-song .song-section-grid :global(.rhythm-cell) {
@@ -1416,11 +1413,12 @@
 		gap: 0.55rem;
 		min-height: 8rem;
 	}
-	.editable-song.is-section-dragging .song-section-label-row {
+	.editable-song.is-section-dragging .song-section-grid {
 		grid-template-columns: minmax(0, 1fr);
 	}
 	.editable-song.is-section-dragging .section-header-actions,
-	.editable-song.is-section-dragging .row-gutter {
+	.editable-song.is-section-dragging .row-gutter,
+	.editable-song.is-section-dragging .song-section-end {
 		display: none;
 	}
 	.editable-song.is-section-dragging .section-header-edit {
@@ -1500,9 +1498,11 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		align-self: center;
-		min-height: 1.25em;
+		align-self: stretch;
+		box-sizing: border-box;
+		min-height: calc(1.55em + 6px);
 		min-width: 0;
+		width: 100%;
 	}
 	.editable-song .row-gutter .gutter-toolbar-row {
 		display: flex;
@@ -1516,6 +1516,12 @@
 		box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
 		backdrop-filter: blur(3px);
 		color: #ffffff;
+		visibility: hidden;
+		pointer-events: none;
+	}
+	.editable-song .row-gutter.is-active .gutter-toolbar-row {
+		visibility: visible;
+		pointer-events: auto;
 	}
 	.editable-song .row-gutter .gutter-kind {
 		color: #ffffff;
@@ -1617,9 +1623,6 @@
 		border-color: rgba(255, 255, 255, 0.28);
 		background-color: rgba(255, 255, 255, 0.08);
 	}
-	.editable-song.read-only .song-section-label-row {
-		grid-template-columns: minmax(0, 1fr);
-	}
 	.editable-song.read-only .song-section-grid {
 		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
 	}
@@ -1629,9 +1632,6 @@
 	@media (hover: none), (pointer: coarse) {
 		.editable-song .row-gutter {
 			display: none;
-		}
-		.editable-song .song-section-label-row {
-			grid-template-columns: minmax(0, 1fr);
 		}
 		.editable-song .song-section-grid {
 			grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
@@ -1707,9 +1707,6 @@
 		.editable-song .section-drag-handle,
 		.editable-song .row-gutter {
 			display: none;
-		}
-		.editable-song .song-section-label-row {
-			grid-template-columns: minmax(0, 1fr);
 		}
 		.editable-song .song-section-grid {
 			grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
