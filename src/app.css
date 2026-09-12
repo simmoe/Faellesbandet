@@ -279,7 +279,8 @@ select {
 	visibility: hidden !important;
 	pointer-events: none !important;
 }
-.no-bass-tabs .editable-song .rhythm-cell {
+.no-bass-tabs .editable-song .rhythm-cell,
+.no-bass-tabs .editable-song .song-section-end {
 	display: none !important;
 }
 .no-bass-tabs .editable-song .song-section-grid {
