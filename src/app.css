@@ -583,11 +583,6 @@ select {
 	.print-page:last-child {
 		page-break-after: auto;
 	}
-
-	/* Hjælpe-linjen "Klik direkte i teksten…" — irrelevant på print */
-	.edit-hint {
-		display: none !important;
-	}
 }
 
 @utility btn-ghost {

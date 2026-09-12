@@ -617,12 +617,6 @@
 				/>
 			</div>
 
-			<p class="edit-hint mt-3 text-xs italic text-[var(--color-ink-faint)]">
-				Klik direkte i teksten for at rette. Klik på akkord-cellen til venstre eller bass-cellen
-				til højre for at åbne en modal og redigere linjen i pipe-notation. Ændringer gemmes
-				automatisk.
-			</p>
-
 			<div
 				class="play-controls no-print"
 				class:is-playing={playing}
