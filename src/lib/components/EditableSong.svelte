@@ -23,6 +23,12 @@
 		sectionHeaderType
 	} from '$lib/chordFormatter';
 	import { normalizeBassLine, regroupBassLine as regroupSingleBassLine } from '$lib/migrate';
+	import {
+		relocateSection,
+		sectionDropIsNoOp,
+		type SectionDropPlace,
+		type SectionRelocateMode
+	} from '$lib/sectionReorder';
 	import type { BassLines, CollapsedSections } from '$lib/types';
 	import { tick } from 'svelte';
 
@@ -268,62 +274,32 @@
 		emitBassLines(next);
 	}
 
-	function moveSection(sourceHeaderIdx: number, targetHeaderIdx: number) {
-		if (sourceHeaderIdx === targetHeaderIdx) return;
-		const source = sections[sourceHeaderIdx];
-		const target = sections[targetHeaderIdx];
-		if (!source || !target) return;
-
-		const sourceStart = source.headerRowIdx;
-		const sourceEnd = source.bodyEnd;
-		const movingRows = rows.slice(sourceStart, sourceEnd);
-		const withoutSource = [...rows.slice(0, sourceStart), ...rows.slice(sourceEnd)];
-
-		let insertAt = target.headerRowIdx;
-		if (target.headerRowIdx > sourceStart) insertAt -= movingRows.length;
-
-		const next = [...withoutSource.slice(0, insertAt), ...movingRows, ...withoutSource.slice(insertAt)];
-		emit(next);
-
-		const oldToNew = new Map<number, number>();
-		for (let oldIdx = 0; oldIdx < rows.length; oldIdx++) {
-			let newIdx: number;
-			if (oldIdx >= sourceStart && oldIdx < sourceEnd) {
-				newIdx = insertAt + (oldIdx - sourceStart);
-			} else {
-				newIdx = oldIdx;
-				if (oldIdx >= sourceEnd) newIdx -= movingRows.length;
-				if (newIdx >= insertAt) newIdx += movingRows.length;
-			}
-			oldToNew.set(oldIdx, newIdx);
+	function applySectionRelocate(
+		sourceHeaderIdx: number,
+		targetHeaderIdx: number,
+		place: SectionDropPlace,
+		mode: SectionRelocateMode
+	) {
+		const result = relocateSection({
+			rows,
+			bassLines,
+			collapsedSections,
+			sourceHeaderIdx,
+			targetHeaderIdx,
+			place,
+			mode
+		});
+		if (!result) return;
+		emit(result.rows);
+		if (JSON.stringify(result.bassLines) !== JSON.stringify(bassLines)) {
+			emitBassLines(result.bassLines);
 		}
-
-		const movedBassLines: BassLines = {};
-		for (const [k, v] of Object.entries(bassLines)) {
-			const oldIdx = Number(k);
-			const newIdx = oldToNew.get(oldIdx);
-			if (newIdx !== undefined) movedBassLines[String(newIdx)] = normalizeBassLine(v);
+		if (
+			onCollapsedSectionsChange &&
+			JSON.stringify(result.collapsedSections) !== JSON.stringify(collapsedSections)
+		) {
+			onCollapsedSectionsChange(result.collapsedSections);
 		}
-		if (JSON.stringify(movedBassLines) !== JSON.stringify(bassLines)) {
-			emitBassLines(movedBassLines);
-		}
-
-		if (onCollapsedSectionsChange) {
-			const nextSections = buildSections(next);
-			const sourceLabel = source.headerText;
-			const collapsedLabels = new Set(
-				collapsedSections.map((idx) => sections[idx]?.headerText).filter(Boolean)
-			);
-			// Bevar collapsed-state for de sektioner der allerede var collapsed.
-			// Hvis den flyttede sektion var collapsed, følger den også med via label.
-			const nextCollapsed = nextSections
-				.map((s, idx) => (collapsedLabels.has(s.headerText) || s.headerText === sourceLabel && collapsedSet.has(sourceHeaderIdx) ? idx : -1))
-				.filter((idx) => idx >= 0);
-			if (JSON.stringify(nextCollapsed) !== JSON.stringify(collapsedSections)) {
-				onCollapsedSectionsChange(nextCollapsed);
-			}
-		}
-
 		hoveredRow = null;
 	}
 
@@ -676,7 +652,73 @@
 	let dragInfo = $state<{ rowIdx: number; col: DragCol } | null>(null);
 	let dropTarget = $state<{ rowIdx: number; col: DragCol } | null>(null);
 	let sectionDrag = $state<{ headerIdx: number } | null>(null);
-	let sectionDropTarget = $state<number | null>(null);
+	let sectionDropTarget = $state<{ headerIdx: number; place: SectionDropPlace } | null>(null);
+	let sectionDragCopy = $state(false);
+
+	function headerIdxForRow(rowIdx: number): number {
+		const row = rows[rowIdx];
+		if (row?.kind === 'header') {
+			return sections.findIndex((s) => s.headerRowIdx === rowIdx);
+		}
+		return rowToHeaderIdx[rowIdx] ?? -1;
+	}
+
+	function resolveDropHeaderIdx(rowIdx: number): number {
+		const idx = headerIdxForRow(rowIdx);
+		if (idx >= 0) return idx;
+		const first = sections[0];
+		if (first && rowIdx < first.headerRowIdx) return 0;
+		return -1;
+	}
+
+	function sectionPlaceFromEvent(e: DragEvent, headerIdx: number): SectionDropPlace {
+		const root = document.querySelector('.editable-song');
+		const els = root
+			? [...root.querySelectorAll<HTMLElement>(`[data-section="${headerIdx}"]`)]
+			: [];
+		if (els.length === 0) return 'before';
+		const top = Math.min(...els.map((el) => el.getBoundingClientRect().top));
+		const bottom = Math.max(...els.map((el) => el.getBoundingClientRect().bottom));
+		return e.clientY < (top + bottom) / 2 ? 'before' : 'after';
+	}
+
+	function sectionModeFromEvent(e: DragEvent): SectionRelocateMode {
+		return e.altKey ? 'copy' : 'move';
+	}
+
+	function isFirstVisibleSectionRow(rowIdx: number, headerIdx: number): boolean {
+		const section = sections[headerIdx];
+		return !!section && section.headerRowIdx === rowIdx;
+	}
+
+	function isLastVisibleSectionRow(rowIdx: number, headerIdx: number): boolean {
+		const section = sections[headerIdx];
+		if (!section) return false;
+		if (collapsedSet.has(headerIdx)) return section.headerRowIdx === rowIdx;
+		for (let i = section.bodyEnd - 1; i > section.headerRowIdx; i--) {
+			if (!isRowHidden(i)) return i === rowIdx;
+		}
+		return section.headerRowIdx === rowIdx;
+	}
+
+	function sectionRowClass(
+		rowIdx: number,
+		headerIdx: number
+	): {
+		source: boolean;
+		target: boolean;
+		before: boolean;
+		after: boolean;
+	} {
+		const source = sectionDrag?.headerIdx === headerIdx && headerIdx >= 0;
+		const target = sectionDropTarget?.headerIdx === headerIdx && headerIdx >= 0;
+		return {
+			source,
+			target,
+			before: !!(target && sectionDropTarget?.place === 'before' && isFirstVisibleSectionRow(rowIdx, headerIdx)),
+			after: !!(target && sectionDropTarget?.place === 'after' && isLastVisibleSectionRow(rowIdx, headerIdx))
+		};
+	}
 
 	function onLineDragStart(e: DragEvent, rowIdx: number, col: DragCol) {
 		if (!e.dataTransfer) return;
@@ -696,6 +738,10 @@
 	}
 
 	function onLineDragOver(e: DragEvent, rowIdx: number, col: DragCol) {
+		if (sectionDrag) {
+			onSectionDragOver(e, resolveDropHeaderIdx(rowIdx));
+			return;
+		}
 		if (!dragInfo || dragInfo.col !== col || dragInfo.rowIdx === rowIdx) return;
 		e.preventDefault();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
@@ -705,11 +751,19 @@
 	}
 
 	function onLineDragLeave(rowIdx: number, col: DragCol) {
+		if (sectionDrag) {
+			onSectionDragLeave(resolveDropHeaderIdx(rowIdx));
+			return;
+		}
 		if (dropTarget?.rowIdx === rowIdx && dropTarget?.col === col) dropTarget = null;
 	}
 
 	function onLineDrop(e: DragEvent, targetIdx: number, col: DragCol) {
 		e.preventDefault();
+		if (sectionDrag || e.dataTransfer?.types.includes('application/x-song-section')) {
+			onSectionDrop(e, resolveDropHeaderIdx(targetIdx));
+			return;
+		}
 		const raw = e.dataTransfer?.getData('application/x-chord-line');
 		dropTarget = null;
 		dragInfo = null;
@@ -743,38 +797,67 @@
 	}
 
 	function onSectionDragStart(e: DragEvent, headerIdx: number) {
-		if (!e.dataTransfer) return;
-		e.dataTransfer.effectAllowed = 'move';
+		if (!e.dataTransfer || headerIdx < 0) {
+			e.preventDefault();
+			return;
+		}
+		hideRowToolbar();
+		e.dataTransfer.effectAllowed = 'copyMove';
 		e.dataTransfer.setData('application/x-song-section', String(headerIdx));
 		e.dataTransfer.setData('text/plain', sections[headerIdx]?.headerText ?? 'Formstykke');
 		sectionDrag = { headerIdx };
+		sectionDragCopy = e.altKey;
 		sectionDropTarget = null;
 	}
 
 	function onSectionDragEnd() {
 		sectionDrag = null;
 		sectionDropTarget = null;
+		sectionDragCopy = false;
 	}
 
 	function onSectionDragOver(e: DragEvent, headerIdx: number) {
-		if (!sectionDrag || sectionDrag.headerIdx === headerIdx) return;
+		if (!sectionDrag || headerIdx < 0) return;
+		const mode = sectionModeFromEvent(e);
+		const place = sectionPlaceFromEvent(e, headerIdx);
+		if (sectionDropIsNoOp(rows, sectionDrag.headerIdx, headerIdx, place, mode)) {
+			if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+			if (sectionDropTarget) sectionDropTarget = null;
+			return;
+		}
 		e.preventDefault();
-		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-		if (sectionDropTarget !== headerIdx) sectionDropTarget = headerIdx;
+		sectionDragCopy = mode === 'copy';
+		if (e.dataTransfer) e.dataTransfer.dropEffect = mode === 'copy' ? 'copy' : 'move';
+		if (
+			sectionDropTarget?.headerIdx !== headerIdx ||
+			sectionDropTarget?.place !== place
+		) {
+			sectionDropTarget = { headerIdx, place };
+		}
 	}
 
 	function onSectionDragLeave(headerIdx: number) {
-		if (sectionDropTarget === headerIdx) sectionDropTarget = null;
+		if (sectionDropTarget?.headerIdx === headerIdx) sectionDropTarget = null;
 	}
 
 	function onSectionDrop(e: DragEvent, targetHeaderIdx: number) {
+		const isSection =
+			!!sectionDrag || !!e.dataTransfer?.types.includes('application/x-song-section');
+		if (!isSection) return;
 		e.preventDefault();
 		const raw = e.dataTransfer?.getData('application/x-song-section');
 		const sourceHeaderIdx = raw ? Number(raw) : sectionDrag?.headerIdx;
+		const mode = sectionModeFromEvent(e);
+		const place =
+			targetHeaderIdx >= 0
+				? sectionPlaceFromEvent(e, targetHeaderIdx)
+				: sectionDropTarget?.place ?? 'before';
 		sectionDrag = null;
 		sectionDropTarget = null;
+		sectionDragCopy = false;
 		if (sourceHeaderIdx === undefined || !Number.isInteger(sourceHeaderIdx)) return;
-		moveSection(sourceHeaderIdx, targetHeaderIdx);
+		if (targetHeaderIdx < 0) return;
+		applySectionRelocate(sourceHeaderIdx, targetHeaderIdx, place, mode);
 	}
 
 	function focusOnMount(node: HTMLInputElement) {
@@ -832,6 +915,8 @@
 
 {#snippet bassCell(i: number)}
 	{@const hasBass = !!bassLines[String(i)]?.trim()}
+	{@const sectionIdx = headerIdxForRow(i)}
+	{@const sectionCls = sectionRowClass(i, sectionIdx)}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
@@ -839,7 +924,12 @@
 		class:rhythm-cell-empty={!hasBass}
 		class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'bass'}
 		class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'bass'}
+		class:section-drag-source={sectionCls.source}
+		class:section-drop-target={sectionCls.target}
+		class:section-drop-before={sectionCls.before}
+		class:section-drop-after={sectionCls.after}
 		data-row={i}
+		data-section={sectionIdx >= 0 ? sectionIdx : undefined}
 		title={readOnly ? undefined : hasBass ? 'Klik for at redigere · træk for at kopiere bass-linjen' : 'Klik for at starte en baslinje'}
 		draggable={readOnly || !hasBass ? 'false' : 'true'}
 		onmouseenter={readOnly ? undefined : hideRowToolbar}
@@ -860,6 +950,8 @@
 <div
 	class="editable-song chord-grid"
 	class:read-only={readOnly}
+	class:is-section-dragging={!!sectionDrag}
+	class:is-section-copying={sectionDragCopy}
 	role={readOnly ? 'presentation' : 'textbox'}
 	aria-multiline={readOnly ? undefined : 'true'}
 	tabindex={readOnly ? undefined : -1}
@@ -870,12 +962,17 @@
 			{@const headerIdx = sections.findIndex((s) => s.headerRowIdx === i)}
 			{@const isCollapsed = headerIdx >= 0 && collapsedSet.has(headerIdx)}
 			{@const prevSame = headerIdx >= 0 ? findPreviousSameType(sections, headerIdx) : null}
+			{@const sectionCls = sectionRowClass(i, headerIdx)}
 			{@render rowGutter(i)}
 			<div
 				class="section-header-cell"
 				class:section-header-cell--collapsed={isCollapsed}
-				class:section-drop-target={sectionDropTarget === headerIdx}
-				class:section-drag-source={sectionDrag?.headerIdx === headerIdx}
+				class:section-drop-target={sectionCls.target}
+				class:section-drop-before={sectionCls.before}
+				class:section-drop-after={sectionCls.after}
+				class:section-drag-source={sectionCls.source}
+				data-section={headerIdx >= 0 ? headerIdx : undefined}
+				title={readOnly || headerIdx < 0 ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
 				draggable={readOnly || headerIdx < 0 ? 'false' : 'true'}
 				ondragstart={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDragStart(e, headerIdx)}
 				ondragend={readOnly ? undefined : onSectionDragEnd}
@@ -884,6 +981,28 @@
 				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
 				onmouseenter={readOnly ? undefined : (e) => showRowToolbar(e, i)}
 			>
+				{#if headerIdx >= 0 && !readOnly}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<span
+						class="section-drag-handle"
+						title="Træk hele formstykket for at flytte · hold Alt for at kopiere"
+						draggable="true"
+						ondragstart={(e) => {
+							e.stopPropagation();
+							onSectionDragStart(e, headerIdx);
+						}}
+						ondragend={onSectionDragEnd}
+					>
+						<svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true">
+							<circle cx="3" cy="3" r="1.15"></circle>
+							<circle cx="9" cy="3" r="1.15"></circle>
+							<circle cx="3" cy="7" r="1.15"></circle>
+							<circle cx="9" cy="7" r="1.15"></circle>
+							<circle cx="3" cy="11" r="1.15"></circle>
+							<circle cx="9" cy="11" r="1.15"></circle>
+						</svg>
+					</span>
+				{/if}
 				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<div
 					class="section-header-edit section-header--{sectionHeaderType(row.text)}"
@@ -970,7 +1089,18 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="section-header-echo"
+				class:section-drag-source={sectionCls.source}
+				class:section-drop-target={sectionCls.target}
+				class:section-drop-before={sectionCls.before}
+				class:section-drop-after={sectionCls.after}
+				data-section={headerIdx >= 0 ? headerIdx : undefined}
 				aria-hidden="true"
+				draggable={readOnly || headerIdx < 0 ? 'false' : 'true'}
+				ondragstart={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDragStart(e, headerIdx)}
+				ondragend={readOnly ? undefined : onSectionDragEnd}
+				ondragover={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDragOver(e, headerIdx)}
+				ondragleave={readOnly || headerIdx < 0 ? undefined : () => onSectionDragLeave(headerIdx)}
+				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
 				onmouseenter={readOnly ? undefined : hideRowToolbar}
 			>
 				<span class="section-header section-header--{sectionHeaderType(row.text)}">
@@ -980,15 +1110,23 @@
 		{:else if isRowHidden(i)}
 			<!-- skjult af kollapset sektion -->
 		{:else if row.kind === 'blank' || row.kind === 'lyric'}
+			{@const sectionIdx = headerIdxForRow(i)}
+			{@const sectionCls = sectionRowClass(i, sectionIdx)}
 			{@render rowGutter(i)}
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="lyrics-cell blank-cell"
 				class:lyric-cell={row.kind === 'lyric'}
+				class:section-drag-source={sectionCls.source}
+				class:section-drop-target={sectionCls.target}
+				class:section-drop-before={sectionCls.before}
+				class:section-drop-after={sectionCls.after}
 				contenteditable={readOnly ? 'false' : 'plaintext-only'}
 				use:init={row.kind === 'blank' ? '' : row.text}
 				data-row={i}
 				data-field="text"
+				data-section={sectionIdx >= 0 ? sectionIdx : undefined}
 				oninput={readOnly ? undefined : (e) => onCellInput(e, i)}
 				onblur={readOnly ? undefined : () => onCellBlur(i)}
 				onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
@@ -996,12 +1134,17 @@
 				onmouseenter={readOnly ? undefined : (e) => showRowToolbar(e, i)}
 				onfocus={readOnly ? undefined : hideRowToolbar}
 				onclick={readOnly ? undefined : hideRowToolbar}
+				ondragover={readOnly ? undefined : (e) => onSectionDragOver(e, resolveDropHeaderIdx(i))}
+				ondragleave={readOnly ? undefined : () => onSectionDragLeave(resolveDropHeaderIdx(i))}
+				ondrop={readOnly ? undefined : (e) => onSectionDrop(e, resolveDropHeaderIdx(i))}
 				role={readOnly ? 'presentation' : 'textbox'}
 				tabindex={readOnly ? undefined : 0}
 				aria-label={readOnly ? undefined : row.kind === 'blank' ? 'Tom linje' : 'Tekst-linje'}
 			></div>
 			{@render bassCell(i)}
 		{:else if row.kind === 'chord'}
+			{@const sectionIdx = headerIdxForRow(i)}
+			{@const sectionCls = sectionRowClass(i, sectionIdx)}
 			{@render rowGutter(i)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -1010,7 +1153,12 @@
 				class="lyrics-cell chord-cell chord-cell-clickable"
 				class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'chord'}
 				class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'chord'}
+				class:section-drag-source={sectionCls.source}
+				class:section-drop-target={sectionCls.target}
+				class:section-drop-before={sectionCls.before}
+				class:section-drop-after={sectionCls.after}
 				data-row={i}
+				data-section={sectionIdx >= 0 ? sectionIdx : undefined}
 				title={readOnly ? undefined : 'Klik for at redigere · træk for at kopiere til en anden linje'}
 				draggable={readOnly ? 'false' : 'true'}
 				onmousedown={readOnly ? undefined : hideRowToolbar}
@@ -1225,23 +1373,75 @@
 	.editable-song .section-header-echo .section-header {
 		opacity: 0.7;
 	}
-	.editable-song:not(.read-only) .section-header-cell {
+	.editable-song:not(.read-only) .section-header-cell,
+	.editable-song:not(.read-only) .section-header-echo,
+	.editable-song:not(.read-only) .section-drag-handle {
 		cursor: grab;
 	}
-	.editable-song .section-header-cell.section-drag-source {
+	.editable-song:not(.read-only) .section-header-cell:active,
+	.editable-song:not(.read-only) .section-drag-handle:active {
+		cursor: grabbing;
+	}
+	.editable-song .section-drag-handle {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 auto;
+		width: 1.15em;
+		height: 1.6em;
+		color: var(--color-ink-faint, #6b7280);
+		opacity: 0.55;
+		touch-action: none;
+	}
+	.editable-song .section-header-cell:hover .section-drag-handle,
+	.editable-song .section-header-cell:focus-within .section-drag-handle,
+	.editable-song.is-section-dragging .section-drag-handle {
+		opacity: 1;
+	}
+	.editable-song .section-header-edit {
+		-webkit-user-drag: none;
+	}
+	.editable-song .section-drag-source {
 		opacity: 0.45;
 	}
+	.editable-song .section-drop-target {
+		background: rgba(245, 158, 11, 0.08);
+	}
 	.editable-song .section-header-cell.section-drop-target {
-		background: rgba(245, 158, 11, 0.16);
 		box-shadow: inset 0 0 0 2px var(--color-accent, #f59e0b);
 	}
-	.editable-song .section-header-cell.section-drop-target::before {
-		content: 'Slip her';
+	.editable-song .section-drop-before {
+		box-shadow: inset 0 3px 0 var(--color-accent, #f59e0b);
+	}
+	.editable-song .section-drop-after {
+		box-shadow: inset 0 -3px 0 var(--color-accent, #f59e0b);
+	}
+	.editable-song .section-header-cell.section-drop-target.section-drop-before {
+		box-shadow: inset 0 3px 0 var(--color-accent, #f59e0b);
+	}
+	.editable-song .section-header-cell.section-drop-target.section-drop-after {
+		box-shadow: inset 0 -3px 0 var(--color-accent, #f59e0b);
+	}
+	.editable-song .section-header-cell.section-drop-before::before,
+	.editable-song .section-header-cell.section-drop-after::before {
 		color: var(--color-accent, #f59e0b);
 		font-size: 0.7em;
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
+		white-space: nowrap;
+	}
+	.editable-song .section-header-cell.section-drop-before::before {
+		content: 'Flyt herover';
+	}
+	.editable-song .section-header-cell.section-drop-after::before {
+		content: 'Flyt herunder';
+	}
+	.editable-song.is-section-copying .section-header-cell.section-drop-before::before {
+		content: 'Kopiér herover';
+	}
+	.editable-song.is-section-copying .section-header-cell.section-drop-after::before {
+		content: 'Kopiér herunder';
 	}
 	.editable-song .section-header-actions {
 		display: inline-flex;
@@ -1477,6 +1677,9 @@
 			cursor: auto;
 			background: transparent !important;
 			box-shadow: none !important;
+		}
+		.editable-song .section-drag-handle {
+			display: none;
 		}
 	}
 	.editable-song .lyric-cell {
