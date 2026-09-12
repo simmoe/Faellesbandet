@@ -1460,35 +1460,40 @@
 		appearance: none;
 		-webkit-appearance: none;
 		position: absolute;
-		top: 50%;
-		right: 0.1em;
+		top: 2px;
+		bottom: 2px;
+		right: 0.35em;
 		z-index: 3;
-		transform: translateY(-50%);
+		box-sizing: border-box;
 		margin: 0;
-		min-width: 6.2em;
-		height: 1.45em;
-		padding: 0 1.25em 0 0.45em;
-		border: 1px solid color-mix(in srgb, var(--section-accent) 28%, #d1d5db);
-		border-radius: 999px;
+		min-width: 7.1em;
+		height: auto;
+		padding: 0 1.55em 0 0.7em;
+		border: 1px solid #d1d5db;
+		border-radius: 5px;
 		background-color: #fff;
-		background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-			linear-gradient(135deg, currentColor 50%, transparent 50%);
+		background-image: linear-gradient(45deg, transparent 50%, #6b7280 50%),
+			linear-gradient(135deg, #6b7280 50%, transparent 50%);
 		background-position:
-			calc(100% - 8px) 55%,
-			calc(100% - 5px) 55%;
-		background-size: 4px 4px, 4px 4px;
+			calc(100% - 11px) calc(50% - 2px),
+			calc(100% - 7px) calc(50% - 2px);
+		background-size: 5px 5px, 5px 5px;
 		background-repeat: no-repeat;
-		color: color-mix(in srgb, var(--section-accent) 80%, #4b5563);
-		font-size: 0.68em;
-		font-weight: 700;
-		font-family: inherit;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
+		color: #4b5563;
+		font: 500 13px/1 var(--font-sans);
+		font-style: normal;
+		letter-spacing: 0;
+		text-transform: none;
 		cursor: pointer;
-		line-height: 1.2;
 		opacity: 0;
 		pointer-events: none;
-		transition: opacity 100ms ease;
+		box-shadow: -10px 0 12px 4px #fff;
+		transition: opacity 100ms ease, border-color 100ms ease;
+	}
+	.editable-song .line-kind option {
+		font: 500 13px/1.3 var(--font-sans);
+		text-transform: none;
+		letter-spacing: 0;
 	}
 	.editable-song .song-line-wrap:hover .line-kind,
 	.editable-song .song-line-wrap:focus-within .line-kind,
@@ -1501,9 +1506,9 @@
 	}
 	.editable-song .line-kind:hover,
 	.editable-song .line-kind:focus-visible {
-		border-color: var(--section-accent);
+		border-color: #9ca3af;
 		outline: none;
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--section-accent) 18%, transparent);
+		color: #374151;
 	}
 	.editable-song .song-section-ellipsis {
 		color: var(--section-accent);
