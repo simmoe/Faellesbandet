@@ -1051,7 +1051,7 @@
 				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
 				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
 			>
-				<div class="section-header-pill section-header--{sectionHeaderType(row.text)}">
+				<div class="section-header section-header-pill section-header--{sectionHeaderType(row.text)}">
 					{#if headerIdx >= 0 && !readOnly}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span
@@ -1382,15 +1382,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.15em;
-		padding: 0.15rem 0.7rem;
-		border-radius: 0.35em;
-		font-size: 0.85rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		color: #1f2937;
-		background: #eeeeee;
-		border: 1px solid rgba(0, 0, 0, 0.06);
 		min-width: 0;
 	}
 	.editable-song .section-header-pill:has(.section-drag-handle) {
@@ -1818,14 +1809,4 @@
 		color: inherit;
 		background: transparent;
 	}
-	.editable-song .section-header--intro { background: #e3f2fd; color: #0d47a1; }
-	.editable-song .section-header--verse { background: #e8f5e9; color: #1b5e20; }
-	.editable-song .section-header--pre-chorus { background: #fff8e1; color: #8d6e00; }
-	.editable-song .section-header--chorus { background: #ffebee; color: #b71c1c; }
-	.editable-song .section-header--bridge { background: #fff3e0; color: #b3501a; }
-	.editable-song .section-header--solo { background: #fff9c4; color: #6c5b00; }
-	.editable-song .section-header--interlude { background: #e0f2f1; color: #0d6e63; }
-	.editable-song .section-header--outro { background: #ede7f6; color: #4527a0; }
-	.editable-song .section-header--coda { background: #efebe9; color: #4e342e; }
-	.editable-song .section-header--other { background: #eeeeee; color: #1f2937; }
 </style>
