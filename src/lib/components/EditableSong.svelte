@@ -337,25 +337,59 @@
 		}
 	}
 
-	async function focusRow(idx: number) {
+	async function focusRow(idx: number, offset: number | 'end' = 'end') {
 		await tick();
 		const root = document.querySelector(`.editable-song`);
 		if (!root) return;
 		const el = root.querySelector(`[data-row="${idx}"][data-field]`) as HTMLElement | null;
-		el?.focus();
 		if (el) {
-			const range = document.createRange();
-			range.selectNodeContents(el);
-			range.collapse(false);
-			const s = window.getSelection();
-			s?.removeAllRanges();
-			s?.addRange(range);
+			el.focus();
+			const text = cellPlainText(el);
+			placeCaret(el, offset === 'end' ? text.length : Math.max(0, Math.min(offset, text.length)));
+			return;
 		}
+		(root.querySelector(`[data-row="${idx}"]`) as HTMLElement | null)?.focus();
+	}
+
+	function cellPlainText(el: HTMLElement): string {
+		return el.innerText.replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+	}
+
+	function placeCaret(el: HTMLElement, offset: number) {
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let remaining = offset;
+		let node = walker.nextNode();
+		while (node) {
+			const len = node.textContent?.length ?? 0;
+			if (remaining <= len) {
+				const range = document.createRange();
+				range.setStart(node, remaining);
+				range.collapse(true);
+				const s = window.getSelection();
+				s?.removeAllRanges();
+				s?.addRange(range);
+				return;
+			}
+			remaining -= len;
+			node = walker.nextNode();
+		}
+		const range = document.createRange();
+		range.selectNodeContents(el);
+		range.collapse(false);
+		const s = window.getSelection();
+		s?.removeAllRanges();
+		s?.addRange(range);
+	}
+
+	function selectionCollapsedIn(el: HTMLElement): boolean {
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0) return true;
+		if (!el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) return true;
+		return sel.isCollapsed;
 	}
 
 	function onCellKeydown(e: KeyboardEvent, idx: number) {
 		const target = e.currentTarget as HTMLElement;
-		const text = target.innerText;
 
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
@@ -363,10 +397,14 @@
 			return;
 		}
 
-		if (e.key === 'Backspace' && text === '') {
-			if (rows.length === 1) return;
+		if (
+			e.key === 'Backspace' &&
+			selectionCollapsedIn(target) &&
+			(getCaretOffset(target) === 0 || cellPlainText(target) === '')
+		) {
+			if (idx === 0 || rows.length <= 1) return;
 			e.preventDefault();
-			deleteRow(idx, true);
+			joinRowWithPrevious(idx);
 			return;
 		}
 
@@ -457,6 +495,39 @@
 		shiftBassLines(idx + 1, -1, [idx, idx + 1]);
 		const target = focusPrev ? Math.max(0, idx - 1) : Math.min(idx, next.length - 1);
 		focusRow(target);
+		hoveredRow = null;
+	}
+
+	function rowPlainText(row: Row | undefined): string {
+		if (!row || row.kind === 'blank') return '';
+		return row.text;
+	}
+
+	function joinRowWithPrevious(idx: number) {
+		if (idx <= 0) return;
+		const cur = rows[idx];
+		const prev = rows[idx - 1];
+		if (!cur || !prev) return;
+
+		const curText = rowPlainText(cur);
+		if (cur.kind === 'header' || curText === '') {
+			deleteRow(idx, true);
+			return;
+		}
+		if (prev.kind === 'chord' || prev.kind === 'header') return;
+
+		const prevText = rowPlainText(prev);
+		const merged = prevText + curText;
+		const next = [...rows];
+		next[idx - 1] = merged === '' ? { kind: 'blank' } : { kind: 'lyric', text: merged };
+		next.splice(idx, 1);
+		const prevEl = document.querySelector(
+			`.editable-song [data-row="${idx - 1}"][data-field="text"]`
+		) as HTMLElement | null;
+		if (prevEl && prevEl.innerText !== merged) prevEl.innerText = merged;
+		emit(next);
+		shiftBassLines(idx + 1, -1, [idx, idx + 1]);
+		focusRow(idx - 1, prevText.length);
 		hoveredRow = null;
 	}
 
