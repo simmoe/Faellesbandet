@@ -279,17 +279,12 @@ select {
 	visibility: hidden !important;
 	pointer-events: none !important;
 }
+.no-bass-tabs .editable-song .rhythm-cell {
+	display: none !important;
+}
 .no-bass-tabs .editable-song .song-section-grid {
-	grid-template-columns: minmax(0, 1fr) minmax(8em, max-content) !important;
-	column-gap: 0.55em !important;
-}
-.no-bass-tabs .editable-song.read-only .song-section-grid {
-	grid-template-columns: minmax(0, 1fr) 4em !important;
-}
-@media (hover: none), (pointer: coarse) {
-	.no-bass-tabs .editable-song .song-section-grid {
-		grid-template-columns: minmax(0, 1fr) 4em !important;
-	}
+	grid-template-columns: minmax(0, 1fr) !important;
+	column-gap: 0 !important;
 }
 .no-bass-tabs .pdf-section-grid {
 	grid-template-columns: minmax(0, 1fr) 12mm !important;

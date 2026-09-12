@@ -54,6 +54,7 @@
 
 	let rows = $state<Row[]>([]);
 	let lastEmitted = $state<Row[] | null>(null);
+	let activeRow = $state<number | null>(null);
 
 	$effect(() => {
 		if (rowsProp === lastEmitted) return;
@@ -594,6 +595,53 @@
 		return r.text.trim() === '';
 	}
 
+	type LineKind = 'chord' | 'lyric' | 'form';
+
+	function rowKindToOption(r: Row | undefined): LineKind | null {
+		if (!r) return null;
+		if (r.kind === 'chord') return 'chord';
+		if (r.kind === 'lyric' || r.kind === 'blank') return 'lyric';
+		if (r.kind === 'header') return 'form';
+		return null;
+	}
+
+	function changeRowKind(idx: number, target: LineKind) {
+		const r = rows[idx];
+		if (!r) return;
+		const current = rowKindToOption(r);
+		if (current === target) return;
+
+		const text = r.kind === 'blank' ? '' : r.text;
+		const nextRow: Row =
+			target === 'chord'
+				? { kind: 'chord', text: normalizeAccidentals(text) }
+				: target === 'lyric'
+					? { kind: 'lyric', text }
+					: { kind: 'header', text: cleanSectionHeader(text) };
+		const next = [...rows];
+		next[idx] = nextRow;
+		emit(next);
+		if (target === 'form' && bassLines[String(idx)]) {
+			const out = { ...bassLines };
+			delete out[String(idx)];
+			emitBassLines(out);
+		}
+		activeRow = idx;
+	}
+
+	function activeRowInRange(start: number, end: number, fallback: number): number {
+		if (activeRow != null && activeRow >= start && activeRow < end) return activeRow;
+		return fallback;
+	}
+
+	function onEditorActivate(e: Event) {
+		if (readOnly) return;
+		const el = (e.target as HTMLElement | null)?.closest?.('[data-row]') as HTMLElement | null;
+		if (!el) return;
+		const n = Number(el.dataset.row);
+		if (Number.isInteger(n)) activeRow = n;
+	}
+
 	// Action der initierer cell-indhold uden at konkurrere med cursoren.
 	function init(node: HTMLElement, text: string) {
 		if (node.innerText !== text) node.innerText = text;
@@ -965,6 +1013,25 @@
 	{/if}
 {/snippet}
 
+{#snippet lineKindSelect(rowIdx: number)}
+	{@const kind = rowKindToOption(rows[rowIdx])}
+	{#if !readOnly && kind && !sectionDragCompact}
+		<select
+			class="line-kind"
+			aria-label="Linjetype"
+			title="Linjetype for den linje du sidst klikkede"
+			value={kind}
+			onmousedown={(e) => e.stopPropagation()}
+			onchange={(e) =>
+				changeRowKind(rowIdx, (e.currentTarget as HTMLSelectElement).value as LineKind)}
+		>
+			<option value="chord">Akkord</option>
+			<option value="lyric">Lyrics</option>
+			<option value="form">Form</option>
+		</select>
+	{/if}
+{/snippet}
+
 {#snippet bassCell(i: number)}
 	{@const hasBass = !!bassLines[String(i)]?.trim()}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -996,6 +1063,7 @@
 		<div
 			class="lyrics-cell blank-cell song-line"
 			class:lyric-cell={row.kind === 'lyric'}
+			class:is-line-active={activeRow === i}
 			contenteditable={readOnly ? 'false' : 'plaintext-only'}
 			use:init={row.kind === 'blank' ? '' : row.text}
 			data-row={i}
@@ -1017,6 +1085,7 @@
 		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<div
 			class="lyrics-cell chord-cell chord-cell-clickable song-line"
+			class:is-line-active={activeRow === i}
 			class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'chord'}
 			class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'chord'}
 			data-row={i}
@@ -1046,13 +1115,21 @@
 	role={readOnly ? 'presentation' : 'textbox'}
 	aria-multiline={readOnly ? undefined : 'true'}
 	tabindex={readOnly ? undefined : -1}
+	onfocusin={readOnly ? undefined : onEditorActivate}
+	onpointerdown={readOnly ? undefined : onEditorActivate}
 	ondragover={readOnly ? undefined : onSectionDragOver}
 	ondrop={readOnly ? undefined : (e) => onSectionDrop(e, sectionDropTarget?.headerIdx ?? -1)}
 >
 	{#if unlabeledRowIdxs.length && !sectionDragCompact}
+		{@const unlabeledEnd = sections[0]?.headerRowIdx ?? rows.length}
 		<section class="song-section song-section--unlabeled">
-			{@render sectionInserts(0, sections[0]?.headerRowIdx ?? rows.length)}
+			{@render sectionInserts(0, unlabeledEnd)}
 			<div class="song-section-grid chord-grid">
+				{#if !readOnly}
+					<div class="song-section-toolbar song-section-toolbar--bare">
+						{@render lineKindSelect(activeRowInRange(0, unlabeledEnd, unlabeledRowIdxs[0] ?? 0))}
+					</div>
+				{/if}
 				{#each unlabeledRowIdxs as i (i)}
 					{@render songLine(i)}
 				{/each}
@@ -1080,13 +1157,16 @@
 		>
 			{@render sectionInserts(section.headerRowIdx, section.bodyEnd)}
 			<div class="song-section-grid chord-grid">
-				<div
-					class="song-section-label"
-					title={readOnly ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
-					draggable={readOnly ? 'false' : 'true'}
-					ondragstart={readOnly ? undefined : (e) => onSectionDragStart(e, headerIdx)}
-					ondragend={readOnly ? undefined : onSectionDragEnd}
-				>
+				<div class="song-section-toolbar">
+					<div
+						class="song-section-label"
+						class:is-line-active={activeRow === section.headerRowIdx}
+						data-row={section.headerRowIdx}
+						title={readOnly ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
+						draggable={readOnly ? 'false' : 'true'}
+						ondragstart={readOnly ? undefined : (e) => onSectionDragStart(e, headerIdx)}
+						ondragend={readOnly ? undefined : onSectionDragEnd}
+					>
 					{#if !readOnly}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span
@@ -1193,7 +1273,10 @@
 						</div>
 					{/if}
 				</div>
-				<div class="song-section-end"></div>
+				{@render lineKindSelect(
+					activeRowInRange(section.headerRowIdx, section.bodyEnd, section.headerRowIdx)
+				)}
+				</div>
 				{#if !hideBody}
 					{#each Array.from({ length: section.bodyEnd - section.bodyStart }, (_, offset) => section.bodyStart + offset) as i (i)}
 						{@render songLine(i)}
@@ -1281,8 +1364,8 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75em;
-		padding: 0.1em 0 0.3em;
+		gap: 1em;
+		padding: 0.2em 0 0.4em;
 	}
 	.editable-song.read-only,
 	.editable-song.read-only :global(*) {
@@ -1308,7 +1391,7 @@
 		border: 1px solid var(--section-accent);
 		border-radius: 7px;
 		background: #fff;
-		padding: 0.4em 0.55em 0.45em;
+		padding: 0.6em 0.95em 0.7em;
 		overflow: visible;
 	}
 	.editable-song .section-insert {
@@ -1364,12 +1447,26 @@
 	.editable-song .song-section--unlabeled {
 		border-color: #cfd8dc;
 	}
+	.editable-song .song-section-toolbar {
+		grid-column: 1 / -1;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.65em;
+		min-width: 0;
+		margin: 0 0 0.35em;
+	}
+	.editable-song .song-section-toolbar--bare {
+		justify-content: flex-end;
+		margin-bottom: 0.15em;
+	}
 	.editable-song .song-section-label {
 		display: flex;
 		align-items: center;
-		gap: 0.35em;
+		gap: 0.4em;
+		flex: 1 1 auto;
 		min-width: 0;
-		min-height: 1.45em;
+		min-height: 1.65em;
 		padding: 0;
 		color: var(--section-accent);
 		font-size: 0.78em;
@@ -1379,9 +1476,38 @@
 		background: transparent;
 		line-height: 1.15;
 	}
-	.editable-song .song-section-end {
-		min-width: 0;
-		min-height: 1.2em;
+	.editable-song .line-kind {
+		appearance: none;
+		-webkit-appearance: none;
+		flex: 0 0 auto;
+		margin: 0;
+		min-width: 6.4em;
+		height: 1.65em;
+		padding: 0 1.35em 0 0.55em;
+		border: 1px solid color-mix(in srgb, var(--section-accent) 28%, #d1d5db);
+		border-radius: 999px;
+		background-color: #fff;
+		background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+			linear-gradient(135deg, currentColor 50%, transparent 50%);
+		background-position:
+			calc(100% - 9px) 55%,
+			calc(100% - 6px) 55%;
+		background-size: 4px 4px, 4px 4px;
+		background-repeat: no-repeat;
+		color: color-mix(in srgb, var(--section-accent) 80%, #4b5563);
+		font-size: 0.72em;
+		font-weight: 700;
+		font-family: inherit;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		cursor: pointer;
+		line-height: 1.2;
+	}
+	.editable-song .line-kind:hover,
+	.editable-song .line-kind:focus-visible {
+		border-color: var(--section-accent);
+		outline: none;
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--section-accent) 18%, transparent);
 	}
 	.editable-song .song-section-ellipsis {
 		color: var(--section-accent);
@@ -1392,7 +1518,8 @@
 	.editable-song .song-section-grid {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
-		column-gap: 0.55em;
+		column-gap: 1em;
+		row-gap: 0.18em;
 		align-items: center;
 		width: 100%;
 	}
@@ -1435,7 +1562,8 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 	.editable-song.is-section-dragging .section-header-actions,
-	.editable-song.is-section-dragging .song-section-end {
+	.editable-song.is-section-dragging .line-kind,
+	.editable-song.is-section-dragging .song-section-toolbar--bare {
 		display: none;
 	}
 	.editable-song.is-section-dragging .section-header-edit {
@@ -1520,6 +1648,10 @@
 		background: rgba(245, 158, 11, 0.04);
 		border-radius: 3px;
 	}
+	.editable-song .is-line-active {
+		border-radius: 3px;
+		box-shadow: inset 3px 0 0 var(--section-accent, #6b7280);
+	}
 	.editable-song .blank-cell {
 		min-height: 1.2em;
 	}
@@ -1574,7 +1706,9 @@
 		}
 		.editable-song .section-drag-handle,
 		.editable-song .section-insert,
-		.editable-song .section-header-actions {
+		.editable-song .section-header-actions,
+		.editable-song .line-kind,
+		.editable-song .song-section-toolbar--bare {
 			display: none;
 		}
 		.editable-song .song-section-grid {
