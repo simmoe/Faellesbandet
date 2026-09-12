@@ -19,8 +19,7 @@
 	import {
 		cleanSectionHeader,
 		normalizeAccidentals,
-		renderBarLine,
-		sectionHeaderType
+		renderBarLine
 	} from '$lib/chordFormatter';
 	import { normalizeBassLine, regroupBassLine as regroupSingleBassLine } from '$lib/migrate';
 	import {
@@ -110,6 +109,11 @@
 	// ──────────────────────────────────────────────────────────────────────
 	const sections = $derived(buildSections(rows));
 	const collapsedSet = $derived(new Set(collapsedSections));
+	const unlabeledRowIdxs = $derived.by(() => {
+		const end = sections[0]?.headerRowIdx ?? rows.length;
+		if (end <= 0) return [] as number[];
+		return Array.from({ length: end }, (_, i) => i);
+	});
 	const rowToHeaderIdx = $derived.by(() => {
 		const map = new Array<number>(rows.length).fill(-1);
 		for (const s of sections) {
@@ -117,11 +121,6 @@
 		}
 		return map;
 	});
-
-	function isRowHidden(rowIdx: number): boolean {
-		const h = rowToHeaderIdx[rowIdx];
-		return h >= 0 && collapsedSet.has(h);
-	}
 
 	function toggleSectionCollapsed(headerIdx: number) {
 		if (!onCollapsedSectionsChange) return;
@@ -984,8 +983,6 @@
 
 {#snippet bassCell(i: number)}
 	{@const hasBass = !!bassLines[String(i)]?.trim()}
-	{@const sectionIdx = headerIdxForRow(i)}
-	{@const sectionCls = sectionRowClass(sectionIdx)}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
@@ -993,12 +990,7 @@
 		class:rhythm-cell-empty={!hasBass}
 		class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'bass'}
 		class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'bass'}
-		class:section-drag-source={sectionCls.source}
-		class:section-drop-target={sectionCls.target}
-		class:section-drop-before={sectionCls.before}
-		class:section-drop-after={sectionCls.after}
 		data-row={i}
-		data-section={sectionIdx >= 0 ? sectionIdx : undefined}
 		title={readOnly ? undefined : hasBass ? 'Klik for at redigere · træk for at kopiere bass-linjen' : 'Klik for at starte en baslinje'}
 		draggable={readOnly || !hasBass ? 'false' : 'true'}
 		onmouseenter={readOnly ? undefined : hideRowToolbar}
@@ -1014,45 +1006,117 @@
 	</div>
 {/snippet}
 
+{#snippet songLine(i: number)}
+	{@const row = rows[i]}
+	{#if row.kind === 'blank' || row.kind === 'lyric'}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="lyrics-cell blank-cell song-line"
+			class:lyric-cell={row.kind === 'lyric'}
+			contenteditable={readOnly ? 'false' : 'plaintext-only'}
+			use:init={row.kind === 'blank' ? '' : row.text}
+			data-row={i}
+			data-field="text"
+			oninput={readOnly ? undefined : (e) => onCellInput(e, i)}
+			onblur={readOnly ? undefined : () => onCellBlur(i)}
+			onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
+			onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
+			onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
+			onfocus={readOnly ? undefined : hideRowToolbar}
+			onclick={readOnly ? undefined : hideRowToolbar}
+			ondragover={readOnly ? undefined : onSectionDragOver}
+			ondrop={readOnly ? undefined : (e) => onSectionDrop(e, resolveDropHeaderIdx(i))}
+			role={readOnly ? 'presentation' : 'textbox'}
+			tabindex={readOnly ? undefined : 0}
+			aria-label={readOnly ? undefined : row.kind === 'blank' ? 'Tom linje' : 'Tekst-linje'}
+		></div>
+		{#if !readOnly}
+			{@render rowGutter(i)}
+		{/if}
+		{@render bassCell(i)}
+	{:else if row.kind === 'chord'}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<div
+			class="lyrics-cell chord-cell chord-cell-clickable song-line"
+			class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'chord'}
+			class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'chord'}
+			data-row={i}
+			title={readOnly ? undefined : 'Klik for at redigere · træk for at kopiere til en anden linje'}
+			draggable={readOnly ? 'false' : 'true'}
+			onmousedown={readOnly ? undefined : hideRowToolbar}
+			ondragstart={readOnly ? undefined : (e) => onLineDragStart(e, i, 'chord')}
+			ondragend={readOnly ? undefined : onLineDragEnd}
+			ondragover={readOnly ? undefined : (e) => onLineDragOver(e, i, 'chord')}
+			ondragleave={readOnly ? undefined : () => onLineDragLeave(i, 'chord')}
+			ondrop={readOnly ? undefined : (e) => onLineDrop(e, i, 'chord')}
+			onclick={readOnly ? undefined : () => { hideRowToolbar(); openChordModal(i); }}
+			onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
+			role={readOnly ? 'presentation' : 'button'}
+			tabindex={readOnly ? undefined : 0}
+			aria-label={readOnly ? undefined : `Rediger akkord-linje for række ${i + 1}`}
+		>{#if row.text.trim()}{@html renderBarLine(row.text)}{:else}&nbsp;{/if}</div>
+		{#if !readOnly}
+			{@render rowGutter(i)}
+		{/if}
+		{@render bassCell(i)}
+	{/if}
+{/snippet}
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
-	class="editable-song chord-grid"
+	class="editable-song"
 	class:read-only={readOnly}
 	class:is-section-dragging={sectionDragCompact}
 	class:is-section-copying={sectionDragCopy}
 	role={readOnly ? 'presentation' : 'textbox'}
 	aria-multiline={readOnly ? undefined : 'true'}
 	tabindex={readOnly ? undefined : -1}
-		onmouseleave={readOnly ? undefined : hideRowToolbarSoon}
-		ondragover={readOnly ? undefined : onSectionDragOver}
-		ondrop={readOnly ? undefined : (e) => onSectionDrop(e, sectionDropTarget?.headerIdx ?? -1)}
+	onmouseleave={readOnly ? undefined : hideRowToolbarSoon}
+	ondragover={readOnly ? undefined : onSectionDragOver}
+	ondrop={readOnly ? undefined : (e) => onSectionDrop(e, sectionDropTarget?.headerIdx ?? -1)}
 >
-	{#each rows as row, i (i)}
-		{#if row.kind === 'header'}
-			{@const headerIdx = sections.findIndex((s) => s.headerRowIdx === i)}
-			{@const isCollapsed = headerIdx >= 0 && collapsedSet.has(headerIdx)}
-			{@const prevSame = headerIdx >= 0 ? findPreviousSameType(sections, headerIdx) : null}
-			{@const sectionCls = sectionRowClass(headerIdx)}
-			<div
-				class="section-header-cell"
-				class:section-header-cell--collapsed={isCollapsed}
-				class:section-drop-target={sectionCls.target}
-				class:section-drop-before={sectionCls.before}
-				class:section-drop-after={sectionCls.after}
-				class:section-drag-source={sectionCls.source}
-				data-section={headerIdx >= 0 ? headerIdx : undefined}
-				data-section-block={headerIdx >= 0 ? headerIdx : undefined}
-				title={readOnly || headerIdx < 0 ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
-				draggable={readOnly || headerIdx < 0 ? 'false' : 'true'}
-				ondragstart={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDragStart(e, headerIdx)}
-				ondragend={readOnly ? undefined : onSectionDragEnd}
-				ondragover={readOnly || headerIdx < 0 ? undefined : onSectionDragOver}
-				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
-				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
-			>
-				<div class="section-header section-header-pill section-header--{sectionHeaderType(row.text)}">
-					{#if headerIdx >= 0 && !readOnly}
+	{#if unlabeledRowIdxs.length && !sectionDragCompact}
+		<section class="song-section song-section--unlabeled">
+			<div class="song-section-grid chord-grid">
+				{#each unlabeledRowIdxs as i (i)}
+					{@render songLine(i)}
+				{/each}
+			</div>
+		</section>
+	{/if}
+	{#each sections as section (section.headerIdx)}
+		{@const headerIdx = section.headerIdx}
+		{@const headerRow = rows[section.headerRowIdx]}
+		{@const isCollapsed = collapsedSet.has(headerIdx)}
+		{@const hideBody = isCollapsed || sectionDragCompact}
+		{@const prevSame = findPreviousSameType(sections, headerIdx)}
+		{@const sectionCls = sectionRowClass(headerIdx)}
+		<section
+			class="song-section song-section--{section.type}"
+			class:song-section--collapsed={isCollapsed}
+			class:section-drop-target={sectionCls.target}
+			class:section-drop-before={sectionCls.before}
+			class:section-drop-after={sectionCls.after}
+			class:section-drag-source={sectionCls.source}
+			data-section={headerIdx}
+			data-section-block={headerIdx}
+			ondragover={readOnly ? undefined : onSectionDragOver}
+			ondrop={readOnly ? undefined : (e) => onSectionDrop(e, headerIdx)}
+		>
+			<div class="song-section-label-row">
+				<div
+					class="song-section-label"
+					title={readOnly ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
+					draggable={readOnly ? 'false' : 'true'}
+					ondragstart={readOnly ? undefined : (e) => onSectionDragStart(e, headerIdx)}
+					ondragend={readOnly ? undefined : onSectionDragEnd}
+					onmouseenter={readOnly ? undefined : () => showRowToolbar(section.headerRowIdx)}
+				>
+					{#if !readOnly}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span
 							class="section-drag-handle"
@@ -1078,174 +1142,100 @@
 					<div
 						class="section-header-edit"
 						contenteditable={readOnly ? 'false' : 'plaintext-only'}
-						use:init={row.text}
-						data-row={i}
+						use:init={headerRow.kind === 'header' ? headerRow.text : ''}
+						data-row={section.headerRowIdx}
 						data-field="text"
-						oninput={readOnly ? undefined : (e) => onCellInput(e, i)}
-						onblur={readOnly ? undefined : () => onCellBlur(i)}
-						onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
-						onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
+						oninput={readOnly ? undefined : (e) => onCellInput(e, section.headerRowIdx)}
+						onblur={readOnly ? undefined : () => onCellBlur(section.headerRowIdx)}
+						onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, section.headerRowIdx)}
+						onpaste={readOnly ? undefined : (e) => onCellPaste(e, section.headerRowIdx)}
 						onfocus={readOnly ? undefined : hideRowToolbar}
 						onclick={readOnly ? undefined : hideRowToolbar}
 						role={readOnly ? 'presentation' : 'textbox'}
 						tabindex={readOnly ? undefined : 0}
 						aria-label={readOnly ? undefined : 'Sektionsnavn'}
 					></div>
-				</div>
-				{#if headerIdx >= 0 && !readOnly}
-					<div class="section-header-actions">
-						{#if prevSame}
+					{#if isCollapsed}
+						<span class="song-section-ellipsis" aria-hidden="true">…</span>
+					{/if}
+					{#if !readOnly}
+						<div class="section-header-actions">
+							{#if prevSame}
+								<button
+									type="button"
+									class="section-action-btn"
+									title="Kopiér indhold fra forrige {prevSame.headerText}"
+									aria-label="Kopiér indhold fra forrige {prevSame.headerText}"
+									onmousedown={(e) => e.preventDefault()}
+									onclick={() => copyFromPreviousSameType(headerIdx)}
+								>
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+										<rect x="9" y="9" width="11" height="11" rx="2"></rect>
+										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+									</svg>
+								</button>
+								{#if previousSameTypeHasChords(headerIdx)}
+									<button
+										type="button"
+										class="section-action-btn section-action-btn--bass"
+										title="Kopiér akkorder og bas fra forrige {prevSame.headerText}"
+										aria-label="Kopiér akkorder og bas fra forrige {prevSame.headerText}"
+										onmousedown={(e) => e.preventDefault()}
+										onclick={() => copyChordsAndBassFromPreviousSameType(headerIdx)}
+									>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<path d="M9 18V5l12-2v13"></path>
+											<circle cx="6" cy="18" r="3"></circle>
+											<circle cx="18" cy="16" r="3"></circle>
+										</svg>
+									</button>
+								{/if}
+							{/if}
 							<button
 								type="button"
 								class="section-action-btn"
-								title="Kopiér indhold fra forrige {prevSame.headerText}"
-								aria-label="Kopiér indhold fra forrige {prevSame.headerText}"
+								class:is-active={isCollapsed}
+								title={isCollapsed ? 'Klap ud' : 'Klap sammen (skjules også ved print)'}
+								aria-label={isCollapsed ? 'Klap sektion ud' : 'Klap sektion sammen'}
+								aria-expanded={!isCollapsed}
 								onmousedown={(e) => e.preventDefault()}
-								onclick={() => copyFromPreviousSameType(headerIdx)}
+								onclick={() => toggleSectionCollapsed(headerIdx)}
 							>
-								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-									<rect x="9" y="9" width="11" height="11" rx="2"></rect>
-									<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="chevron">
+									<polyline points="6 9 12 15 18 9"></polyline>
 								</svg>
 							</button>
-							{#if previousSameTypeHasChords(headerIdx)}
-								<button
-									type="button"
-									class="section-action-btn section-action-btn--bass"
-									title="Kopiér akkorder og bas fra forrige {prevSame.headerText}"
-									aria-label="Kopiér akkorder og bas fra forrige {prevSame.headerText}"
-									onmousedown={(e) => e.preventDefault()}
-									onclick={() => copyChordsAndBassFromPreviousSameType(headerIdx)}
-								>
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-										<path d="M9 18V5l12-2v13"></path>
-										<circle cx="6" cy="18" r="3"></circle>
-										<circle cx="18" cy="16" r="3"></circle>
-									</svg>
-								</button>
-							{/if}
-						{/if}
-						<button
-							type="button"
-							class="section-action-btn"
-							class:is-active={isCollapsed}
-							title={isCollapsed ? 'Klap ud' : 'Klap sammen (skjules også ved print)'}
-							aria-label={isCollapsed ? 'Klap sektion ud' : 'Klap sektion sammen'}
-							aria-expanded={!isCollapsed}
-							onmousedown={(e) => e.preventDefault()}
-							onclick={() => toggleSectionCollapsed(headerIdx)}
-						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="chevron">
-								<polyline points="6 9 12 15 18 9"></polyline>
-							</svg>
-						</button>
-						<button
-							type="button"
-							class="section-action-btn section-action-btn--danger"
-							title="Slet hele sektionen (kan fortrydes med ⌘Z)"
-							aria-label="Slet sektion"
-							onmousedown={(e) => e.preventDefault()}
-							onclick={() => deleteSection(headerIdx)}
-						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-								<polyline points="3 6 5 6 21 6"></polyline>
-								<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-								<path d="M10 11v6"></path>
-								<path d="M14 11v6"></path>
-								<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
-							</svg>
-						</button>
-					</div>
+							<button
+								type="button"
+								class="section-action-btn section-action-btn--danger"
+								title="Slet hele sektionen (kan fortrydes med ⌘Z)"
+								aria-label="Slet sektion"
+								onmousedown={(e) => e.preventDefault()}
+								onclick={() => deleteSection(headerIdx)}
+							>
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<polyline points="3 6 5 6 21 6"></polyline>
+									<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+									<path d="M10 11v6"></path>
+									<path d="M14 11v6"></path>
+									<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+								</svg>
+							</button>
+						</div>
+					{/if}
+				</div>
+				{#if !readOnly}
+					{@render rowGutter(section.headerRowIdx)}
 				{/if}
 			</div>
-			{@render rowGutter(i)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="section-header-echo"
-				class:section-drag-source={sectionCls.source}
-				class:section-drop-target={sectionCls.target}
-				class:section-drop-before={sectionCls.before}
-				class:section-drop-after={sectionCls.after}
-				data-section={headerIdx >= 0 ? headerIdx : undefined}
-				aria-hidden="true"
-				draggable={readOnly || headerIdx < 0 ? 'false' : 'true'}
-				ondragstart={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDragStart(e, headerIdx)}
-				ondragend={readOnly ? undefined : onSectionDragEnd}
-				ondragover={readOnly || headerIdx < 0 ? undefined : onSectionDragOver}
-				ondrop={readOnly || headerIdx < 0 ? undefined : (e) => onSectionDrop(e, headerIdx)}
-				onmouseenter={readOnly ? undefined : hideRowToolbar}
-			>
-				<span class="section-header section-header--{sectionHeaderType(row.text)}">
-					{cleanSectionHeader(row.text)}
-				</span>
-			</div>
-		{:else if sectionDragCompact || isRowHidden(i)}
-			<!-- skjult under form-træk eller af kollapset sektion -->
-		{:else if row.kind === 'blank' || row.kind === 'lyric'}
-			{@const sectionIdx = headerIdxForRow(i)}
-			{@const sectionCls = sectionRowClass(sectionIdx)}
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="lyrics-cell blank-cell"
-				class:lyric-cell={row.kind === 'lyric'}
-				class:section-drag-source={sectionCls.source}
-				class:section-drop-target={sectionCls.target}
-				class:section-drop-before={sectionCls.before}
-				class:section-drop-after={sectionCls.after}
-				contenteditable={readOnly ? 'false' : 'plaintext-only'}
-				use:init={row.kind === 'blank' ? '' : row.text}
-				data-row={i}
-				data-field="text"
-				data-section={sectionIdx >= 0 ? sectionIdx : undefined}
-				oninput={readOnly ? undefined : (e) => onCellInput(e, i)}
-				onblur={readOnly ? undefined : () => onCellBlur(i)}
-				onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, i)}
-				onpaste={readOnly ? undefined : (e) => onCellPaste(e, i)}
-				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
-				onfocus={readOnly ? undefined : hideRowToolbar}
-				onclick={readOnly ? undefined : hideRowToolbar}
-				ondragover={readOnly ? undefined : onSectionDragOver}
-				ondrop={readOnly ? undefined : (e) => onSectionDrop(e, resolveDropHeaderIdx(i))}
-				role={readOnly ? 'presentation' : 'textbox'}
-				tabindex={readOnly ? undefined : 0}
-				aria-label={readOnly ? undefined : row.kind === 'blank' ? 'Tom linje' : 'Tekst-linje'}
-			></div>
-			{@render rowGutter(i)}
-			{@render bassCell(i)}
-		{:else if row.kind === 'chord'}
-			{@const sectionIdx = headerIdxForRow(i)}
-			{@const sectionCls = sectionRowClass(sectionIdx)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-			<div
-				class="lyrics-cell chord-cell chord-cell-clickable"
-				class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'chord'}
-				class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'chord'}
-				class:section-drag-source={sectionCls.source}
-				class:section-drop-target={sectionCls.target}
-				class:section-drop-before={sectionCls.before}
-				class:section-drop-after={sectionCls.after}
-				data-row={i}
-				data-section={sectionIdx >= 0 ? sectionIdx : undefined}
-				title={readOnly ? undefined : 'Klik for at redigere · træk for at kopiere til en anden linje'}
-				draggable={readOnly ? 'false' : 'true'}
-				onmousedown={readOnly ? undefined : hideRowToolbar}
-				ondragstart={readOnly ? undefined : (e) => onLineDragStart(e, i, 'chord')}
-				ondragend={readOnly ? undefined : onLineDragEnd}
-				ondragover={readOnly ? undefined : (e) => onLineDragOver(e, i, 'chord')}
-				ondragleave={readOnly ? undefined : () => onLineDragLeave(i, 'chord')}
-				ondrop={readOnly ? undefined : (e) => onLineDrop(e, i, 'chord')}
-				onclick={readOnly ? undefined : () => { hideRowToolbar(); openChordModal(i); }}
-				onmouseenter={readOnly ? undefined : () => showRowToolbar(i)}
-				role={readOnly ? 'presentation' : 'button'}
-				tabindex={readOnly ? undefined : 0}
-				aria-label={readOnly ? undefined : `Rediger akkord-linje for række ${i + 1}`}
-			>{#if row.text.trim()}{@html renderBarLine(row.text)}{:else}&nbsp;{/if}</div>
-			{@render rowGutter(i)}
-			{@render bassCell(i)}
-		{/if}
+			{#if !hideBody}
+				<div class="song-section-grid chord-grid">
+					{#each Array.from({ length: section.bodyEnd - section.bodyStart }, (_, offset) => section.bodyStart + offset) as i (i)}
+						{@render songLine(i)}
+					{/each}
+				</div>
+			{/if}
+		</section>
 	{/each}
 </div>
 
@@ -1324,6 +1314,10 @@
 	.editable-song {
 		min-height: 4rem;
 		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75em;
+		padding: 0.1em 0 0.3em;
 	}
 	.editable-song.read-only,
 	.editable-song.read-only :global(*) {
@@ -1343,49 +1337,62 @@
 	.editable-song.read-only .blank-cell:empty::before {
 		content: '' !important;
 	}
-	.editable-song.chord-grid {
+	.editable-song .song-section {
+		--section-accent: #6b7280;
+		position: relative;
+		border: 1px solid var(--section-accent);
+		border-radius: 7px;
+		background: #fff;
+		padding: 0.4em 0.55em 0.45em;
+	}
+	.editable-song .song-section--unlabeled {
+		border-color: #cfd8dc;
+	}
+	.editable-song .song-section-label-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 11em;
+		column-gap: 0.55em;
+		align-items: center;
+	}
+	.editable-song .song-section-label {
+		display: flex;
+		align-items: center;
+		gap: 0.35em;
+		min-width: 0;
+		min-height: 1.45em;
+		padding: 0 0 0.15em;
+		color: var(--section-accent);
+		font-size: 0.78em;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		background: transparent;
+		line-height: 1.15;
+	}
+	.editable-song .song-section-ellipsis {
+		color: var(--section-accent);
+		opacity: 0.55;
+		letter-spacing: 0.15em;
+		font-weight: 700;
+	}
+	.editable-song .song-section-grid {
+		display: grid;
 		grid-template-columns: minmax(0, 1fr) 11em minmax(8em, max-content);
 		column-gap: 0.55em;
+		width: 100%;
 	}
-	.editable-song.chord-grid > .rhythm-cell {
+	.editable-song .song-section-grid :global(.rhythm-cell) {
 		justify-self: stretch;
 		text-align: right;
 		margin-left: 0;
 	}
-	.editable-song.chord-grid :global(.section-header-cell) {
-		grid-column: 1;
-		display: flex;
-		align-items: center;
-		gap: 0.4em;
-		border-radius: 0.35em;
-		min-width: 0;
-	}
-	.editable-song .section-header-echo {
-		justify-self: end;
-		align-self: center;
-		text-align: right;
-		pointer-events: auto;
-	}
-	.editable-song .section-header-echo .section-header {
-		opacity: 0.7;
-	}
-	.editable-song:not(.read-only) .section-header-cell,
-	.editable-song:not(.read-only) .section-header-echo,
+	.editable-song:not(.read-only) .song-section-label,
 	.editable-song:not(.read-only) .section-drag-handle {
 		cursor: grab;
 	}
-	.editable-song:not(.read-only) .section-header-cell:active,
+	.editable-song:not(.read-only) .song-section-label:active,
 	.editable-song:not(.read-only) .section-drag-handle:active {
 		cursor: grabbing;
-	}
-	.editable-song .section-header-pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.15em;
-		min-width: 0;
-	}
-	.editable-song .section-header-pill:has(.section-drag-handle) {
-		padding-left: 0.35rem;
 	}
 	.editable-song .section-drag-handle {
 		display: inline-flex;
@@ -1398,41 +1405,32 @@
 		opacity: 0.45;
 		touch-action: none;
 	}
-	.editable-song .section-header-cell:hover .section-drag-handle,
-	.editable-song .section-header-cell:focus-within .section-drag-handle {
+	.editable-song .song-section-label:hover .section-drag-handle,
+	.editable-song .song-section-label:focus-within .section-drag-handle {
 		opacity: 1;
 	}
 	.editable-song .section-header-edit {
 		-webkit-user-drag: none;
 	}
 	.editable-song.is-section-dragging {
-		row-gap: 0.55rem;
+		gap: 0.55rem;
 		min-height: 8rem;
 	}
-	.editable-song.is-section-dragging .section-header-cell {
-		position: relative;
-		grid-column: 1 / -1;
-		border-radius: 8px;
-		padding: 0.45rem 0.75rem;
-		background: rgba(15, 23, 42, 0.045);
-		box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.1);
+	.editable-song.is-section-dragging .song-section-label-row {
+		grid-template-columns: minmax(0, 1fr);
 	}
-	.editable-song.is-section-dragging .section-header-echo,
 	.editable-song.is-section-dragging .section-header-actions,
 	.editable-song.is-section-dragging .row-gutter {
 		display: none;
 	}
-	.editable-song.is-section-dragging .section-header-cell--collapsed::after {
-		content: none;
-	}
 	.editable-song.is-section-dragging .section-header-edit {
 		pointer-events: none;
 	}
-	.editable-song.is-section-dragging .section-header-cell.section-drag-source {
+	.editable-song .song-section.section-drag-source {
 		opacity: 0.4;
 	}
-	.editable-song.is-section-dragging .section-header-cell.section-drop-after::after,
-	.editable-song.is-section-dragging .section-header-cell.section-drop-before::before {
+	.editable-song .song-section.section-drop-after::after,
+	.editable-song .song-section.section-drop-before::before {
 		content: '';
 		position: absolute;
 		left: 0.2rem;
@@ -1443,21 +1441,22 @@
 		box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.18);
 		pointer-events: none;
 	}
-	.editable-song.is-section-dragging .section-header-cell.section-drop-after::after {
+	.editable-song .song-section.section-drop-after::after {
 		bottom: -0.4rem;
 	}
-	.editable-song.is-section-dragging .section-header-cell.section-drop-before::before {
+	.editable-song .song-section.section-drop-before::before {
 		top: -0.4rem;
 	}
 	.editable-song .section-header-actions {
 		display: inline-flex;
 		gap: 0.25em;
+		margin-left: auto;
 		opacity: 0;
 		transition: opacity 120ms ease;
 	}
-	.editable-song .section-header-cell:hover .section-header-actions,
-	.editable-song .section-header-cell:focus-within .section-header-actions,
-	.editable-song .section-header-cell--collapsed .section-header-actions {
+	.editable-song .song-section-label:hover .section-header-actions,
+	.editable-song .song-section-label:focus-within .section-header-actions,
+	.editable-song .song-section--collapsed .section-header-actions {
 		opacity: 1;
 	}
 	.editable-song .section-action-btn {
@@ -1469,9 +1468,9 @@
 		height: 1.6em;
 		padding: 0;
 		border-radius: 50%;
-		border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.18));
-		background: rgba(255, 255, 255, 0.08);
-		color: var(--color-ink-muted, #b9c1cf);
+		border: 1px solid color-mix(in srgb, var(--section-accent) 28%, #d1d5db);
+		background: #fff;
+		color: color-mix(in srgb, var(--section-accent) 72%, #6b7280);
 		cursor: pointer;
 		line-height: 0;
 		transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
@@ -1494,15 +1493,8 @@
 	.editable-song .section-action-btn.is-active .chevron {
 		transform: rotate(-90deg);
 	}
-	.editable-song .section-header-cell--collapsed .section-header-pill {
-		opacity: 0.7;
-	}
-	.editable-song .section-header-cell--collapsed::after {
-		content: '…';
-		color: var(--color-ink-faint, #6b7280);
-		font-size: 0.85em;
-		letter-spacing: 0.15em;
-		margin-left: 0.2em;
+	.editable-song .song-section--collapsed .song-section-label {
+		opacity: 0.82;
 	}
 	.editable-song .row-gutter {
 		display: flex;
@@ -1625,7 +1617,10 @@
 		border-color: rgba(255, 255, 255, 0.28);
 		background-color: rgba(255, 255, 255, 0.08);
 	}
-	.editable-song.read-only.chord-grid {
+	.editable-song.read-only .song-section-label-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.editable-song.read-only .song-section-grid {
 		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
 	}
 	.editable-song.read-only .row-gutter {
@@ -1635,7 +1630,10 @@
 		.editable-song .row-gutter {
 			display: none;
 		}
-		.editable-song.chord-grid {
+		.editable-song .song-section-label-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editable-song .song-section-grid {
 			grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
 		}
 	}
@@ -1657,7 +1655,7 @@
 	.editable-song .blank-cell {
 		min-height: 1.2em;
 	}
-	.editable-song:has(> :nth-child(2):last-child) .blank-cell:empty::before {
+	.editable-song .song-section--unlabeled:only-child .blank-cell:empty::before {
 		content: 'Skriv eller paste sang her — fx [Verse 1] og chord/lyric-linjer fra Ultimate Guitar';
 		color: var(--color-ink-faint);
 		font-style: italic;
@@ -1710,7 +1708,10 @@
 		.editable-song .row-gutter {
 			display: none;
 		}
-		.editable-song.chord-grid {
+		.editable-song .song-section-label-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.editable-song .song-section-grid {
 			grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
 		}
 	}

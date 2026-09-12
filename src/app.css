@@ -279,15 +279,15 @@ select {
 	visibility: hidden !important;
 	pointer-events: none !important;
 }
-.no-bass-tabs .editable-song.chord-grid {
+.no-bass-tabs .editable-song .song-section-grid {
 	grid-template-columns: minmax(0, 1fr) 11em 4em !important;
 	column-gap: 0.55em !important;
 }
-.no-bass-tabs .editable-song.read-only.chord-grid {
+.no-bass-tabs .editable-song.read-only .song-section-grid {
 	grid-template-columns: minmax(0, 1fr) 4em !important;
 }
 @media (hover: none), (pointer: coarse) {
-	.no-bass-tabs .editable-song.chord-grid {
+	.no-bass-tabs .editable-song .song-section-grid {
 		grid-template-columns: minmax(0, 1fr) 4em !important;
 	}
 }
@@ -459,15 +459,18 @@ select {
 .pdf-line--blank {
 	min-height: calc(0.14cm * var(--pdf-layout-scale));
 }
-.pdf-song-section--intro { --section-accent: #0d47a1; }
-.pdf-song-section--verse { --section-accent: #1b5e20; }
-.pdf-song-section--pre-chorus { --section-accent: #8d6e00; }
-.pdf-song-section--chorus { --section-accent: #b71c1c; }
-.pdf-song-section--bridge { --section-accent: #b3501a; }
-.pdf-song-section--solo { --section-accent: #6c5b00; }
-.pdf-song-section--interlude { --section-accent: #0d6e63; }
-.pdf-song-section--outro { --section-accent: #4527a0; }
-.pdf-song-section--coda { --section-accent: #4e342e; }
+.song-section--intro, .pdf-song-section--intro { --section-accent: #0d47a1; }
+.song-section--verse, .pdf-song-section--verse { --section-accent: #1b5e20; }
+.song-section--pre-chorus, .pdf-song-section--pre-chorus { --section-accent: #8d6e00; }
+.song-section--chorus, .pdf-song-section--chorus { --section-accent: #b71c1c; }
+.song-section--bridge, .pdf-song-section--bridge { --section-accent: #b3501a; }
+.song-section--solo, .pdf-song-section--solo { --section-accent: #6c5b00; }
+.song-section--interlude, .pdf-song-section--interlude { --section-accent: #0d6e63; }
+.song-section--outro, .pdf-song-section--outro { --section-accent: #4527a0; }
+.song-section--coda, .pdf-song-section--coda { --section-accent: #4e342e; }
+.song-section--other, .pdf-song-section--other, .song-section--unlabeled {
+	--section-accent: #6b7280;
+}
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Print-styles
