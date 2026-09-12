@@ -1448,6 +1448,7 @@
 	.editable-song .song-section {
 		--section-accent: #6b7280;
 		position: relative;
+		container-type: inline-size;
 		border: 1px solid var(--section-accent);
 		border-radius: 7px;
 		background: #fff;
@@ -1512,7 +1513,9 @@
 		border-color: #cfd8dc;
 	}
 	.editable-song .song-section-label {
+		grid-column: 1;
 		position: relative;
+		z-index: 1;
 		display: flex;
 		align-items: center;
 		gap: 0.4em;
@@ -1532,21 +1535,30 @@
 		min-height: 1.2em;
 	}
 	.editable-song .song-line-wrap {
+		grid-column: 1;
 		position: relative;
+		z-index: 1;
 		min-width: 0;
+	}
+	.editable-song .song-line-wrap:hover,
+	.editable-song .song-section-label:hover {
+		z-index: 6;
 	}
 	.editable-song .line-actions {
 		position: absolute;
 		top: 2px;
 		bottom: 2px;
-		right: 0.35em;
+		left: 50%;
+		left: 50cqi;
+		right: auto;
 		z-index: 4;
 		display: flex;
 		align-items: stretch;
 		gap: 0.3em;
+		transform: translateX(-50%);
 		opacity: 0;
 		pointer-events: none;
-		box-shadow: -10px 0 12px 4px #fff;
+		box-shadow: 0 0 10px 6px #fff;
 		transition: opacity 80ms ease;
 	}
 	.editable-song .song-line-wrap:hover:not(:has(.song-line:focus)) .line-actions,

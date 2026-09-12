@@ -287,9 +287,6 @@ select {
 	grid-template-columns: minmax(0, 1fr) !important;
 	column-gap: 0 !important;
 }
-.no-bass-tabs .editable-song .line-actions {
-	right: clamp(10em, 24%, 20em);
-}
 .no-bass-tabs .pdf-section-grid {
 	grid-template-columns: minmax(0, 1fr) 12mm !important;
 	column-gap: calc(2mm * var(--pdf-layout-scale, 1)) !important;
