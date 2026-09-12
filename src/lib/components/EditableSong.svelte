@@ -797,6 +797,11 @@
 	}
 
 	function onSectionDragStart(e: DragEvent, headerIdx: number) {
+		const target = e.target as HTMLElement | null;
+		if (target?.closest?.('[contenteditable]:not([contenteditable="false"])')) {
+			e.preventDefault();
+			return;
+		}
 		if (!e.dataTransfer || headerIdx < 0) {
 			e.preventDefault();
 			return;
@@ -847,7 +852,8 @@
 		e.preventDefault();
 		const raw = e.dataTransfer?.getData('application/x-song-section');
 		const sourceHeaderIdx = raw ? Number(raw) : sectionDrag?.headerIdx;
-		const mode = sectionModeFromEvent(e);
+		const mode: SectionRelocateMode =
+			sectionModeFromEvent(e) === 'copy' || sectionDragCopy ? 'copy' : 'move';
 		const place =
 			targetHeaderIdx >= 0
 				? sectionPlaceFromEvent(e, targetHeaderIdx)

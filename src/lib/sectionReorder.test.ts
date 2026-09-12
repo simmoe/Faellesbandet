@@ -142,6 +142,14 @@ test('copy before self duplicates the formstykke in place', () => {
 
 test('copy is never treated as a no-op, even on self', () => {
 	assert(!sectionDropIsNoOp(sampleRows, 1, 1, 'after', 'copy'), 'copy after self is allowed');
+	assert(!sectionDropIsNoOp(sampleRows, 0, 1, 'before', 'copy'), 'copy before next is allowed');
+});
+
+test('move no-op when insert position is already the source slot', () => {
+	assert(sectionDropIsNoOp(sampleRows, 1, 1, 'before', 'move'), 'self before');
+	assert(sectionDropIsNoOp(sampleRows, 1, 1, 'after', 'move'), 'self after');
+	assert(sectionDropIsNoOp(sampleRows, 1, 0, 'after', 'move'), 'after previous is already there');
+	assert(!sectionDropIsNoOp(sampleRows, 0, 1, 'after', 'move'), 'after next actually moves down');
 });
 
 test('copy before an earlier section shifts source bass down', () => {
