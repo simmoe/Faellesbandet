@@ -113,6 +113,12 @@
 		if (end <= 0) return [] as number[];
 		return Array.from({ length: end }, (_, i) => i);
 	});
+	const isPristineSong = $derived.by(() => {
+		if (readOnly || rows.length > 1) return false;
+		if (rows.length === 0) return true;
+		const r = rows[0];
+		return r.kind === 'blank' || r.text.trim() === '';
+	});
 	const rowToHeaderIdx = $derived.by(() => {
 		const map = new Array<number>(rows.length).fill(-1);
 		for (const s of sections) {
@@ -1186,6 +1192,7 @@
 <div
 	class="editable-song"
 	class:read-only={readOnly}
+	class:is-pristine={isPristineSong}
 	class:is-section-dragging={sectionDragCompact}
 	class:is-section-copying={sectionDragCopy}
 	role={readOnly ? 'presentation' : 'textbox'}
@@ -1798,7 +1805,7 @@
 	.editable-song .blank-cell {
 		min-height: 1.2em;
 	}
-	.editable-song .song-section--unlabeled:only-child .blank-cell:empty::before {
+	.editable-song.is-pristine .blank-cell:empty::before {
 		content: 'Skriv eller paste sang her — fx [Verse 1] og chord/lyric-linjer fra Ultimate Guitar';
 		color: var(--color-ink-faint);
 		font-style: italic;
