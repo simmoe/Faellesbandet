@@ -3,6 +3,7 @@
 @theme {
 	--font-sans: 'Oxygen', system-ui, -apple-system, sans-serif;
 	--font-display: 'Raleway', system-ui, sans-serif;
+	--font-title: 'Outfit', system-ui, sans-serif;
 	--font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
 
 	/* Stage / koncert-palette: dyb blå baggrund, varm rav-accent */

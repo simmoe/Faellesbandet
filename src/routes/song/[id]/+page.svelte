@@ -434,36 +434,35 @@
 	<title>{title || song?.title || 'Sang'} · {BAND.name}</title>
 </svelte:head>
 
-<main class="mx-auto max-w-5xl px-6 py-8">
-	<header class="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
-		<a href="/songbook" class="text-sm text-[var(--color-ink-faint)] hover:text-[var(--color-accent)]"
-			>← Tilbage til sangbogen</a
-		>
-		<div class="flex items-center gap-3 text-xs text-[var(--color-ink-faint)]">
-			{#if saveStatus === 'saving'}
-				<span class="text-[var(--color-ink-faint)]">Gemmer…</span>
-			{:else if saveStatus === 'saved'}
-				<span class="text-[var(--color-success)]">✓ Gemt</span>
-			{:else if saveStatus === 'error'}
-				<span class="text-[var(--color-error)]" title={saveError ?? ''}>Fejl ved gem</span>
-			{/if}
-			{#if authState.profile}
-				<span>Logget ind som {authState.profile.displayName}</span>
-			{/if}
-		</div>
-	</header>
-
+<main class="mx-auto max-w-5xl px-6 py-5">
 	{#if loading}
 		<div class="card p-8 text-center text-[var(--color-ink-muted)]">Henter sang…</div>
 	{:else if loadError}
+		<a href="/songbook" class="back-link no-print mb-3 inline-block">Sangbogen</a>
 		<div class="card p-6">
 			<p class="text-[var(--color-error)] font-semibold">Fejl</p>
 			<p class="mt-1 text-sm text-[var(--color-ink-muted)]">{loadError}</p>
 		</div>
 	{:else if song}
-		<article class="card song-card p-6 sm:p-7">
-			<div class="title-row no-print-toolbar">
-				<div class="min-w-0 flex-1">
+		<article class="card song-card">
+			<div class="song-chrome no-print">
+				<a href="/songbook" class="back-link">Sangbogen</a>
+				<div class="song-chrome-status">
+					{#if saveStatus === 'saving'}
+						<span>Gemmer…</span>
+					{:else if saveStatus === 'saved'}
+						<span class="text-[var(--color-success)]">Gemt</span>
+					{:else if saveStatus === 'error'}
+						<span class="text-[var(--color-error)]" title={saveError ?? ''}>Fejl ved gem</span>
+					{/if}
+					{#if authState.profile}
+						<span>{authState.profile.displayName}</span>
+					{/if}
+				</div>
+			</div>
+
+			<div class="song-head no-print-toolbar">
+				<div class="song-identity">
 					<div class="title-line">
 						<input
 							class="title-input"
@@ -471,103 +470,91 @@
 							bind:value={title}
 							oninput={() => scheduleSave()}
 							placeholder="Titel"
+							style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
 						/>
-						<span class="key-chip" aria-label="Toneart, transponér">
+						<span class="key-cluster" aria-label="Toneart, transponér">
 							<button
 								type="button"
-								class="key-chip-btn"
+								class="key-btn"
 								title="Transponér ned"
 								onclick={() => transpose(-1)}>−</button
 							>
 							<input
-								class="key-chip-input"
+								class="key-input"
 								type="text"
 								bind:value={key}
 								oninput={() => scheduleSave()}
-								placeholder="Toneart"
+								placeholder="—"
 								spellcheck="false"
 							/>
 							<button
 								type="button"
-								class="key-chip-btn"
+								class="key-btn"
 								title="Transponér op"
 								onclick={() => transpose(1)}>+</button
 							>
 						</span>
 					</div>
-					<input
-						class="artist-input"
-						type="text"
-						bind:value={artist}
-						oninput={() => scheduleSave()}
-						placeholder="Kunstner (valgfri)"
-					/>
+					<div class="song-sub">
+						<input
+							class="artist-input"
+							type="text"
+							bind:value={artist}
+							oninput={() => scheduleSave()}
+							placeholder="Kunstner"
+							style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
+						/>
+						<details class="meta-details">
+							<summary>Takter og kategorier</summary>
+							<div class="meta-panel">
+								<SongMetaForm
+									{title}
+									{artist}
+									{key}
+									{barsPerLine}
+									{categories}
+									{knownCategories}
+									categoryColors={effectiveCategoryColorMap}
+									onRegroupAllBassLines={regroupAllBassLines}
+									onChange={onMetaChange}
+								/>
+							</div>
+						</details>
+					</div>
 				</div>
-				<div class="flex items-center gap-1.5">
+				<div class="song-actions">
 					<label class="print-toggle" title="Vis bass-tabs på siden og tag dem med ved print">
 						<input type="checkbox" bind:checked={showBassTabs} onchange={() => scheduleSave()} />
-						Bass tabs
+						Bass
 					</label>
 					<label
 						class="print-toggle"
 						title="Skalér sangen proportionalt så den fylder maks én A4-side"
 					>
 						<input type="checkbox" bind:checked={fitSinglePage} onchange={() => scheduleSave()} />
-						Hold sang på en side
+						Én side
 					</label>
 					<button
 						type="button"
-						class="btn-secondary"
+						class="song-tool"
 						onclick={handlePdf}
 						disabled={pdfBusy}
 						title="Generér akkord-PDF og hent direkte"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-							><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle
-								cx="18"
-								cy="16"
-								r="3"
-							></circle></svg
-						>
 						{pdfBusy ? 'Genererer…' : 'Akkorder'}
 					</button>
 					<button
 						type="button"
-						class="btn-secondary"
+						class="song-tool"
 						onclick={handleAudiencePdf}
 						disabled={audiencePdfBusy}
 						title="Generér publikums-PDF uden akkorder"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-							><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path
-								d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"
-							></path><path d="M8 7h8"></path><path d="M8 11h7"></path></svg
-						>
 						{audiencePdfBusy ? 'Genererer…' : 'Tekst'}
 					</button>
 					<button
 						type="button"
-						class="btn-secondary !text-[var(--color-error)]"
+						class="song-tool song-tool-danger"
 						onclick={handleDelete}
 						title="Slet sang">Slet</button
 					>
@@ -585,25 +572,6 @@
 					<div class="print-artist">{artist.trim()}</div>
 				{/if}
 			</div>
-
-			<details class="meta-details mb-5">
-				<summary class="cursor-pointer text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-faint)]">
-					Toneart, takter, kategorier…
-				</summary>
-				<div class="mt-3">
-					<SongMetaForm
-						{title}
-						{artist}
-						{key}
-						{barsPerLine}
-						{categories}
-						{knownCategories}
-						categoryColors={effectiveCategoryColorMap}
-						onRegroupAllBassLines={regroupAllBassLines}
-						onChange={onMetaChange}
-					/>
-				</div>
-			</details>
 
 			<div class="song-area" class:no-bass-tabs={!showBassTabs}>
 				<EditableSong
@@ -678,20 +646,107 @@
 <style>
 	.song-card {
 		container-type: inline-size;
+		padding: 0.85rem 1.25rem 1.15rem;
+	}
+	.song-chrome {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-bottom: 0.6rem;
+		padding-bottom: 0.4rem;
+		border-bottom: 1px solid var(--color-border-subtle);
+	}
+	.back-link {
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--color-ink-faint);
+	}
+	.back-link:hover {
+		color: var(--color-ink);
+	}
+	.song-chrome-status {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		font-size: 0.68rem;
+		letter-spacing: 0.04em;
+		color: var(--color-ink-faint);
+	}
+	.song-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem 1.5rem;
+		margin-bottom: 0.7rem;
+	}
+	@container (max-width: 42rem) {
+		.song-head {
+			flex-wrap: wrap;
+			align-items: flex-start;
+		}
+		.song-actions {
+			width: 100%;
+			justify-content: flex-start;
+			padding-top: 0.15rem;
+		}
+	}
+	.song-identity {
+		min-width: 0;
+		flex: 1 1 12rem;
+	}
+	.song-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		gap: 0.1rem 0.15rem;
 	}
 	.print-toggle {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.8rem;
+		gap: 0.28rem;
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 		color: var(--color-ink-muted);
 		cursor: pointer;
 		user-select: none;
-		padding: 0 0.4rem;
+		padding: 0.2rem 0.35rem;
 		white-space: nowrap;
 	}
 	.print-toggle input {
-		accent-color: var(--color-accent);
+		accent-color: var(--color-ink);
+		width: 0.8rem;
+		height: 0.8rem;
+	}
+	.song-tool {
+		appearance: none;
+		border: none;
+		background: transparent;
+		padding: 0.2rem 0.4rem;
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-ink-muted);
+		cursor: pointer;
+	}
+	.song-tool:hover:not(:disabled) {
+		color: var(--color-ink);
+	}
+	.song-tool:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.song-tool-danger {
+		color: var(--color-error);
+	}
+	.song-tool-danger:hover:not(:disabled) {
+		color: #991b1b;
 	}
 	.play-controls {
 		position: fixed;
@@ -762,104 +817,119 @@
 	.play-controls.is-playing .play-side:hover {
 		background: rgba(245, 158, 11, 0.12);
 	}
-	.title-row {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 0.75rem;
-		margin-bottom: 0.75rem;
-	}
 	.title-line {
 		display: flex;
 		align-items: baseline;
-		gap: 0.6rem;
+		gap: 0.7rem;
 		min-width: 0;
-		flex-wrap: wrap;
 	}
 	.title-input {
-		min-width: 0;
-		flex: 1 1 auto;
+		min-width: 6ch;
+		max-width: calc(100% - 5.5rem);
+		flex: 0 1 auto;
 		background: transparent;
 		border: none;
-		font-family: var(--font-display);
-		font-size: 1.6rem;
-		line-height: 1.1;
-		font-weight: 700;
+		font-family: var(--font-title);
+		font-size: 1.55rem;
+		line-height: 1.12;
+		font-weight: 400;
+		letter-spacing: -0.03em;
 		color: var(--color-ink);
-		padding: 0.05rem 0.25rem;
-		border-radius: 4px;
+		padding: 0;
+		border-radius: 0;
 	}
 	.title-input:focus {
 		outline: none;
-		background: var(--color-accent-soft);
+		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
-	.key-chip {
+	.key-cluster {
 		display: inline-flex;
-		align-items: center;
+		align-items: baseline;
 		flex: 0 0 auto;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 999px;
-		background: #ffffff;
+		gap: 0.05rem;
+		color: var(--color-ink-muted);
+	}
+	.key-btn {
+		padding: 0 0.2rem;
+		font-weight: 400;
 		font-size: 0.85rem;
 		line-height: 1;
-		overflow: hidden;
-	}
-	.key-chip-btn {
-		padding: 0.3rem 0.55rem;
-		font-weight: 600;
-		color: var(--color-ink);
+		color: var(--color-ink-faint);
 		background: transparent;
 		border: none;
 		cursor: pointer;
 	}
-	.key-chip-btn:hover {
-		background: #f3f4f6;
-	}
-	.key-chip-input {
-		width: 3.2rem;
-		text-align: center;
-		font-weight: 700;
-		font-family: var(--font-mono);
-		font-size: 0.85rem;
+	.key-btn:hover {
 		color: var(--color-ink);
+	}
+	.key-input {
+		width: 2.4rem;
+		text-align: center;
+		font-weight: 500;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		letter-spacing: 0.02em;
+		color: var(--color-ink-muted);
 		background: transparent;
 		border: none;
-		padding: 0.3rem 0;
-		border-left: 1px solid var(--color-border-subtle);
-		border-right: 1px solid var(--color-border-subtle);
+		padding: 0;
 	}
-	.key-chip-input:focus {
+	.key-input:focus {
 		outline: none;
-		background: var(--color-accent-soft);
+		color: var(--color-ink);
+		box-shadow: inset 0 -1px 0 var(--color-ink);
+	}
+	.song-sub {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.15rem 0.9rem;
+		margin-top: 0.12rem;
 	}
 	.artist-input {
-		width: 100%;
+		width: auto;
+		min-width: 8ch;
+		max-width: 100%;
+		flex: 0 1 auto;
 		background: transparent;
 		border: none;
+		font-family: var(--font-title);
 		font-size: 0.78rem;
 		font-weight: 400;
 		color: var(--color-ink-faint);
-		padding: 0.05rem 0.25rem;
-		margin-top: 0.1rem;
-		border-radius: 4px;
-		font-style: italic;
-		letter-spacing: 0.01em;
+		padding: 0;
+		letter-spacing: 0.02em;
 	}
 	.artist-input:focus {
 		outline: none;
-		background: var(--color-bg-card-muted);
-		font-style: normal;
+		color: var(--color-ink);
+		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
 	.artist-input::placeholder {
-		font-style: italic;
 		color: var(--color-ink-faint);
-		opacity: 0.6;
+		opacity: 0.55;
 	}
 	.print-header {
 		display: none;
 	}
+	.meta-details {
+		min-width: 0;
+	}
+	.meta-details[open] {
+		flex: 1 1 100%;
+	}
 	.meta-details > summary {
 		list-style: none;
+		cursor: pointer;
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-ink-faint);
+		user-select: none;
+	}
+	.meta-details > summary:hover {
+		color: var(--color-ink-muted);
 	}
 	.meta-details > summary::-webkit-details-marker {
 		display: none;
@@ -867,19 +937,13 @@
 	.meta-details > summary::marker {
 		content: '';
 	}
-	.meta-details > summary::before {
-		content: '▸';
-		display: inline-block;
-		margin-right: 0.4em;
-		transition: transform 120ms ease;
-	}
-	.meta-details[open] > summary::before {
-		transform: rotate(90deg);
+	.meta-panel {
+		margin-top: 0.75rem;
 	}
 	.song-area {
 		background: #ffffff;
-		border-radius: 0.5rem;
-		padding: 1.25rem;
+		border-radius: 0.35rem;
+		padding: 0.9rem 1rem 1rem;
 		border: 1px solid var(--color-border-subtle);
 	}
 </style>
