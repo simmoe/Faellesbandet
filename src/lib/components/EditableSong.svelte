@@ -1300,12 +1300,17 @@
 								{#if previousSameTypeHasChords(headerIdx)}
 									<button
 										type="button"
-										class="section-copy-link"
+										class="section-action-btn section-action-btn--bass"
 										title="Kopiér akkorder og bas fra forrige {prevSame.headerText}"
+										aria-label="Kopiér akkorder og bas fra forrige {prevSame.headerText}"
 										onmousedown={(e) => e.preventDefault()}
 										onclick={() => copyChordsAndBassFromPreviousSameType(headerIdx)}
 									>
-										Kopiér akkorder og bas fra sidste {prevSame.headerText}
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<path d="M9 18V5l12-2v13"></path>
+											<circle cx="6" cy="18" r="3"></circle>
+											<circle cx="18" cy="16" r="3"></circle>
+										</svg>
 									</button>
 								{/if}
 							{/if}
@@ -1525,8 +1530,7 @@
 		z-index: 1;
 		display: flex;
 		align-items: center;
-		flex-wrap: wrap;
-		gap: 0.4em 0.65em;
+		gap: 0.4em;
 		min-width: 0;
 		min-height: 1.65em;
 		padding: 0 0.15em 0.28em 0;
@@ -1703,18 +1707,6 @@
 		opacity: 1;
 	}
 	.editable-song .section-header-edit {
-		flex: 1 1 auto;
-		min-width: 6ch;
-		display: inline-block;
-		padding: 0;
-		border: 0;
-		border-radius: 0;
-		font-size: inherit;
-		font-weight: inherit;
-		letter-spacing: inherit;
-		text-transform: inherit;
-		color: inherit;
-		background: transparent;
 		-webkit-user-drag: none;
 	}
 	.editable-song.is-section-dragging {
@@ -1754,29 +1746,9 @@
 	}
 	.editable-song .section-header-actions {
 		display: inline-flex;
-		align-items: center;
-		gap: 0.35em 0.55em;
-		margin-left: auto;
-		flex: 0 0 auto;
+		gap: 0.25em;
+		margin-left: 0.15em;
 		opacity: 1;
-	}
-	.editable-song .section-copy-link {
-		appearance: none;
-		display: inline-flex;
-		align-items: center;
-		padding: 0.08rem 0;
-		border: none;
-		background: transparent;
-		color: color-mix(in srgb, var(--section-accent) 72%, #64748b);
-		font-size: 0.68rem;
-		font-weight: 500;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.editable-song .section-copy-link:hover {
-		color: var(--color-accent, #f59e0b);
 	}
 	.editable-song .section-action-btn {
 		appearance: none;
@@ -1818,10 +1790,8 @@
 	.editable-song .lyrics-cell,
 	.editable-song .section-header-edit {
 		outline: none;
-		caret-color: var(--color-accent);
-	}
-	.editable-song .lyrics-cell {
 		min-width: 1ch;
+		caret-color: var(--color-accent);
 	}
 	.editable-song .lyrics-cell:focus,
 	.editable-song .section-header-edit:focus {
@@ -1976,6 +1946,18 @@
 	.bass-modal-btn--primary:hover {
 		background: #d97706;
 		border-color: #d97706;
+	}
+	.editable-song .section-header-edit {
+		display: inline-block;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		font-size: inherit;
+		font-weight: inherit;
+		letter-spacing: inherit;
+		text-transform: inherit;
+		color: inherit;
+		background: transparent;
 	}
 	.editable-song .section-header-edit:empty::before {
 		content: 'FORM';
