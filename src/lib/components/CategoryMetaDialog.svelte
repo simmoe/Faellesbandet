@@ -203,15 +203,6 @@
 				{#if selectedCategory}
 					<div class="category-editor-title">
 						<h3>{selectedCategory}</h3>
-						<button
-							type="button"
-							class="btn-secondary btn-sm !text-[var(--color-error)]"
-							onclick={handleDeleteCategory}
-							disabled={saving || uploading}
-							title="Fjerner kategorien fra sange og sletter kategori-metadata."
-						>
-							Slet kategori
-						</button>
 					</div>
 
 					<label class="form-label" for="category-name">Navn</label>
@@ -274,6 +265,36 @@
 		{#if error}
 			<p class="category-error">{error}</p>
 		{/if}
+		{#if selectedCategory}
+			<div class="category-modal-footer">
+				<button
+					type="button"
+					class="category-delete-link"
+					onclick={handleDeleteCategory}
+					disabled={saving || uploading}
+					title="Fjerner kategorien fra sange og sletter kategori-metadata."
+				>
+					<svg
+						width="13"
+						height="13"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<polyline points="3 6 5 6 21 6"></polyline>
+						<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+						<path d="M10 11v6"></path>
+						<path d="M14 11v6"></path>
+						<path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+					</svg>
+					Slet kategori
+				</button>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -305,8 +326,7 @@
 		padding: 1.4rem;
 	}
 	.category-modal-header,
-	.category-image-actions,
-	.category-editor-title {
+	.category-image-actions {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -486,6 +506,33 @@
 		margin: 0.9rem 0 0;
 		color: var(--color-error);
 		font-size: 0.9rem;
+	}
+	.category-modal-footer {
+		flex: 0 0 auto;
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 0.85rem;
+	}
+	.category-delete-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.08rem 0;
+		border: none;
+		background: transparent;
+		color: var(--color-error);
+		font-size: 0.72rem;
+		font-weight: 500;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+	.category-delete-link:hover:not(:disabled) {
+		color: #991b1b;
+	}
+	.category-delete-link:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	@media (max-width: 760px) {
 		.category-admin-grid {
