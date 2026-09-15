@@ -891,45 +891,46 @@
 								· {setCountLabel(countSetsForCategory(printCategory))}
 							{/if}
 						</p>
+					{:else}
+						<div
+							class="print-set-palette"
+							role="button"
+							tabindex="0"
+							draggable="true"
+							ondragstart={(e) => onPrintDragStart(e, { kind: 'palette-set' })}
+							ondragend={onPrintDragEnd}
+							title="Træk ind i listen for at indsætte en ny tom sæt-side"
+						>
+							<span aria-hidden="true">+</span>
+							Sæt
+						</div>
 					{/if}
-					<div class="print-order-actions">
-						{#if editingPrintOrder === printCategory}
-							<div
-								class="print-set-palette"
-								role="button"
-								tabindex="0"
-								draggable="true"
-								ondragstart={(e) => onPrintDragStart(e, { kind: 'palette-set' })}
-								ondragend={onPrintDragEnd}
-								title="Træk ind i listen for at indsætte en ny tom sæt-side"
-							>
-								<span aria-hidden="true">+</span>
-								Sæt
-							</div>
-							<button
-								type="button"
-								class="panel-link"
-								onclick={() => (editingPrintOrder = null)}
-							>
-								Færdig
-							</button>
-						{:else}
-							<button
-								type="button"
-								class="panel-link"
-								onclick={() => (editingPrintOrder = printCategory)}
-							>
-								Redigér rækkefølge
-							</button>
-						{/if}
+				</div>
+				<div class="print-order-actions">
+					{#if editingPrintOrder === printCategory}
 						<button
 							type="button"
 							class="panel-link"
-							onclick={() => openCategoryEditor(printCategory)}
+							onclick={() => (editingPrintOrder = null)}
 						>
-							Redigér kategori
+							Færdig
 						</button>
-					</div>
+					{:else}
+						<button
+							type="button"
+							class="panel-link"
+							onclick={() => (editingPrintOrder = printCategory)}
+						>
+							Redigér rækkefølge
+						</button>
+					{/if}
+					<button
+						type="button"
+						class="panel-link"
+						onclick={() => openCategoryEditor(printCategory)}
+					>
+						Redigér kategori
+					</button>
 				</div>
 				{#if categoryMeta?.imageUrl}
 					<div class="print-order-image-wrap">
@@ -1234,17 +1235,18 @@
 		padding: 0;
 	}
 	.print-order-head {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto auto;
 		align-items: stretch;
 	}
 	.print-order-copy {
-		flex: 1 1 auto;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
+		align-items: flex-start;
 		gap: 0.2rem;
-		padding: 0.75rem 1rem;
+		padding: 0.7rem 0.85rem 0.7rem 1rem;
 	}
 	.print-order-copy h2 {
 		margin: 0;
@@ -1253,12 +1255,9 @@
 	}
 	.print-order-image-wrap {
 		position: relative;
-		flex: 0 0 auto;
-		align-self: stretch;
+		height: 0;
+		min-height: 100%;
 		aspect-ratio: 1 / 1;
-		width: auto;
-		min-width: 0;
-		min-height: 0;
 		overflow: hidden;
 	}
 	.print-order-image {
@@ -1272,14 +1271,15 @@
 		padding: 0 0.85rem 0.85rem;
 	}
 	.print-order-actions {
-		display: inline-flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.15rem 0.15rem;
-		margin-top: 0.15rem;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		justify-content: center;
+		gap: 0.05rem;
+		padding: 0.65rem 0.85rem;
 	}
 	.panel-link {
-		padding: 0.22rem 0.45rem 0.22rem 0;
+		padding: 0.08rem 0;
 		border: none;
 		background: transparent;
 		color: var(--color-ink-faint);
@@ -1287,6 +1287,8 @@
 		font-weight: 500;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
+		text-align: right;
+		white-space: nowrap;
 	}
 	.panel-link:hover {
 		color: var(--color-ink);
@@ -1305,6 +1307,7 @@
 	}
 	.print-set-palette {
 		min-height: 2rem;
+		margin-top: 0.25rem;
 		padding: 0.35rem 0.75rem;
 		border-style: dashed;
 		background: var(--color-accent-soft);
@@ -1477,7 +1480,7 @@
 	}
 	.song-card-sub {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		align-items: center;
 		gap: 0.45rem;
 		min-width: 0;
@@ -1527,10 +1530,22 @@
 	}
 	.song-card-categories {
 		display: flex;
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
 		align-items: center;
 		gap: 0.45rem;
 		min-width: 0;
+		flex: 1 1 auto;
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: thin;
+		overscroll-behavior-x: contain;
+	}
+	.song-card-categories::-webkit-scrollbar {
+		height: 3px;
+	}
+	.song-card-categories::-webkit-scrollbar-thumb {
+		background: color-mix(in srgb, var(--color-ink-faint) 45%, transparent);
+		border-radius: 999px;
 	}
 	.print-group {
 		display: inline-flex;
