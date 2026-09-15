@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tick } from 'svelte';
+
 	export type CategoryPickerOption = { value: string; label: string };
 	export type CategoryPickerColor = { text: string };
 
@@ -10,6 +12,7 @@
 		emptyOption?: CategoryPickerOption | null;
 		ariaLabel: string;
 		variant?: 'joined' | 'default';
+		allowCreate?: boolean;
 		colorFor: (cat: string) => CategoryPickerColor;
 		onToggle: (value: string) => void;
 	}
@@ -22,15 +25,32 @@
 		emptyOption = null,
 		ariaLabel,
 		variant = 'default',
+		allowCreate = false,
 		colorFor,
 		onToggle
 	}: Props = $props();
 
 	let open = $state(false);
+	let draft = $state('');
 	let rootEl = $state<HTMLDivElement | null>(null);
+	let inputEl = $state<HTMLInputElement | null>(null);
 
 	const triggerColor = $derived(triggerValue ? colorFor(triggerValue).text : '');
 	const emptySelected = $derived(selected.length === 0);
+	const query = $derived(draft.trim());
+	const queryKey = $derived(query.toLocaleLowerCase('da'));
+	const visibleOptions = $derived.by(() => {
+		if (!queryKey) return options;
+		return options.filter(
+			(opt) =>
+				opt.label.toLocaleLowerCase('da').includes(queryKey) ||
+				opt.value.toLocaleLowerCase('da').includes(queryKey)
+		);
+	});
+	const exactMatch = $derived(
+		options.find((opt) => opt.value.toLocaleLowerCase('da') === queryKey) ?? null
+	);
+	const canCreate = $derived(allowCreate && query.length > 0 && !exactMatch);
 
 	function isSelected(value: string): boolean {
 		if (!value) return emptySelected;
@@ -40,13 +60,40 @@
 
 	function choose(value: string): void {
 		onToggle(value);
+		draft = '';
 		open = false;
+	}
+
+	function commitDraft(): void {
+		if (!query) return;
+		choose(exactMatch?.value ?? query);
+	}
+
+	async function setOpen(next: boolean): Promise<void> {
+		open = next;
+		if (next && allowCreate) {
+			await tick();
+			inputEl?.focus();
+		}
+		if (!next) draft = '';
+	}
+
+	function onDraftKey(e: KeyboardEvent): void {
+		if (e.key === 'Enter' || e.key === ',') {
+			e.preventDefault();
+			commitDraft();
+			return;
+		}
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			void setOpen(false);
+		}
 	}
 
 	$effect(() => {
 		if (!open) return;
 		const close = (e: PointerEvent) => {
-			if (rootEl && !rootEl.contains(e.target as Node)) open = false;
+			if (rootEl && !rootEl.contains(e.target as Node)) void setOpen(false);
 		};
 		window.addEventListener('pointerdown', close);
 		return () => window.removeEventListener('pointerdown', close);
@@ -55,29 +102,69 @@
 
 <svelte:window
 	onkeydown={(e) => {
-		if (e.key === 'Escape') open = false;
+		if (e.key === 'Escape' && open) void setOpen(false);
 	}}
 />
 
 <div class="category-picker {variant}" bind:this={rootEl}>
-	<button
-		type="button"
-		class="category-picker-trigger"
-		class:is-open={open}
-		aria-haspopup="listbox"
-		aria-expanded={open}
-		aria-label={ariaLabel}
-		onclick={() => (open = !open)}
-	>
-		{#if triggerValue}
-			<span class="cat-mark" style:color={triggerColor} aria-hidden="true"></span>
-		{/if}
-		<span class="category-picker-label">{triggerLabel}</span>
-		<span class="category-picker-caret" aria-hidden="true"></span>
-	</button>
+	{#if allowCreate}
+		<div class="category-picker-trigger is-editable" class:is-open={open}>
+			<input
+				bind:this={inputEl}
+				class="category-picker-input"
+				type="text"
+				placeholder={triggerLabel}
+				aria-label={ariaLabel}
+				aria-haspopup="listbox"
+				aria-expanded={open}
+				bind:value={draft}
+				onfocus={() => (open = true)}
+				oninput={() => (open = true)}
+				onkeydown={onDraftKey}
+			/>
+			<button
+				type="button"
+				class="category-picker-caret-btn"
+				tabindex="-1"
+				aria-label="Vis kategorier"
+				onclick={() => void setOpen(!open)}
+			>
+				<span class="category-picker-caret" aria-hidden="true"></span>
+			</button>
+		</div>
+	{:else}
+		<button
+			type="button"
+			class="category-picker-trigger"
+			class:is-open={open}
+			aria-haspopup="listbox"
+			aria-expanded={open}
+			aria-label={ariaLabel}
+			onclick={() => void setOpen(!open)}
+		>
+			{#if triggerValue}
+				<span class="cat-mark" style:color={triggerColor} aria-hidden="true"></span>
+			{/if}
+			<span class="category-picker-label">{triggerLabel}</span>
+			<span class="category-picker-caret" aria-hidden="true"></span>
+		</button>
+	{/if}
 	{#if open}
 		<ul class="category-picker-menu" role="listbox">
-			{#if emptyOption}
+			{#if canCreate}
+				<li>
+					<button
+						type="button"
+						class="category-picker-option"
+						role="option"
+						aria-selected="false"
+						onclick={commitDraft}
+					>
+						Tilføj “{query}”
+					</button>
+				</li>
+			{/if}
+			{#if emptyOption && !queryKey}
 				<li>
 					<button
 						type="button"
@@ -91,7 +178,7 @@
 					</button>
 				</li>
 			{/if}
-			{#each options as opt (opt.value)}
+			{#each visibleOptions as opt (opt.value)}
 				{@const c = colorFor(opt.value)}
 				{@const active = isSelected(opt.value)}
 				<li>
@@ -141,6 +228,38 @@
 		border-right: 0;
 		border-radius: var(--radius-button) 0 0 var(--radius-button);
 	}
+	.category-picker-trigger.is-editable {
+		cursor: text;
+		padding-right: 0.35rem;
+	}
+	.category-picker-input {
+		flex: 1 1 auto;
+		min-width: 0;
+		height: 100%;
+		border: 0;
+		background: transparent;
+		padding: 0;
+		color: inherit;
+		font: inherit;
+		font-weight: 500;
+		outline: none;
+	}
+	.category-picker-input::placeholder {
+		color: var(--color-ink-faint);
+		font-weight: 500;
+	}
+	.category-picker-caret-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: 0 0 auto;
+		width: 1.4rem;
+		height: 100%;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+	}
 	.category-picker-label {
 		flex: 1 1 auto;
 		min-width: 0;
@@ -160,7 +279,8 @@
 	.category-picker-trigger.is-open .category-picker-caret {
 		transform: scaleY(-1);
 	}
-	.category-picker-trigger:focus {
+	.category-picker-trigger:focus,
+	.category-picker-trigger.is-editable:focus-within {
 		outline: 2px solid var(--color-accent);
 		outline-offset: -1px;
 	}

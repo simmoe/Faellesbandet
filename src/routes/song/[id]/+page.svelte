@@ -601,6 +601,7 @@
 						selected={categories}
 						triggerLabel="Kategori"
 						ariaLabel="Tilføj eller fjern kategori"
+						allowCreate
 						colorFor={colorForCategory}
 						onToggle={toggleCategory}
 					/>
