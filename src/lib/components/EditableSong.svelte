@@ -423,7 +423,7 @@
 
 		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'K' || e.key === 'k')) {
 			e.preventDefault();
-			deleteRow(idx, false);
+			deleteRow(idx, 'next');
 			return;
 		}
 
@@ -503,7 +503,7 @@
 			deleteSection(headerIdx, false);
 			return;
 		}
-		deleteRow(idx, false);
+		deleteRow(idx, 'none');
 		if (headerIdx >= 0 && onCollapsedSectionsChange) {
 			const v = collapsedSections
 				.filter((h) => h !== headerIdx)
@@ -513,9 +513,13 @@
 				onCollapsedSectionsChange(v);
 			}
 		}
+		void tick().then(() => {
+			const active = document.activeElement;
+			if (active instanceof HTMLElement && active.closest('.editable-song')) active.blur();
+		});
 	}
 
-	function deleteRow(idx: number, focusPrev = false) {
+	function deleteRow(idx: number, focus: 'prev' | 'next' | 'none' = 'none') {
 		if (idx < 0 || idx >= rows.length) return;
 		if (rows.length <= 1) {
 			emit([{ kind: 'blank' }]);
@@ -525,8 +529,8 @@
 		const next = rows.filter((_, i) => i !== idx);
 		emit(next);
 		shiftBassLines(idx + 1, -1, [idx, idx + 1]);
-		const target = focusPrev ? Math.max(0, idx - 1) : Math.min(idx, next.length - 1);
-		focusRow(target);
+		if (focus === 'prev') focusRow(Math.max(0, idx - 1));
+		else if (focus === 'next') focusRow(Math.min(idx, next.length - 1));
 	}
 
 	function rowPlainText(row: Row | undefined): string {
@@ -549,12 +553,12 @@
 			}
 			if (curText === '') {
 				(document.activeElement as HTMLElement | null)?.blur?.();
-				deleteRow(idx, true);
+				deleteRow(idx, 'prev');
 			}
 			return;
 		}
 		if (curText === '') {
-			deleteRow(idx, true);
+			deleteRow(idx, 'prev');
 			return;
 		}
 		if (prev.kind === 'chord' || prev.kind === 'header') return;
@@ -1126,7 +1130,7 @@
 {#snippet songLine(i: number)}
 	{@const row = rows[i]}
 	{#if row.kind === 'blank' || row.kind === 'lyric'}
-		<div class="song-line-wrap">
+		<div class="song-line-wrap" class:is-empty={isEmptyRow(row)}>
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
@@ -1150,7 +1154,7 @@
 		</div>
 		{@render bassCell(i)}
 	{:else if row.kind === 'chord'}
-		<div class="song-line-wrap">
+		<div class="song-line-wrap is-chord" class:is-empty={isEmptyRow(row)}>
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -1224,6 +1228,7 @@
 			<div class="song-section-grid chord-grid">
 				<div
 					class="song-section-label"
+					class:is-empty={isEmptyRow(headerRow)}
 					title={readOnly ? undefined : 'Træk hele formstykket for at flytte · hold Alt for at kopiere'}
 					draggable={readOnly ? 'false' : 'true'}
 					ondragstart={readOnly ? undefined : (e) => onSectionDragStart(e, headerIdx)}
@@ -1570,8 +1575,9 @@
 		z-index: -1;
 		background: #fff;
 	}
-	.editable-song .song-line-wrap:hover:not(:has(.song-line:focus)) .line-actions,
+	.editable-song .song-line-wrap:hover .line-actions,
 	.editable-song .song-section-label:hover:not(:has(.section-header-edit:focus)) .line-actions,
+	.editable-song .song-section-label.is-empty:hover .line-actions,
 	.editable-song .line-actions:focus-within {
 		opacity: 1;
 		pointer-events: auto;
