@@ -20,6 +20,8 @@
 	} from '$lib/chordFormatter';
 	import { parseRows, serializeRows, transposeRows, type Row } from '$lib/songParse';
 	import EditableSong from '$lib/components/EditableSong.svelte';
+	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
+	import { persistSongbookCategory } from '$lib/songbookSelection';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
 	import {
 		assignMissingCategoryColors,
@@ -27,6 +29,7 @@
 		hasSameCategoryColors
 	} from '$lib/categoryColors';
 	import { tick } from 'svelte';
+	import { browser } from '$app/environment';
 	import type {
 		BassLines,
 		CategoryColorMap,
@@ -56,7 +59,6 @@
 	let showBassTabs = $state(true);
 	let fitSinglePage = $state(true);
 	let infoOpen = $state(false);
-	let categoryDraft = $state('');
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
@@ -72,6 +74,11 @@
 	const effectiveCategoryColorMap = $derived(
 		assignMissingCategoryColors(knownCategories, categoryColorMap)
 	);
+
+	const pickerCategories = $derived.by(() => {
+		const names = new Set([...knownCategories, ...categories]);
+		return [...names].sort((a, b) => a.localeCompare(b, 'da'));
+	});
 
 	function colorForCategory(cat: string) {
 		return paletteColorForCategory(cat, effectiveCategoryColorMap);
@@ -216,27 +223,30 @@
 		const trimmed = cat.trim();
 		if (!trimmed) return;
 		if (categories.some((c) => c.toLocaleLowerCase('da') === trimmed.toLocaleLowerCase('da'))) {
-			categoryDraft = '';
 			return;
 		}
 		categories = [...categories, trimmed];
-		categoryDraft = '';
 		scheduleSave();
-	}
-
-	function onCategoryInput(value: string) {
-		categoryDraft = value;
-		const trimmed = value.trim();
-		if (!trimmed) return;
-		const existing = knownCategories.find(
-			(cat) => cat.toLocaleLowerCase('da') === trimmed.toLocaleLowerCase('da')
-		);
-		if (existing) addCategory(existing);
 	}
 
 	function removeCategory(cat: string) {
 		categories = categories.filter((c) => c !== cat);
 		scheduleSave();
+	}
+
+	function toggleCategory(cat: string) {
+		const trimmed = cat.trim();
+		if (!trimmed) return;
+		const existing = categories.find(
+			(c) => c.toLocaleLowerCase('da') === trimmed.toLocaleLowerCase('da')
+		);
+		if (existing) removeCategory(existing);
+		else addCategory(trimmed);
+	}
+
+	function goToSongbookCategory(cat: string) {
+		if (browser) persistSongbookCategory(cat);
+		void goto('/songbook');
 	}
 
 	// ───── Transponering ────────────────────────────────────────────────
@@ -586,21 +596,13 @@
 							onclick={() => transpose(1)}>+</button
 						>
 					</span>
-					<input
-						class="cat-pick"
-						type="text"
-						list="song-known-categories"
-						bind:value={categoryDraft}
-						oninput={(e) => onCategoryInput(e.currentTarget.value)}
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ',') {
-								e.preventDefault();
-								addCategory(categoryDraft);
-							}
-						}}
-						onblur={() => addCategory(categoryDraft)}
-						placeholder="Kategori"
-						aria-label="Tilføj kategori"
+					<CategoryPicker
+						options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
+						selected={categories}
+						triggerLabel="Kategori"
+						ariaLabel="Tilføj eller fjern kategori"
+						colorFor={colorForCategory}
+						onToggle={toggleCategory}
 					/>
 					{#if categories.length > 0}
 						<div class="function-cats">
@@ -610,8 +612,8 @@
 									type="button"
 									class="artist-cat"
 									style:--cat-color={c.text}
-									title="Fjern {cat}"
-									onclick={() => removeCategory(cat)}
+									title="Vis {cat} i sangbogen"
+									onclick={() => goToSongbookCategory(cat)}
 								>
 									<span class="cat-mark" aria-hidden="true"></span>
 									{cat}
@@ -642,9 +644,6 @@
 						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
 					</svg>
 				</button>
-				<datalist id="song-known-categories">
-					{#each knownCategories as c (c)}<option value={c}></option>{/each}
-				</datalist>
 			</div>
 			<div class="info-fold no-print" class:is-open={infoOpen}>
 				<div class="info-inner">
@@ -819,9 +818,6 @@
 		justify-self: start;
 		align-self: center;
 		margin-top: 0.15rem;
-	}
-	.song-head datalist {
-		display: none;
 	}
 	@container (max-width: 42rem) {
 		.song-head {
@@ -1010,8 +1006,6 @@
 		align-items: center;
 		gap: 0.45rem;
 		min-width: 0;
-		padding: 0.15rem 0.55rem;
-		border-left: 1px solid var(--color-border-subtle);
 		align-self: stretch;
 	}
 	.cat-mark {
@@ -1042,21 +1036,23 @@
 	}
 	.song-functions {
 		display: inline-flex;
-		align-items: center;
-		gap: 0;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 2px;
-		min-height: 1.55rem;
+		align-items: stretch;
+		gap: 0.5rem;
 		max-width: 100%;
 		min-width: 0;
+		position: relative;
+		z-index: 2;
 	}
 	.key-cluster {
 		display: inline-flex;
-		align-items: baseline;
+		align-items: center;
 		flex: 0 0 auto;
 		gap: 0.05rem;
 		padding: 0 0.35rem 0 0.2rem;
 		color: var(--color-ink-muted);
+		border: 1px solid var(--color-border-subtle);
+		border-radius: var(--radius-button);
+		min-height: 2.35rem;
 	}
 	.key-btn {
 		padding: 0 0.2rem;
@@ -1087,29 +1083,6 @@
 		outline: none;
 		color: var(--color-ink);
 		box-shadow: inset 0 -1px 0 var(--color-ink);
-	}
-	.cat-pick {
-		width: 9.5rem;
-		min-width: 0;
-		background: transparent;
-		border: none;
-		border-left: 1px solid var(--color-border-subtle);
-		padding: 0 0.55rem;
-		height: 1.55rem;
-		font-family: var(--font-title);
-		font-size: 0.72rem;
-		letter-spacing: 0.04em;
-		color: var(--color-ink);
-	}
-	.cat-pick:focus {
-		outline: none;
-		background: #f8fafc;
-	}
-	.cat-pick::placeholder {
-		color: var(--color-ink-faint);
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		font-size: 0.64rem;
 	}
 	.info-toggle {
 		grid-column: 2;

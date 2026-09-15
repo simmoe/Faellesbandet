@@ -23,7 +23,9 @@
 	} from '$lib/firebase/members';
 	import { uniqueCategoriesFromSongs } from '$lib/chordFormatter';
 	import CategoryMetaDialog from '$lib/components/CategoryMetaDialog.svelte';
+	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
 	import ProfileDialog from '$lib/components/ProfileDialog.svelte';
+	import { SONGBOOK_SESSION_SELECTION_KEY } from '$lib/songbookSelection';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf, type SongbookPrintEntry } from '$lib/pdf';
 	import {
 		assignMissingCategoryColors,
@@ -64,8 +66,6 @@
 	let printDrag = $state<{ kind: 'palette-set' } | { kind: 'print-entry'; index: number } | null>(null);
 	let printDropIndex = $state<number | null>(null);
 	let editingPrintOrder = $state<string | null>(null);
-	let printMenuOpen = $state(false);
-	let printPickerEl = $state<HTMLDivElement | null>(null);
 	const pdfGenerating = $derived(pdfBusy || audiencePdfBusy);
 
 	type PrintOrderEntry =
@@ -73,8 +73,6 @@
 		| { type: 'set'; id: string; label: string };
 
 	const SET_ORDER_PREFIX = '__set__:';
-
-	const SONGBOOK_SESSION_SELECTION_KEY = 'faellesbandet.songbook.session-selection';
 
 	$effect(() => {
 		if (!authState.loading && !authState.user) goto('/login');
@@ -649,19 +647,22 @@
 		printDropIndex = null;
 	}
 
-	function selectSongbookCategory(cat: string | null): void {
-		activeCategory = cat;
-		printCategory = cat ?? '';
-	}
-
 	function selectPrintCategory(cat: string): void {
 		printCategory = cat;
 		activeCategory = cat || null;
+		search = '';
+	}
+
+	function selectSongbookCategory(cat: string | null): void {
+		selectPrintCategory(cat ?? '');
 	}
 
 	function pickPrintCategory(cat: string): void {
+		if (cat && cat === printCategory) {
+			selectPrintCategory('');
+			return;
+		}
 		selectPrintCategory(cat);
-		printMenuOpen = false;
 	}
 
 	function printOptionLabel(cat: string): string {
@@ -669,21 +670,6 @@
 		const count = songs.filter((s) => (s.categories ?? []).includes(cat)).length;
 		const sets = countSetsForCategory(cat);
 		return `${cat} (${songCountLabel(count)}${sets ? `, ${setCountLabel(sets)}` : ''})`;
-	}
-
-	$effect(() => {
-		if (!printMenuOpen) return;
-		const close = (e: PointerEvent) => {
-			if (printPickerEl && !printPickerEl.contains(e.target as Node)) printMenuOpen = false;
-		};
-		window.addEventListener('pointerdown', close);
-		return () => window.removeEventListener('pointerdown', close);
-	});
-
-	function searchByCategory(cat: string): void {
-		search = cat;
-		activeCategory = null;
-		printCategory = cat;
 	}
 
 	function categorySortKey(cat: string): string {
@@ -745,11 +731,6 @@
 </script>
 
 <svelte:head><title>Sangbog · {BAND.name}</title></svelte:head>
-<svelte:window
-	onkeydown={(e) => {
-		if (e.key === 'Escape') printMenuOpen = false;
-	}}
-/>
 
 <main class="mx-auto max-w-6xl px-6 py-5">
 	<header class="page-head">
@@ -787,57 +768,17 @@
 		<div class="toolbar-actions">
 			<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj sang</a>
 			<div class="print-group">
-			<div class="print-picker" bind:this={printPickerEl}>
-				<button
-					type="button"
-					class="print-select"
-					class:is-open={printMenuOpen}
-					aria-haspopup="listbox"
-					aria-expanded={printMenuOpen}
-					aria-label="Vælg hvad der skal eksporteres som PDF"
-					onclick={() => (printMenuOpen = !printMenuOpen)}
-				>
-					{#if printCategory}
-						{@const c = colorForCategory(printCategory)}
-						<span class="cat-mark" style:color={c.text} aria-hidden="true"></span>
-					{/if}
-					<span class="print-select-label">{printOptionLabel(printCategory)}</span>
-					<span class="print-caret" aria-hidden="true"></span>
-				</button>
-				{#if printMenuOpen}
-					<ul class="print-menu" role="listbox">
-						<li>
-							<button
-								type="button"
-								class="print-option"
-								class:is-active={!printCategory}
-								role="option"
-								aria-selected={!printCategory}
-								onclick={() => pickPrintCategory('')}
-							>
-								Hele sangbogen ({songs.length})
-							</button>
-						</li>
-						{#each categories as cat (cat)}
-							{@const c = colorForCategory(cat)}
-							<li>
-								<button
-									type="button"
-									class="print-option"
-									class:is-active={printCategory === cat}
-									style:--cat-color={c.text}
-									role="option"
-									aria-selected={printCategory === cat}
-									onclick={() => pickPrintCategory(cat)}
-								>
-									<span class="cat-mark" aria-hidden="true"></span>
-									{printOptionLabel(cat)}
-								</button>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			</div>
+			<CategoryPicker
+				options={allCategoryNames.map((cat) => ({ value: cat, label: printOptionLabel(cat) }))}
+				selected={printCategory ? [printCategory] : []}
+				triggerLabel={printOptionLabel(printCategory)}
+				triggerValue={printCategory}
+				emptyOption={{ value: '', label: `Hele sangbogen (${songs.length})` }}
+				ariaLabel="Vælg hvad der skal eksporteres som PDF"
+				variant="joined"
+				colorFor={colorForCategory}
+				onToggle={pickPrintCategory}
+			/>
 			<button
 				type="button"
 				class="pdf-choice"
@@ -1107,7 +1048,7 @@
 												class="cat-pill"
 												class:highlighted={cat === highlightedCategoryForSong(song)}
 												style:--cat-color={c.text}
-												onclick={() => searchByCategory(cat)}
+												onclick={() => selectSongbookCategory(cat)}
 											>
 												<span class="cat-mark" aria-hidden="true"></span>
 												{cat}
@@ -1293,10 +1234,8 @@
 		padding: 0;
 	}
 	.print-order-head {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
+		display: flex;
 		align-items: stretch;
-		min-height: 5.5rem;
 	}
 	.print-order-copy {
 		flex: 1 1 auto;
@@ -1313,12 +1252,18 @@
 		font-size: 1.05rem;
 	}
 	.print-order-image-wrap {
-		height: 100%;
+		position: relative;
+		flex: 0 0 auto;
+		align-self: stretch;
 		aspect-ratio: 1 / 1;
-		min-height: 5.5rem;
+		width: auto;
+		min-width: 0;
+		min-height: 0;
+		overflow: hidden;
 	}
 	.print-order-image {
-		display: block;
+		position: absolute;
+		inset: 0;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
@@ -1594,89 +1539,6 @@
 		height: 2.35rem;
 		position: relative;
 		z-index: 2;
-	}
-	.print-picker {
-		position: relative;
-		display: flex;
-		flex: 0 0 auto;
-		height: 100%;
-	}
-	.print-select {
-		appearance: none;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		height: 100%;
-		background: #ffffff;
-		border: 1px solid var(--color-border-subtle);
-		border-right: 0;
-		border-radius: var(--radius-button) 0 0 var(--radius-button);
-		padding: 0 0.7rem 0 0.8rem;
-		color: var(--color-ink);
-		font-weight: 500;
-		font-size: 0.82rem;
-		min-width: 12.5rem;
-		max-width: 18rem;
-		cursor: pointer;
-	}
-	.print-select-label {
-		flex: 1 1 auto;
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		text-align: left;
-	}
-	.print-caret {
-		width: 0.38rem;
-		height: 0.28rem;
-		flex-shrink: 0;
-		background: currentColor;
-		clip-path: polygon(0 0, 100% 0, 50% 100%);
-		opacity: 0.7;
-	}
-	.print-select.is-open .print-caret {
-		transform: scaleY(-1);
-	}
-	.print-select:focus {
-		outline: 2px solid var(--color-accent);
-		outline-offset: -1px;
-	}
-	.print-menu {
-		position: absolute;
-		top: calc(100% + 0.3rem);
-		left: 0;
-		z-index: 30;
-		min-width: max(100%, 16rem);
-		margin: 0;
-		padding: 0.3rem;
-		list-style: none;
-		background: #ffffff;
-		color: var(--color-ink);
-		border: 1px solid var(--color-border-subtle);
-		border-radius: var(--radius-card);
-		box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
-		max-height: 18rem;
-		overflow: auto;
-	}
-	.print-option {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		width: 100%;
-		border: none;
-		background: transparent;
-		padding: 0.4rem 0.5rem;
-		border-radius: calc(var(--radius-card) * 0.7);
-		color: var(--cat-color, var(--color-ink));
-		font-size: 0.82rem;
-		font-weight: 500;
-		text-align: left;
-		cursor: pointer;
-	}
-	.print-option:hover,
-	.print-option.is-active {
-		background: #f8fafc;
 	}
 	.pdf-choice {
 		display: inline-flex;
