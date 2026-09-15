@@ -7,6 +7,7 @@
 		saving?: boolean;
 		uploading?: boolean;
 		error?: string | null;
+		initialCategory?: string;
 		onClose: () => void;
 		onAddCategory: (category: string) => void;
 		onRenameCategory: (from: string, to: string) => void | Promise<void>;
@@ -22,6 +23,7 @@
 		saving = false,
 		uploading = false,
 		error = null,
+		initialCategory = '',
 		onClose,
 		onAddCategory,
 		onRenameCategory,
@@ -31,7 +33,11 @@
 		onRemoveImage
 	}: Props = $props();
 
-	let selectedCategory = $state('');
+	let selectedCategory = $state(
+		initialCategory && categories.includes(initialCategory)
+			? initialCategory
+			: (categories[0] ?? '')
+	);
 	let newCategory = $state('');
 	let displayName = $state('');
 	let introText = $state('');

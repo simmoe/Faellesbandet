@@ -48,6 +48,7 @@
 	let pdfBusy = $state(false);
 	let audiencePdfBusy = $state(false);
 	let editingCategories = $state(false);
+	let editingFocusCategory = $state('');
 	let categorySaving = $state(false);
 	let categoryUploading = $state(false);
 	let categoryError = $state<string | null>(null);
@@ -310,7 +311,8 @@
 		}
 	}
 
-	function openCategoryEditor(): void {
+	function openCategoryEditor(category?: string): void {
+		editingFocusCategory = category ?? '';
 		editingCategories = true;
 		categoryError = null;
 	}
@@ -936,35 +938,63 @@
 	</div>
 
 	{#if printCategory}
-		<section class="print-order-panel card mb-4 p-3">
-			<div class="print-order-header">
-				<div>
-					<p class="print-order-kicker">Udskrivningsrækkefølge</p>
+		{@const categoryMeta = categoryMetaMap[printCategory]}
+		<section class="print-order-panel card mb-4">
+			<div class="print-order-head">
+				<div class="print-order-copy">
 					<h2>{printCategory}</h2>
-				</div>
-				<div class="print-order-actions">
-					{#if editingPrintOrder === printCategory}
-						<div
-							class="print-set-palette"
-							role="button"
-							tabindex="0"
-							draggable="true"
-							ondragstart={(e) => onPrintDragStart(e, { kind: 'palette-set' })}
-							ondragend={onPrintDragEnd}
-							title="Træk ind i listen for at indsætte en ny tom sæt-side"
-						>
-							<span aria-hidden="true">+</span>
-							Sæt
-						</div>
-						<button type="button" class="btn-secondary btn-sm" onclick={() => (editingPrintOrder = null)}>
-							Færdig
-						</button>
-					{:else}
-						<button type="button" class="btn-secondary btn-sm" onclick={() => (editingPrintOrder = printCategory)}>
-							Redigér rækkefølge
-						</button>
+					{#if editingPrintOrder !== printCategory}
+						<p class="print-order-summary">
+							{songCountLabel(printSongs.length)}
+							{#if countSetsForCategory(printCategory)}
+								· {setCountLabel(countSetsForCategory(printCategory))}
+							{/if}
+						</p>
 					{/if}
+					<div class="print-order-actions">
+						{#if editingPrintOrder === printCategory}
+							<div
+								class="print-set-palette"
+								role="button"
+								tabindex="0"
+								draggable="true"
+								ondragstart={(e) => onPrintDragStart(e, { kind: 'palette-set' })}
+								ondragend={onPrintDragEnd}
+								title="Træk ind i listen for at indsætte en ny tom sæt-side"
+							>
+								<span aria-hidden="true">+</span>
+								Sæt
+							</div>
+							<button
+								type="button"
+								class="panel-link"
+								onclick={() => (editingPrintOrder = null)}
+							>
+								Færdig
+							</button>
+						{:else}
+							<button
+								type="button"
+								class="panel-link"
+								onclick={() => (editingPrintOrder = printCategory)}
+							>
+								Redigér rækkefølge
+							</button>
+						{/if}
+						<button
+							type="button"
+							class="panel-link"
+							onclick={() => openCategoryEditor(printCategory)}
+						>
+							Redigér kategori
+						</button>
+					</div>
 				</div>
+				{#if categoryMeta?.imageUrl}
+					<div class="print-order-image-wrap">
+						<img class="print-order-image" src={categoryMeta.imageUrl} alt="" />
+					</div>
+				{/if}
 			</div>
 			{#if editingPrintOrder === printCategory}
 				{@const currentPrintOrder = printOrderForCategory(printCategory)}
@@ -1027,13 +1057,6 @@
 						Slip her for at placere sidst
 					</div>
 				</div>
-			{:else}
-				<p class="print-order-summary">
-					{songCountLabel(printSongs.length)}
-					{#if countSetsForCategory(printCategory)}
-						· {setCountLabel(countSetsForCategory(printCategory))}
-					{/if}
-				</p>
 			{/if}
 		</section>
 	{/if}
@@ -1107,7 +1130,11 @@
 			saving={categorySaving}
 			uploading={categoryUploading}
 			error={categoryError}
-			onClose={() => (editingCategories = false)}
+			onClose={() => {
+				editingCategories = false;
+				editingFocusCategory = '';
+			}}
+			initialCategory={editingFocusCategory}
 			onAddCategory={addCategoryMeta}
 			onRenameCategory={renameCategory}
 			onDeleteCategory={deleteCategoryMeta}
@@ -1262,31 +1289,62 @@
 	}
 	.print-order-panel {
 		color: var(--color-ink);
+		overflow: hidden;
+		padding: 0;
 	}
-	.print-order-header {
+	.print-order-head {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: stretch;
+		min-height: 5.5rem;
+	}
+	.print-order-copy {
+		flex: 1 1 auto;
+		min-width: 0;
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		margin-bottom: 0.75rem;
+		flex-direction: column;
+		justify-content: center;
+		gap: 0.2rem;
+		padding: 0.75rem 1rem;
 	}
-	.print-order-actions {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	.print-order-kicker {
-		margin: 0 0 0.1rem;
-		color: var(--color-ink-faint);
-		font-size: 0.72rem;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-	.print-order-header h2 {
+	.print-order-copy h2 {
 		margin: 0;
 		font-family: var(--font-display);
 		font-size: 1.05rem;
+	}
+	.print-order-image-wrap {
+		height: 100%;
+		aspect-ratio: 1 / 1;
+		min-height: 5.5rem;
+	}
+	.print-order-image {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.print-order-edit-area {
+		padding: 0 0.85rem 0.85rem;
+	}
+	.print-order-actions {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.15rem 0.15rem;
+		margin-top: 0.15rem;
+	}
+	.panel-link {
+		padding: 0.22rem 0.45rem 0.22rem 0;
+		border: none;
+		background: transparent;
+		color: var(--color-ink-faint);
+		font-size: 0.72rem;
+		font-weight: 500;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.panel-link:hover {
+		color: var(--color-ink);
 	}
 	.print-set-palette,
 	.print-order-item {
