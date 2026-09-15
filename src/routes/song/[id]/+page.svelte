@@ -563,7 +563,6 @@
 						style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
 					/>
 					{#if categories.length > 0}
-						<span class="artist-sep" aria-hidden="true">|</span>
 						<div class="artist-cats">
 							{#each categories as cat (cat)}
 								{@const c = colorForCategory(cat)}
@@ -1002,21 +1001,18 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: space-between;
 		gap: 0.45rem;
 		min-width: 0;
-	}
-	.artist-sep {
-		color: var(--color-ink-faint);
-		font-size: 0.72rem;
-		line-height: 1;
-		user-select: none;
 	}
 	.artist-cats {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: flex-end;
 		gap: 0.45rem;
 		min-width: 0;
+		margin-left: auto;
 	}
 	.cat-mark {
 		width: 0.2rem;

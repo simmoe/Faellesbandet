@@ -1064,32 +1064,34 @@
 					<div class="song-card card">
 						<a href={`/song/${song.id}`} class="song-card-main">
 						<div class="song-card-top">
-							<div class="min-w-0">
-								<h3 class="song-card-title">{song.title}</h3>
-								{#if song.artist}
-									<p class="song-card-artist">{song.artist}</p>
-								{/if}
-							</div>
+							<h3 class="song-card-title">{song.title}</h3>
 							{#if song.key}
 								<span class="song-key">{song.key}</span>
 							{/if}
 						</div>
 						</a>
-						{#if (song.categories ?? []).length > 0}
-							<div class="song-card-categories" aria-label={`Kategorier for ${song.title}`}>
-								{#each displayCategoriesForSong(song) as cat (cat)}
-									{@const c = colorForCategory(cat)}
-									<button
-										type="button"
-										class="cat-pill"
-										class:highlighted={cat === highlightedCategoryForSong(song)}
-										style:--cat-color={c.text}
-										onclick={() => searchByCategory(cat)}
-									>
-										<span class="cat-mark" aria-hidden="true"></span>
-										{cat}
-									</button>
-								{/each}
+						{#if song.artist || (song.categories ?? []).length > 0}
+							<div class="song-card-sub">
+								{#if song.artist}
+									<a href={`/song/${song.id}`} class="song-card-artist">{song.artist}</a>
+								{/if}
+								{#if (song.categories ?? []).length > 0}
+									<div class="song-card-categories" aria-label={`Kategorier for ${song.title}`}>
+										{#each displayCategoriesForSong(song) as cat (cat)}
+											{@const c = colorForCategory(cat)}
+											<button
+												type="button"
+												class="cat-pill"
+												class:highlighted={cat === highlightedCategoryForSong(song)}
+												style:--cat-color={c.text}
+												onclick={() => searchByCategory(cat)}
+											>
+												<span class="cat-mark" aria-hidden="true"></span>
+												{cat}
+											</button>
+										{/each}
+									</div>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -1457,12 +1459,26 @@
 		min-width: 0;
 	}
 	.song-card-artist {
-		margin: 0.08rem 0 0;
+		margin: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-size: 0.78rem;
 		color: var(--color-ink-muted);
+		text-decoration: none;
+		min-width: 0;
+		flex: 0 1 auto;
+	}
+	.song-card-artist:hover {
+		color: var(--color-ink);
+	}
+	.song-card-sub {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem;
+		min-width: 0;
+		margin-top: auto;
 	}
 	.song-key {
 		flex-shrink: 0;
@@ -1512,7 +1528,6 @@
 		align-items: center;
 		gap: 0.45rem;
 		min-width: 0;
-		margin-top: auto;
 	}
 	.print-group {
 		display: inline-flex;
