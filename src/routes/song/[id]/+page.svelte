@@ -562,23 +562,6 @@
 						placeholder="Kunstner"
 						style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
 					/>
-					{#if categories.length > 0}
-						<div class="artist-cats">
-							{#each categories as cat (cat)}
-								{@const c = colorForCategory(cat)}
-								<button
-									type="button"
-									class="artist-cat"
-									style:--cat-color={c.text}
-									title="Fjern {cat}"
-									onclick={() => removeCategory(cat)}
-								>
-									<span class="cat-mark" aria-hidden="true"></span>
-									{cat}
-								</button>
-							{/each}
-						</div>
-					{/if}
 				</div>
 				<div class="song-functions">
 					<span class="key-cluster" aria-label="Toneart, transponér">
@@ -619,6 +602,23 @@
 						placeholder="Kategori"
 						aria-label="Tilføj kategori"
 					/>
+					{#if categories.length > 0}
+						<div class="function-cats">
+							{#each categories as cat (cat)}
+								{@const c = colorForCategory(cat)}
+								<button
+									type="button"
+									class="artist-cat"
+									style:--cat-color={c.text}
+									title="Fjern {cat}"
+									onclick={() => removeCategory(cat)}
+								>
+									<span class="cat-mark" aria-hidden="true"></span>
+									{cat}
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 				<button
 					type="button"
@@ -809,7 +809,7 @@
 		align-self: baseline;
 	}
 	.song-sub {
-		grid-column: 1 / -1;
+		grid-column: 1;
 		grid-row: 2;
 		align-self: baseline;
 	}
@@ -1001,18 +1001,18 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		justify-content: space-between;
 		gap: 0.45rem;
 		min-width: 0;
 	}
-	.artist-cats {
+	.function-cats {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		justify-content: flex-end;
 		gap: 0.45rem;
 		min-width: 0;
-		margin-left: auto;
+		padding: 0.15rem 0.55rem;
+		border-left: 1px solid var(--color-border-subtle);
+		align-self: stretch;
 	}
 	.cat-mark {
 		width: 0.2rem;
@@ -1047,7 +1047,8 @@
 		border: 1px solid var(--color-border-subtle);
 		border-radius: 2px;
 		min-height: 1.55rem;
-		flex-shrink: 0;
+		max-width: 100%;
+		min-width: 0;
 	}
 	.key-cluster {
 		display: inline-flex;
