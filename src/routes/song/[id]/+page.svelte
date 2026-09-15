@@ -19,7 +19,6 @@
 		decodeHtmlEntities
 	} from '$lib/chordFormatter';
 	import { parseRows, serializeRows, transposeRows, type Row } from '$lib/songParse';
-	import { regroupBassLine } from '$lib/migrate';
 	import EditableSong from '$lib/components/EditableSong.svelte';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
 	import { assignMissingCategoryColors, hasSameCategoryColors } from '$lib/categoryColors';
@@ -196,19 +195,6 @@
 	}
 
 	function onBassLinesChange(next: BassLines) {
-		bassLines = next;
-		scheduleSave();
-	}
-
-	function regroupAllBassLines(targetBars: 2 | 4) {
-		const next: BassLines = {};
-		let changed = false;
-		for (const [key, line] of Object.entries(bassLines)) {
-			const regrouped = regroupBassLine(line, targetBars);
-			if (regrouped) next[key] = regrouped;
-			if (regrouped !== line) changed = true;
-		}
-		if (!changed) return;
 		bassLines = next;
 		scheduleSave();
 	}
@@ -682,21 +668,6 @@
 								placeholder="Kunstner"
 							/>
 						</label>
-						<div class="info-field">
-							<span>Gruppér baslinjer</span>
-							<div class="info-seg" role="group" aria-label="Gruppér baslinjer">
-								<button
-									type="button"
-									title="Komprimér alle baslinjer parvist"
-									onclick={() => regroupAllBassLines(2)}>2</button
-								>
-								<button
-									type="button"
-									title="Udvid alle baslinjer parvist"
-									onclick={() => regroupAllBassLines(4)}>4</button
-								>
-							</div>
-						</div>
 					</div>
 				</div>
 				</div>
@@ -1224,26 +1195,6 @@
 	.info-input::placeholder {
 		color: var(--color-ink-faint);
 		opacity: 0.55;
-	}
-	.info-seg {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.1rem;
-	}
-	.info-seg button {
-		appearance: none;
-		border: none;
-		background: transparent;
-		min-width: 1.4rem;
-		padding: 0.1rem 0.28rem;
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		font-weight: 500;
-		color: var(--color-ink-faint);
-		cursor: pointer;
-	}
-	.info-seg button:hover {
-		color: var(--color-ink);
 	}
 	.artist-input {
 		width: auto;
