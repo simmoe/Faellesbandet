@@ -617,15 +617,9 @@
 						aria-label="Tilføj kategori"
 					/>
 				</div>
-				<datalist id="song-known-categories">
-					{#each knownCategories as c (c)}<option value={c}></option>{/each}
-				</datalist>
-			</div>
-
-			<div class="info-block no-print">
 				<button
 					type="button"
-					class="info-toggle"
+					class="info-toggle no-print"
 					class:is-open={infoOpen}
 					aria-expanded={infoOpen}
 					onclick={() => (infoOpen = !infoOpen)}
@@ -645,7 +639,11 @@
 						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
 					</svg>
 				</button>
-				<div class="info-fold" class:is-open={infoOpen}>
+				<datalist id="song-known-categories">
+					{#each knownCategories as c (c)}<option value={c}></option>{/each}
+				</datalist>
+			</div>
+			<div class="info-fold no-print" class:is-open={infoOpen}>
 				<div class="info-inner">
 					<div class="info-panel">
 						<label class="info-field">
@@ -669,7 +667,6 @@
 							/>
 						</label>
 					</div>
-				</div>
 				</div>
 			</div>
 
@@ -836,11 +833,13 @@
 		.title-line,
 		.song-actions,
 		.song-sub,
-		.song-functions {
+		.song-functions,
+		.info-toggle {
 			grid-column: 1;
 			grid-row: auto;
 		}
-		.song-actions {
+		.song-actions,
+		.info-toggle {
 			justify-self: start;
 		}
 	}
@@ -1114,10 +1113,11 @@
 		text-transform: uppercase;
 		font-size: 0.64rem;
 	}
-	.info-block {
-		margin: 0 0 0.7rem;
-	}
 	.info-toggle {
+		grid-column: 2;
+		grid-row: 3;
+		justify-self: end;
+		align-self: center;
 		appearance: none;
 		display: inline-flex;
 		align-items: center;
@@ -1125,6 +1125,7 @@
 		border: none;
 		background: transparent;
 		padding: 0.2rem 0;
+		margin-top: 0.15rem;
 		font-size: 0.68rem;
 		font-weight: 500;
 		letter-spacing: 0.08em;
