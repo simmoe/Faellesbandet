@@ -113,9 +113,6 @@
 		} finally {
 			skipHydrate = false;
 		}
-		} catch {
-			return false;
-		}
 	}
 
 	async function selectCategory(cat: string) {
