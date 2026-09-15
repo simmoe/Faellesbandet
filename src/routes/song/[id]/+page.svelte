@@ -438,9 +438,7 @@
 		<div class="card p-8 text-center text-[var(--color-ink-muted)]">Henter sang…</div>
 	{:else if loadError}
 		<a href="/songbook" class="back-link no-print mb-3 inline-flex items-center">
-			<svg class="back-caret" viewBox="0 0 6 8" aria-hidden="true">
-				<polygon points="6,0 0,4 6,8" fill="currentColor"></polygon>
-			</svg>
+			<span class="site-caret" aria-hidden="true"></span>
 			Sangbogen
 		</a>
 		<div class="card p-6">
@@ -451,9 +449,7 @@
 		<article class="card song-card">
 			<div class="song-chrome no-print">
 				<a href="/songbook" class="back-link">
-					<svg class="back-caret" viewBox="0 0 6 8" aria-hidden="true">
-						<polygon points="6,0 0,4 6,8" fill="currentColor"></polygon>
-					</svg>
+					<span class="site-caret" aria-hidden="true"></span>
 					Sangbogen
 				</a>
 				<div class="song-chrome-status">
@@ -775,12 +771,6 @@
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--color-ink-faint);
-	}
-	.back-caret {
-		width: 0.28rem;
-		height: 0.38rem;
-		flex-shrink: 0;
-		display: block;
 	}
 	.back-link:hover {
 		color: var(--color-ink);

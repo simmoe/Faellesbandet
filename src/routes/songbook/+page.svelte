@@ -749,7 +749,6 @@
 	</header>
 
 	<div class="toolbar">
-		<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj sang</a>
 		<input
 			class="toolbar-search"
 			type="search"
@@ -757,7 +756,9 @@
 			bind:value={search}
 			aria-label="Søg i sangbogen"
 		/>
-		<div class="print-group">
+		<div class="toolbar-actions">
+			<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj sang</a>
+			<div class="print-group">
 			<select
 				value={printCategory}
 				class="print-select"
@@ -784,7 +785,25 @@
 					: 'Lav akkord-PDF for hele sangbogen'}
 				aria-busy={pdfBusy}
 			>
-				{#if pdfBusy}<span class="pdf-spinner" aria-hidden="true"></span>{/if}
+				{#if pdfBusy}
+					<span class="pdf-spinner" aria-hidden="true"></span>
+				{:else}
+					<svg
+						class="print-icon"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.7"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M7 8V3h10v5"></path>
+						<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+						<path d="M7 13h10v8H7z"></path>
+					</svg>
+				{/if}
 				<span>{pdfBusy ? 'Bygger…' : 'Akkorder'}</span>
 			</button>
 			<button
@@ -799,9 +818,28 @@
 				aria-busy={audiencePdfBusy}
 				title="Publikums-PDF uden akkorder"
 			>
-				{#if audiencePdfBusy}<span class="pdf-spinner" aria-hidden="true"></span>{/if}
+				{#if audiencePdfBusy}
+					<span class="pdf-spinner" aria-hidden="true"></span>
+				{:else}
+					<svg
+						class="print-icon"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.7"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M7 8V3h10v5"></path>
+						<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+						<path d="M7 13h10v8H7z"></path>
+					</svg>
+				{/if}
 				<span>{audiencePdfBusy ? 'Bygger…' : 'Tekster'}</span>
 			</button>
+			</div>
 		</div>
 	</div>
 
@@ -1073,8 +1111,14 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: stretch;
-		gap: 0.5rem;
+		gap: 0.55rem;
 		margin-bottom: 0.85rem;
+	}
+	.toolbar-actions {
+		display: flex;
+		align-items: stretch;
+		gap: 0.5rem;
+		flex: 0 0 auto;
 	}
 	.toolbar-add {
 		display: inline-flex;
@@ -1083,7 +1127,7 @@
 		flex: 0 0 auto;
 		height: 2.35rem;
 		padding: 0 0.95rem;
-		border-radius: 0.4rem;
+		border-radius: var(--radius-button);
 		background: var(--color-accent);
 		color: #ffffff;
 		font-size: 0.82rem;
@@ -1096,13 +1140,13 @@
 		background: var(--color-accent-hover);
 	}
 	.toolbar-search {
-		flex: 1 1 14rem;
+		flex: 1 1 16rem;
 		min-width: 12rem;
 		height: 2.35rem;
 		padding: 0 0.85rem;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 0.4rem;
-		background: #ffffff;
+		border: 1px solid rgba(226, 232, 240, 0.16);
+		border-radius: var(--radius-button);
+		background: rgba(255, 255, 255, 0.92);
 		color: var(--color-ink);
 		font-size: 0.88rem;
 	}
@@ -1184,7 +1228,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.55rem;
-		border-radius: 0.75rem;
+		border-radius: var(--radius-button);
 		border: 1px solid var(--color-border-subtle);
 		background: #ffffff;
 		padding: 0.65rem 0.8rem;
@@ -1288,7 +1332,7 @@
 	}
 	.print-order-end-drop {
 		margin-top: 0.5rem;
-		border-radius: 0.7rem;
+		border-radius: var(--radius-button);
 		border: 1px dashed var(--color-border-subtle);
 		padding: 0.55rem;
 		color: var(--color-ink-faint);
@@ -1319,10 +1363,12 @@
 	.song-card {
 		display: flex;
 		flex-direction: column;
+		justify-content: space-between;
 		gap: 0.4rem;
 		min-width: 0;
+		min-height: 5.75rem;
 		padding: 0.7rem 0.8rem 0.65rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-card);
 	}
 	.song-card-main {
 		display: block;
@@ -1409,19 +1455,21 @@
 		align-items: stretch;
 		flex: 0 0 auto;
 		height: 2.35rem;
-		border-radius: 0.4rem;
+		border-radius: var(--radius-button);
 		overflow: hidden;
 	}
 	.print-select {
 		appearance: none;
 		-webkit-appearance: none;
-		background: #ffffff
-			url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23374151' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>")
-			no-repeat right 0.7rem center;
+		background-color: #ffffff;
+		background-image: var(--site-caret-down);
+		background-repeat: no-repeat;
+		background-position: right 0.7rem center;
+		background-size: 0.38rem 0.28rem;
 		border: 1px solid var(--color-border-subtle);
 		border-right: 0;
-		border-radius: 0.4rem 0 0 0.4rem;
-		padding: 0 1.9rem 0 0.8rem;
+		border-radius: var(--radius-button) 0 0 var(--radius-button);
+		padding: 0 1.7rem 0 0.8rem;
 		color: var(--color-ink);
 		font-weight: 500;
 		font-size: 0.82rem;
@@ -1445,8 +1493,13 @@
 		font-size: 0.82rem;
 		font-weight: 500;
 		letter-spacing: 0.01em;
-		min-width: 5.4rem;
+		min-width: 6.1rem;
 		transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+	}
+	.print-icon {
+		width: 0.82rem;
+		height: 0.82rem;
+		flex-shrink: 0;
 	}
 	.pdf-choice:hover {
 		background: #f8fafc;
@@ -1476,6 +1529,6 @@
 		border-radius: 0 !important;
 	}
 	.print-group .pdf-choice:last-child {
-		border-radius: 0 0.4rem 0.4rem 0 !important;
+		border-radius: 0 var(--radius-button) var(--radius-button) 0 !important;
 	}
 </style>

@@ -29,8 +29,8 @@
 	--color-error: #dc2626;
 	--color-success: #059669;
 
-	--radius-card: 0.875rem;
-	--radius-button: 0.625rem;
+	--radius-card: 0.4rem;
+	--radius-button: 0.3rem;
 
 	--shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 6px 20px rgba(15, 23, 42, 0.18);
 }
@@ -44,6 +44,46 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 	min-height: 100vh;
 	min-height: 100dvh;
+	--site-caret-down: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 6'><polygon points='0,0 8,0 4,6' fill='%230f172a'/></svg>");
+}
+
+body {
+	isolation: isolate;
+}
+body::before {
+	content: '';
+	position: fixed;
+	inset: -18%;
+	z-index: -1;
+	pointer-events: none;
+	background:
+		radial-gradient(ellipse 46% 38% at 16% 6%, rgba(245, 158, 11, 0.16), transparent 62%),
+		radial-gradient(ellipse 40% 34% at 88% 14%, rgba(148, 163, 184, 0.12), transparent 58%),
+		radial-gradient(ellipse 52% 42% at 70% 94%, rgba(37, 99, 235, 0.16), transparent 64%);
+	filter: blur(42px);
+	animation: liquid-wash 38s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+	body::before {
+		animation: none;
+	}
+}
+@keyframes liquid-wash {
+	from {
+		transform: translate3d(0, 0, 0) scale(1);
+	}
+	to {
+		transform: translate3d(3.5%, -2.5%, 0) scale(1.07);
+	}
+}
+
+.site-caret {
+	display: block;
+	flex-shrink: 0;
+	width: 0.28rem;
+	height: 0.38rem;
+	background: currentColor;
+	clip-path: polygon(100% 0, 0 50%, 100% 100%);
 }
 
 ::selection {
@@ -488,6 +528,9 @@ select {
 		background: #ffffff !important;
 		color: #000000 !important;
 		font-size: 10pt;
+	}
+	body::before {
+		display: none !important;
 	}
 	.no-print,
 	.no-print-toolbar,

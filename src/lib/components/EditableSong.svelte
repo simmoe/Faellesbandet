@@ -1635,9 +1635,9 @@
 		border: 1px solid #d1d5db;
 		border-radius: 5px;
 		background-color: #fff;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+		background-image: var(--site-caret-down);
 		background-position: right 0.45em center;
-		background-size: 12px 12px;
+		background-size: 0.38rem 0.28rem;
 		background-repeat: no-repeat;
 		color: #4b5563;
 		font: 500 13px/1 var(--font-sans);
