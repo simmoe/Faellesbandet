@@ -171,6 +171,14 @@
 		return sortSongsForCategory(activeCategory, filtered);
 	});
 
+	function onSearchInput(): void {
+		if (!search.trim()) return;
+		if (activeCategory !== null || printCategory) {
+			activeCategory = null;
+			printCategory = '';
+		}
+	}
+
 	async function handleSignOut() {
 		await authState.signOut();
 		goto('/login');
@@ -763,6 +771,7 @@
 			type="search"
 			placeholder="Søg titel, kunstner eller kategori"
 			bind:value={search}
+			oninput={onSearchInput}
 			aria-label="Søg i sangbogen"
 		/>
 		<div class="toolbar-actions">
