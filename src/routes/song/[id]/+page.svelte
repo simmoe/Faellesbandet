@@ -21,9 +21,12 @@
 	import { parseRows, serializeRows, transposeRows, type Row } from '$lib/songParse';
 	import { regroupBassLine } from '$lib/migrate';
 	import EditableSong from '$lib/components/EditableSong.svelte';
-	import SongMetaForm from '$lib/components/SongMetaForm.svelte';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
-	import { assignMissingCategoryColors, hasSameCategoryColors } from '$lib/categoryColors';
+	import {
+		assignMissingCategoryColors,
+		colorForCategory,
+		hasSameCategoryColors
+	} from '$lib/categoryColors';
 	import { tick } from 'svelte';
 	import type {
 		BassLines,
@@ -53,6 +56,8 @@
 	let categoryMetaMap = $state<CategoryMetaMap>({});
 	let showBassTabs = $state(true);
 	let fitSinglePage = $state(true);
+	let infoOpen = $state(false);
+	let categoryDraft = $state('');
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
@@ -189,21 +194,6 @@
 
 	// ───── Field change handlers ─────────────────────────────────────────
 
-	function onMetaChange(next: {
-		title: string;
-		artist: string;
-		key: string;
-		barsPerLine: 2 | 4 | 8;
-		categories: string[];
-	}) {
-		title = next.title;
-		artist = next.artist;
-		key = next.key;
-		barsPerLine = next.barsPerLine;
-		categories = next.categories;
-		scheduleSave();
-	}
-
 	function onRowsChange(next: Row[]) {
 		rows = next;
 		scheduleSave();
@@ -229,6 +219,39 @@
 
 	function onCollapsedSectionsChange(next: CollapsedSections) {
 		collapsedSections = next;
+		scheduleSave();
+	}
+
+	function addCategory(cat: string) {
+		const trimmed = cat.trim();
+		if (!trimmed) return;
+		if (categories.some((c) => c.toLocaleLowerCase('da') === trimmed.toLocaleLowerCase('da'))) {
+			categoryDraft = '';
+			return;
+		}
+		categories = [...categories, trimmed];
+		categoryDraft = '';
+		scheduleSave();
+	}
+
+	function onCategoryInput(value: string) {
+		categoryDraft = value;
+		const trimmed = value.trim();
+		if (!trimmed) return;
+		const existing = knownCategories.find(
+			(cat) => cat.toLocaleLowerCase('da') === trimmed.toLocaleLowerCase('da')
+		);
+		if (existing) addCategory(existing);
+	}
+
+	function removeCategory(cat: string) {
+		categories = categories.filter((c) => c !== cat);
+		scheduleSave();
+	}
+
+	function setBarsPerLine(next: 2 | 4 | 8) {
+		if (barsPerLine === next) return;
+		barsPerLine = next;
 		scheduleSave();
 	}
 
@@ -462,16 +485,110 @@
 			</div>
 
 			<div class="song-head no-print-toolbar">
-				<div class="song-identity">
-					<div class="title-line">
-						<input
-							class="title-input"
-							type="text"
-							bind:value={title}
-							oninput={() => scheduleSave()}
-							placeholder="Titel"
-							style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
-						/>
+				<div class="title-line">
+					<input
+						class="title-input"
+						type="text"
+						bind:value={title}
+						oninput={() => scheduleSave()}
+						placeholder="Titel"
+						style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
+					/>
+					{#if categories.length > 0}
+						<div class="title-cats">
+							{#each categories as cat (cat)}
+								{@const c = colorForCategory(cat, effectiveCategoryColorMap)}
+								<button
+									type="button"
+									class="title-cat"
+									style:color={c.text}
+									title="Fjern {cat}"
+									onclick={() => removeCategory(cat)}
+								>
+									{cat}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+				<div class="song-actions">
+					<label class="print-toggle" title="Vis bass-tabs på siden og tag dem med ved print">
+						<input type="checkbox" bind:checked={showBassTabs} onchange={() => scheduleSave()} />
+						Bass
+					</label>
+					<label
+						class="print-toggle"
+						title="Skalér sangen proportionalt så den fylder maks én A4-side"
+					>
+						<input type="checkbox" bind:checked={fitSinglePage} onchange={() => scheduleSave()} />
+						Én side
+					</label>
+					<button
+						type="button"
+						class="song-tool"
+						onclick={handlePdf}
+						disabled={pdfBusy}
+						title="Generér akkord-PDF og hent direkte"
+					>
+						<svg
+							class="print-icon"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M7 8V3h10v5"></path>
+							<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+							<path d="M7 13h10v8H7z"></path>
+						</svg>
+						{pdfBusy ? 'Genererer…' : 'Akkorder'}
+					</button>
+					<button
+						type="button"
+						class="song-tool"
+						onclick={handleAudiencePdf}
+						disabled={audiencePdfBusy}
+						title="Generér publikums-PDF uden akkorder"
+					>
+						<svg
+							class="print-icon"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M7 8V3h10v5"></path>
+							<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+							<path d="M7 13h10v8H7z"></path>
+						</svg>
+						{audiencePdfBusy ? 'Genererer…' : 'Tekst'}
+					</button>
+					<button
+						type="button"
+						class="song-tool song-tool-danger"
+						onclick={handleDelete}
+						title="Slet sang">Slet</button
+					>
+				</div>
+
+				<div class="song-sub">
+					<input
+						class="artist-input"
+						type="text"
+						bind:value={artist}
+						oninput={() => scheduleSave()}
+						placeholder="Kunstner"
+						style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
+					/>
+					<div class="song-functions">
 						<span class="key-cluster" aria-label="Toneart, transponér">
 							<button
 								type="button"
@@ -494,70 +611,82 @@
 								onclick={() => transpose(1)}>+</button
 							>
 						</span>
-					</div>
-					<div class="song-sub">
 						<input
-							class="artist-input"
+							class="cat-pick"
 							type="text"
-							bind:value={artist}
-							oninput={() => scheduleSave()}
-							placeholder="Kunstner"
-							style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
+							list="song-known-categories"
+							bind:value={categoryDraft}
+							oninput={(e) => onCategoryInput(e.currentTarget.value)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ',') {
+									e.preventDefault();
+									addCategory(categoryDraft);
+								}
+							}}
+							onblur={() => addCategory(categoryDraft)}
+							placeholder="Kategori"
+							aria-label="Tilføj kategori"
 						/>
-						<details class="meta-details">
-							<summary>Takter og kategorier</summary>
-							<div class="meta-panel">
-								<SongMetaForm
-									{title}
-									{artist}
-									{key}
-									{barsPerLine}
-									{categories}
-									{knownCategories}
-									categoryColors={effectiveCategoryColorMap}
-									onRegroupAllBassLines={regroupAllBassLines}
-									onChange={onMetaChange}
-								/>
-							</div>
-						</details>
 					</div>
+					<datalist id="song-known-categories">
+						{#each knownCategories as c (c)}<option value={c}></option>{/each}
+					</datalist>
 				</div>
-				<div class="song-actions">
-					<label class="print-toggle" title="Vis bass-tabs på siden og tag dem med ved print">
-						<input type="checkbox" bind:checked={showBassTabs} onchange={() => scheduleSave()} />
-						Bass
-					</label>
-					<label
-						class="print-toggle"
-						title="Skalér sangen proportionalt så den fylder maks én A4-side"
+				<button
+					type="button"
+					class="info-toggle"
+					class:is-open={infoOpen}
+					aria-expanded={infoOpen}
+					onclick={() => (infoOpen = !infoOpen)}
+				>
+					Oplysninger
+					<svg
+						class="info-chevron"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 12 12"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.4"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
 					>
-						<input type="checkbox" bind:checked={fitSinglePage} onchange={() => scheduleSave()} />
-						Én side
-					</label>
-					<button
-						type="button"
-						class="song-tool"
-						onclick={handlePdf}
-						disabled={pdfBusy}
-						title="Generér akkord-PDF og hent direkte"
-					>
-						{pdfBusy ? 'Genererer…' : 'Akkorder'}
-					</button>
-					<button
-						type="button"
-						class="song-tool"
-						onclick={handleAudiencePdf}
-						disabled={audiencePdfBusy}
-						title="Generér publikums-PDF uden akkorder"
-					>
-						{audiencePdfBusy ? 'Genererer…' : 'Tekst'}
-					</button>
-					<button
-						type="button"
-						class="song-tool song-tool-danger"
-						onclick={handleDelete}
-						title="Slet sang">Slet</button
-					>
+						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
+					</svg>
+				</button>
+			</div>
+
+			<div class="info-fold no-print" class:is-open={infoOpen}>
+				<div class="info-inner">
+					<div class="info-panel">
+						<div class="info-field">
+							<span>Takter pr. linje</span>
+							<div class="info-seg" role="group" aria-label="Takter pr. linje">
+								{#each [2, 4, 8] as n (n)}
+									<button
+										type="button"
+										class:is-active={barsPerLine === n}
+										onclick={() => setBarsPerLine(n as 2 | 4 | 8)}>{n}</button
+									>
+								{/each}
+							</div>
+						</div>
+						<div class="info-field">
+							<span>Gruppér baslinjer</span>
+							<div class="info-seg" role="group" aria-label="Gruppér baslinjer">
+								<button
+									type="button"
+									title="Komprimér alle baslinjer parvist"
+									onclick={() => regroupAllBassLines(2)}>2</button
+								>
+								<button
+									type="button"
+									title="Udvid alle baslinjer parvist"
+									onclick={() => regroupAllBassLines(4)}>4</button
+								>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 
@@ -676,32 +805,37 @@
 		color: var(--color-ink-faint);
 	}
 	.song-head {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-rows: auto auto;
 		align-items: baseline;
-		justify-content: space-between;
-		gap: 0.5rem 1.5rem;
-		margin-bottom: 0.7rem;
+		column-gap: 1.25rem;
+		row-gap: 0.18rem;
+		margin-bottom: 0.55rem;
+	}
+	.title-line,
+	.song-actions {
+		align-self: baseline;
+	}
+	.song-sub,
+	.info-toggle {
+		align-self: center;
 	}
 	@container (max-width: 42rem) {
 		.song-head {
-			flex-wrap: wrap;
-			align-items: flex-start;
+			grid-template-columns: minmax(0, 1fr);
 		}
-		.song-actions {
-			width: 100%;
-			justify-content: flex-start;
-			padding-top: 0.15rem;
+		.song-actions,
+		.info-toggle {
+			justify-self: start;
 		}
-	}
-	.song-identity {
-		min-width: 0;
-		flex: 1 1 12rem;
 	}
 	.song-actions {
 		display: flex;
 		align-items: center;
 		flex-wrap: wrap;
 		justify-content: flex-end;
+		justify-self: end;
 		gap: 0.1rem 0.15rem;
 	}
 	.print-toggle {
@@ -725,6 +859,9 @@
 	}
 	.song-tool {
 		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
 		border: none;
 		background: transparent;
 		padding: 0.2rem 0.4rem;
@@ -734,6 +871,12 @@
 		text-transform: uppercase;
 		color: var(--color-ink-muted);
 		cursor: pointer;
+	}
+	.print-icon {
+		width: 0.82rem;
+		height: 0.82rem;
+		flex-shrink: 0;
+		color: currentColor;
 	}
 	.song-tool:hover:not(:disabled) {
 		color: var(--color-ink);
@@ -820,12 +963,13 @@
 	.title-line {
 		display: flex;
 		align-items: baseline;
-		gap: 0.7rem;
+		gap: 0.7rem 0.9rem;
 		min-width: 0;
+		flex-wrap: wrap;
 	}
 	.title-input {
 		min-width: 6ch;
-		max-width: calc(100% - 5.5rem);
+		max-width: 100%;
 		flex: 0 1 auto;
 		background: transparent;
 		border: none;
@@ -842,11 +986,52 @@
 		outline: none;
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
+	.title-cats {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.45rem 0.7rem;
+	}
+	.title-cat {
+		appearance: none;
+		border: none;
+		background: transparent;
+		padding: 0;
+		font-family: var(--font-title);
+		font-size: 0.72rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		cursor: pointer;
+		opacity: 0.9;
+	}
+	.title-cat:hover {
+		opacity: 1;
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+	}
+	.song-sub {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem 0.7rem;
+		min-width: 0;
+	}
+	.song-functions {
+		display: inline-flex;
+		align-items: center;
+		gap: 0;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 2px;
+		min-height: 1.55rem;
+		flex-shrink: 0;
+	}
 	.key-cluster {
 		display: inline-flex;
 		align-items: baseline;
 		flex: 0 0 auto;
 		gap: 0.05rem;
+		padding: 0 0.35rem 0 0.2rem;
 		color: var(--color-ink-muted);
 	}
 	.key-btn {
@@ -879,12 +1064,113 @@
 		color: var(--color-ink);
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
-	.song-sub {
+	.cat-pick {
+		width: 9.5rem;
+		min-width: 0;
+		background: transparent;
+		border: none;
+		border-left: 1px solid var(--color-border-subtle);
+		padding: 0 0.55rem;
+		height: 1.55rem;
+		font-family: var(--font-title);
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		color: var(--color-ink);
+	}
+	.cat-pick:focus {
+		outline: none;
+		background: #f8fafc;
+	}
+	.cat-pick::placeholder {
+		color: var(--color-ink-faint);
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		font-size: 0.64rem;
+	}
+	.info-toggle {
+		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		justify-self: end;
+		border: none;
+		background: transparent;
+		padding: 0.15rem 0;
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-ink-faint);
+		cursor: pointer;
+	}
+	.info-toggle:hover,
+	.info-toggle.is-open {
+		color: var(--color-ink);
+	}
+	.info-chevron {
+		width: 0.7rem;
+		height: 0.7rem;
+		transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	.info-toggle.is-open .info-chevron {
+		transform: rotate(180deg);
+	}
+	.info-fold {
+		display: grid;
+		grid-template-rows: 0fr;
+		transition: grid-template-rows 280ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+	.info-fold.is-open {
+		grid-template-rows: 1fr;
+		margin-bottom: 0.55rem;
+	}
+	.info-inner {
+		overflow: hidden;
+		min-height: 0;
+	}
+	.info-panel {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 0.15rem 0.9rem;
-		margin-top: 0.12rem;
+		gap: 0.65rem 2rem;
+		padding: 0.75rem 0 0.9rem;
+		border-top: 1px solid var(--color-border-subtle);
+	}
+	.info-field {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+	}
+	.info-field > span {
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-ink-faint);
+	}
+	.info-seg {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.1rem;
+	}
+	.info-seg button {
+		appearance: none;
+		border: none;
+		background: transparent;
+		min-width: 1.4rem;
+		padding: 0.1rem 0.28rem;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		font-weight: 500;
+		color: var(--color-ink-faint);
+		cursor: pointer;
+	}
+	.info-seg button:hover {
+		color: var(--color-ink);
+	}
+	.info-seg button.is-active {
+		color: var(--color-ink);
+		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
 	.artist-input {
 		width: auto;
@@ -911,34 +1197,6 @@
 	}
 	.print-header {
 		display: none;
-	}
-	.meta-details {
-		min-width: 0;
-	}
-	.meta-details[open] {
-		flex: 1 1 100%;
-	}
-	.meta-details > summary {
-		list-style: none;
-		cursor: pointer;
-		font-size: 0.68rem;
-		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--color-ink-faint);
-		user-select: none;
-	}
-	.meta-details > summary:hover {
-		color: var(--color-ink-muted);
-	}
-	.meta-details > summary::-webkit-details-marker {
-		display: none;
-	}
-	.meta-details > summary::marker {
-		content: '';
-	}
-	.meta-panel {
-		margin-top: 0.75rem;
 	}
 	.song-area {
 		background: #ffffff;
