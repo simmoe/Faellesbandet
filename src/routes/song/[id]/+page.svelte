@@ -22,11 +22,7 @@
 	import { regroupBassLine } from '$lib/migrate';
 	import EditableSong from '$lib/components/EditableSong.svelte';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
-	import {
-		assignMissingCategoryColors,
-		colorForCategory,
-		hasSameCategoryColors
-	} from '$lib/categoryColors';
+	import { assignMissingCategoryColors, hasSameCategoryColors } from '$lib/categoryColors';
 	import { tick } from 'svelte';
 	import type {
 		BassLines,
@@ -246,12 +242,6 @@
 
 	function removeCategory(cat: string) {
 		categories = categories.filter((c) => c !== cat);
-		scheduleSave();
-	}
-
-	function setBarsPerLine(next: 2 | 4 | 8) {
-		if (barsPerLine === next) return;
-		barsPerLine = next;
 		scheduleSave();
 	}
 
@@ -494,22 +484,6 @@
 						placeholder="Titel"
 						style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
 					/>
-					{#if categories.length > 0}
-						<div class="title-cats">
-							{#each categories as cat (cat)}
-								{@const c = colorForCategory(cat, effectiveCategoryColorMap)}
-								<button
-									type="button"
-									class="title-cat"
-									style:color={c.text}
-									title="Fjern {cat}"
-									onclick={() => removeCategory(cat)}
-								>
-									{cat}
-								</button>
-							{/each}
-						</div>
-					{/if}
 				</div>
 				<div class="song-actions">
 					<label class="print-toggle" title="Vis bass-tabs på siden og tag dem med ved print">
@@ -588,49 +562,20 @@
 						placeholder="Kunstner"
 						style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
 					/>
-					<div class="song-functions">
-						<span class="key-cluster" aria-label="Toneart, transponér">
-							<button
-								type="button"
-								class="key-btn"
-								title="Transponér ned"
-								onclick={() => transpose(-1)}>−</button
-							>
-							<input
-								class="key-input"
-								type="text"
-								bind:value={key}
-								oninput={() => scheduleSave()}
-								placeholder="—"
-								spellcheck="false"
-							/>
-							<button
-								type="button"
-								class="key-btn"
-								title="Transponér op"
-								onclick={() => transpose(1)}>+</button
-							>
-						</span>
-						<input
-							class="cat-pick"
-							type="text"
-							list="song-known-categories"
-							bind:value={categoryDraft}
-							oninput={(e) => onCategoryInput(e.currentTarget.value)}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ',') {
-									e.preventDefault();
-									addCategory(categoryDraft);
-								}
-							}}
-							onblur={() => addCategory(categoryDraft)}
-							placeholder="Kategori"
-							aria-label="Tilføj kategori"
-						/>
-					</div>
-					<datalist id="song-known-categories">
-						{#each knownCategories as c (c)}<option value={c}></option>{/each}
-					</datalist>
+					{#if categories.length > 0}
+						<div class="artist-cats">
+							{#each categories as cat (cat)}
+								<button
+									type="button"
+									class="artist-cat"
+									title="Fjern {cat}"
+									onclick={() => removeCategory(cat)}
+								>
+									{cat}
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 				<button
 					type="button"
@@ -654,23 +599,74 @@
 						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
 					</svg>
 				</button>
+				<div class="song-functions">
+					<span class="key-cluster" aria-label="Toneart, transponér">
+						<button
+							type="button"
+							class="key-btn"
+							title="Transponér ned"
+							onclick={() => transpose(-1)}>−</button
+						>
+						<input
+							class="key-input"
+							type="text"
+							bind:value={key}
+							oninput={() => scheduleSave()}
+							placeholder="—"
+							spellcheck="false"
+						/>
+						<button
+							type="button"
+							class="key-btn"
+							title="Transponér op"
+							onclick={() => transpose(1)}>+</button
+						>
+					</span>
+					<input
+						class="cat-pick"
+						type="text"
+						list="song-known-categories"
+						bind:value={categoryDraft}
+						oninput={(e) => onCategoryInput(e.currentTarget.value)}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' || e.key === ',') {
+								e.preventDefault();
+								addCategory(categoryDraft);
+							}
+						}}
+						onblur={() => addCategory(categoryDraft)}
+						placeholder="Kategori"
+						aria-label="Tilføj kategori"
+					/>
+				</div>
+				<datalist id="song-known-categories">
+					{#each knownCategories as c (c)}<option value={c}></option>{/each}
+				</datalist>
 			</div>
 
 			<div class="info-fold no-print" class:is-open={infoOpen}>
 				<div class="info-inner">
 					<div class="info-panel">
-						<div class="info-field">
-							<span>Takter pr. linje</span>
-							<div class="info-seg" role="group" aria-label="Takter pr. linje">
-								{#each [2, 4, 8] as n (n)}
-									<button
-										type="button"
-										class:is-active={barsPerLine === n}
-										onclick={() => setBarsPerLine(n as 2 | 4 | 8)}>{n}</button
-									>
-								{/each}
-							</div>
-						</div>
+						<label class="info-field">
+							<span>Titel</span>
+							<input
+								class="info-input"
+								type="text"
+								bind:value={title}
+								oninput={() => scheduleSave()}
+								placeholder="Titel"
+							/>
+						</label>
+						<label class="info-field">
+							<span>Kunstner</span>
+							<input
+								class="info-input"
+								type="text"
+								bind:value={artist}
+								oninput={() => scheduleSave()}
+								placeholder="Kunstner"
+							/>
+						</label>
 						<div class="info-field">
 							<span>Gruppér baslinjer</span>
 							<div class="info-seg" role="group" aria-label="Gruppér baslinjer">
@@ -807,23 +803,53 @@
 	.song-head {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
-		grid-template-rows: auto auto;
+		grid-template-rows: auto auto auto;
 		align-items: baseline;
 		column-gap: 1.25rem;
-		row-gap: 0.18rem;
+		row-gap: 0.2rem;
 		margin-bottom: 0.55rem;
 	}
-	.title-line,
+	.title-line {
+		grid-column: 1;
+		grid-row: 1;
+	}
 	.song-actions {
+		grid-column: 2;
+		grid-row: 1;
 		align-self: baseline;
 	}
-	.song-sub,
+	.song-sub {
+		grid-column: 1;
+		grid-row: 2;
+		align-self: baseline;
+	}
 	.info-toggle {
+		grid-column: 2;
+		grid-row: 2;
+		align-self: baseline;
+	}
+	.song-functions {
+		grid-column: 1;
+		grid-row: 3;
+		justify-self: start;
 		align-self: center;
+		margin-top: 0.15rem;
+	}
+	.song-head datalist {
+		display: none;
 	}
 	@container (max-width: 42rem) {
 		.song-head {
 			grid-template-columns: minmax(0, 1fr);
+			grid-template-rows: auto;
+		}
+		.title-line,
+		.song-actions,
+		.song-sub,
+		.info-toggle,
+		.song-functions {
+			grid-column: 1;
+			grid-row: auto;
 		}
 		.song-actions,
 		.info-toggle {
@@ -986,36 +1012,36 @@
 		outline: none;
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
-	.title-cats {
+	.song-sub {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 0.45rem 0.7rem;
+		gap: 0.25rem 0.75rem;
+		min-width: 0;
 	}
-	.title-cat {
+	.artist-cats {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.15rem 0.55rem;
+		min-width: 0;
+	}
+	.artist-cat {
 		appearance: none;
 		border: none;
 		background: transparent;
 		padding: 0;
-		font-family: var(--font-title);
+		font-family: var(--font-sans);
 		font-size: 0.72rem;
-		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
+		font-weight: 400;
+		letter-spacing: 0.01em;
+		color: var(--color-ink-muted);
 		cursor: pointer;
-		opacity: 0.9;
 	}
-	.title-cat:hover {
-		opacity: 1;
+	.artist-cat:hover {
+		color: var(--color-ink);
 		text-decoration: underline;
-		text-underline-offset: 0.18em;
-	}
-	.song-sub {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.45rem 0.7rem;
-		min-width: 0;
+		text-underline-offset: 0.16em;
 	}
 	.song-functions {
 		display: inline-flex;
@@ -1130,14 +1156,14 @@
 	}
 	.info-panel {
 		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.65rem 2rem;
+		flex-direction: column;
+		gap: 0.55rem;
 		padding: 0.75rem 0 0.9rem;
 		border-top: 1px solid var(--color-border-subtle);
 	}
 	.info-field {
-		display: flex;
+		display: grid;
+		grid-template-columns: 8.75rem minmax(0, 1fr);
 		align-items: baseline;
 		gap: 0.75rem;
 	}
@@ -1147,6 +1173,26 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--color-ink-faint);
+	}
+	.info-input {
+		width: 100%;
+		min-width: 0;
+		background: transparent;
+		border: none;
+		padding: 0.1rem 0;
+		font-family: var(--font-title);
+		font-size: 0.95rem;
+		font-weight: 400;
+		letter-spacing: -0.015em;
+		color: var(--color-ink);
+	}
+	.info-input:focus {
+		outline: none;
+		box-shadow: inset 0 -1px 0 var(--color-ink);
+	}
+	.info-input::placeholder {
+		color: var(--color-ink-faint);
+		opacity: 0.55;
 	}
 	.info-seg {
 		display: inline-flex;
