@@ -727,9 +727,7 @@
 			<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
 				{BAND.name}
 			</h1>
-			<p class="page-tagline">
-				{BAND.tagline} · samlede sangbog
-			</p>
+			<p class="page-tagline">{BAND.name}s samlede sangbog</p>
 		</div>
 		{#if authState.profile}
 			<div class="flex items-center gap-3 text-sm">
@@ -1387,7 +1385,7 @@
 		white-space: nowrap;
 		font-family: var(--font-title);
 		font-size: 0.98rem;
-		font-weight: 600;
+		font-weight: 400;
 		letter-spacing: -0.02em;
 		color: var(--color-ink);
 	}
@@ -1412,24 +1410,25 @@
 	}
 	.cat-pill {
 		flex: 0 0 auto;
-		padding: 0.08rem 0.4rem;
+		padding: 0.06rem 0.35rem;
 		border-radius: var(--radius-card);
 		background: transparent;
-		color: var(--color-ink-muted);
+		color: var(--pill-line, var(--color-ink-muted));
 		font-size: 0.64rem;
 		line-height: 1.25;
 		font-weight: 500;
-		border: 1px solid var(--pill-line, var(--color-border-subtle));
+		border: none;
+		box-shadow: 0 0 0 0.5px currentColor;
 		white-space: nowrap;
 	}
 	button.cat-pill {
 		cursor: pointer;
 	}
 	button.cat-pill:hover {
-		color: var(--pill-line, var(--color-ink));
+		opacity: 0.72;
 	}
 	.cat-pill.highlighted {
-		color: var(--pill-line, var(--color-ink));
+		opacity: 1;
 	}
 	.song-card-categories {
 		margin-top: 0;
