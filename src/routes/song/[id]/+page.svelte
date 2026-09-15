@@ -438,10 +438,10 @@
 		<div class="card p-8 text-center text-[var(--color-ink-muted)]">Henter sang…</div>
 	{:else if loadError}
 		<a href="/songbook" class="back-link no-print mb-3 inline-flex items-center">
-			Sangbogen
 			<svg class="back-caret" viewBox="0 0 6 8" aria-hidden="true">
 				<polygon points="6,0 0,4 6,8" fill="currentColor"></polygon>
 			</svg>
+			Sangbogen
 		</a>
 		<div class="card p-6">
 			<p class="text-[var(--color-error)] font-semibold">Fejl</p>
@@ -451,10 +451,10 @@
 		<article class="card song-card">
 			<div class="song-chrome no-print">
 				<a href="/songbook" class="back-link">
-					Sangbogen
 					<svg class="back-caret" viewBox="0 0 6 8" aria-hidden="true">
 						<polygon points="6,0 0,4 6,8" fill="currentColor"></polygon>
 					</svg>
+					Sangbogen
 				</a>
 				<div class="song-chrome-status">
 					{#if saveStatus === 'saving'}
@@ -777,8 +777,8 @@
 		color: var(--color-ink-faint);
 	}
 	.back-caret {
-		width: 0.2rem;
-		height: 0.28rem;
+		width: 0.28rem;
+		height: 0.38rem;
 		flex-shrink: 0;
 		display: block;
 	}
