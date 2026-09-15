@@ -260,6 +260,9 @@ select {
 	user-select: none;
 	letter-spacing: 0.1em;
 }
+.chord-grid .chord-cell .chord-spacer {
+	color: transparent;
+}
 
 /* ──────────────────────────────────────────────────────────────────────────
  * "Uden bass tabs" — global hjælper. Sættes på en wrapper rundt om en
