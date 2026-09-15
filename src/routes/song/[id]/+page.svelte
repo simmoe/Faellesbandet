@@ -451,7 +451,12 @@
 	{#if loading}
 		<div class="card p-8 text-center text-[var(--color-ink-muted)]">Henter sang…</div>
 	{:else if loadError}
-		<a href="/songbook" class="back-link no-print mb-3 inline-block">Sangbogen</a>
+		<a href="/songbook" class="back-link no-print mb-3 inline-flex items-center">
+			<svg class="back-caret" viewBox="0 0 7 10" aria-hidden="true">
+				<polygon points="7,0 0,5 7,10" fill="currentColor"></polygon>
+			</svg>
+			Sangbogen
+		</a>
 		<div class="card p-6">
 			<p class="text-[var(--color-error)] font-semibold">Fejl</p>
 			<p class="mt-1 text-sm text-[var(--color-ink-muted)]">{loadError}</p>
@@ -459,7 +464,12 @@
 	{:else if song}
 		<article class="card song-card">
 			<div class="song-chrome no-print">
-				<a href="/songbook" class="back-link">Sangbogen</a>
+				<a href="/songbook" class="back-link">
+					<svg class="back-caret" viewBox="0 0 7 10" aria-hidden="true">
+						<polygon points="7,0 0,5 7,10" fill="currentColor"></polygon>
+					</svg>
+					Sangbogen
+				</a>
 				<div class="song-chrome-status">
 					{#if saveStatus === 'saving'}
 						<span>Gemmer…</span>
@@ -563,8 +573,12 @@
 						style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
 					/>
 					{#if categories.length > 0}
+						<span class="artist-sep" aria-hidden="true">|</span>
 						<div class="artist-cats">
-							{#each categories as cat (cat)}
+							{#each categories as cat, i (cat)}
+								{#if i > 0}
+									<span class="cat-dot" aria-hidden="true"></span>
+								{/if}
 								<button
 									type="button"
 									class="artist-cat"
@@ -577,28 +591,6 @@
 						</div>
 					{/if}
 				</div>
-				<button
-					type="button"
-					class="info-toggle"
-					class:is-open={infoOpen}
-					aria-expanded={infoOpen}
-					onclick={() => (infoOpen = !infoOpen)}
-				>
-					Oplysninger
-					<svg
-						class="info-chevron"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 12 12"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.4"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
-					</svg>
-				</button>
 				<div class="song-functions">
 					<span class="key-cluster" aria-label="Toneart, transponér">
 						<button
@@ -644,7 +636,30 @@
 				</datalist>
 			</div>
 
-			<div class="info-fold no-print" class:is-open={infoOpen}>
+			<div class="info-block no-print">
+				<button
+					type="button"
+					class="info-toggle"
+					class:is-open={infoOpen}
+					aria-expanded={infoOpen}
+					onclick={() => (infoOpen = !infoOpen)}
+				>
+					Oplysninger
+					<svg
+						class="info-chevron"
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 12 12"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.4"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
+					</svg>
+				</button>
+				<div class="info-fold" class:is-open={infoOpen}>
 				<div class="info-inner">
 					<div class="info-panel">
 						<label class="info-field">
@@ -683,6 +698,7 @@
 							</div>
 						</div>
 					</div>
+				</div>
 				</div>
 			</div>
 
@@ -783,11 +799,19 @@
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 	.back-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
 		font-size: 0.68rem;
 		font-weight: 500;
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--color-ink-faint);
+	}
+	.back-caret {
+		width: 0.38rem;
+		height: 0.55rem;
+		flex-shrink: 0;
 	}
 	.back-link:hover {
 		color: var(--color-ink);
@@ -819,12 +843,7 @@
 		align-self: baseline;
 	}
 	.song-sub {
-		grid-column: 1;
-		grid-row: 2;
-		align-self: baseline;
-	}
-	.info-toggle {
-		grid-column: 2;
+		grid-column: 1 / -1;
 		grid-row: 2;
 		align-self: baseline;
 	}
@@ -846,13 +865,11 @@
 		.title-line,
 		.song-actions,
 		.song-sub,
-		.info-toggle,
 		.song-functions {
 			grid-column: 1;
 			grid-row: auto;
 		}
-		.song-actions,
-		.info-toggle {
+		.song-actions {
 			justify-self: start;
 		}
 	}
@@ -1015,16 +1032,29 @@
 	.song-sub {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.25rem 0.75rem;
+		align-items: center;
+		gap: 0.2rem 0.45rem;
 		min-width: 0;
+	}
+	.artist-sep {
+		color: var(--color-ink-faint);
+		font-size: 0.72rem;
+		line-height: 1;
+		user-select: none;
 	}
 	.artist-cats {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.15rem 0.55rem;
+		align-items: center;
+		gap: 0.15rem 0.45rem;
 		min-width: 0;
+	}
+	.cat-dot {
+		width: 0.28rem;
+		height: 0.28rem;
+		border-radius: 50%;
+		background: var(--color-ink-faint);
+		flex-shrink: 0;
 	}
 	.artist-cat {
 		appearance: none;
@@ -1113,15 +1143,17 @@
 		text-transform: uppercase;
 		font-size: 0.64rem;
 	}
+	.info-block {
+		margin: 0 0 0.7rem;
+	}
 	.info-toggle {
 		appearance: none;
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		justify-self: end;
 		border: none;
 		background: transparent;
-		padding: 0.15rem 0;
+		padding: 0.2rem 0;
 		font-size: 0.68rem;
 		font-weight: 500;
 		letter-spacing: 0.08em;
@@ -1148,7 +1180,6 @@
 	}
 	.info-fold.is-open {
 		grid-template-rows: 1fr;
-		margin-bottom: 0.55rem;
 	}
 	.info-inner {
 		overflow: hidden;
@@ -1213,10 +1244,6 @@
 	}
 	.info-seg button:hover {
 		color: var(--color-ink);
-	}
-	.info-seg button.is-active {
-		color: var(--color-ink);
-		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
 	.artist-input {
 		width: auto;
