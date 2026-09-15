@@ -21,7 +21,11 @@
 	import { parseRows, serializeRows, transposeRows, type Row } from '$lib/songParse';
 	import EditableSong from '$lib/components/EditableSong.svelte';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
-	import { assignMissingCategoryColors, hasSameCategoryColors } from '$lib/categoryColors';
+	import {
+		assignMissingCategoryColors,
+		colorForCategory as paletteColorForCategory,
+		hasSameCategoryColors
+	} from '$lib/categoryColors';
 	import { tick } from 'svelte';
 	import type {
 		BassLines,
@@ -68,6 +72,10 @@
 	const effectiveCategoryColorMap = $derived(
 		assignMissingCategoryColors(knownCategories, categoryColorMap)
 	);
+
+	function colorForCategory(cat: string) {
+		return paletteColorForCategory(cat, effectiveCategoryColorMap);
+	}
 
 	$effect(() => {
 		if (!authState.user) return;
@@ -557,16 +565,16 @@
 					{#if categories.length > 0}
 						<span class="artist-sep" aria-hidden="true">|</span>
 						<div class="artist-cats">
-							{#each categories as cat, i (cat)}
-								{#if i > 0}
-									<span class="cat-dot" aria-hidden="true"></span>
-								{/if}
+							{#each categories as cat (cat)}
+								{@const c = colorForCategory(cat)}
 								<button
 									type="button"
 									class="artist-cat"
+									style:--cat-color={c.text}
 									title="Fjern {cat}"
 									onclick={() => removeCategory(cat)}
 								>
+									<span class="cat-mark" aria-hidden="true"></span>
 									{cat}
 								</button>
 							{/each}
@@ -994,7 +1002,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.2rem 0.45rem;
+		gap: 0.45rem;
 		min-width: 0;
 	}
 	.artist-sep {
@@ -1007,18 +1015,21 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.15rem 0.45rem;
+		gap: 0.45rem;
 		min-width: 0;
 	}
-	.cat-dot {
-		width: 0.28rem;
-		height: 0.28rem;
+	.cat-mark {
+		width: 0.2rem;
+		height: 0.2rem;
 		border-radius: 50%;
-		background: var(--color-ink-faint);
+		background: currentColor;
 		flex-shrink: 0;
 	}
 	.artist-cat {
 		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
 		border: none;
 		background: transparent;
 		padding: 0;
@@ -1026,11 +1037,10 @@
 		font-size: 0.72rem;
 		font-weight: 400;
 		letter-spacing: 0.01em;
-		color: var(--color-ink-muted);
+		color: var(--cat-color, var(--color-ink-muted));
 		cursor: pointer;
 	}
 	.artist-cat:hover {
-		color: var(--color-ink);
 		text-decoration: underline;
 		text-underline-offset: 0.16em;
 	}

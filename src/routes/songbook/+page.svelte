@@ -1000,29 +1000,37 @@
 					<div class="song-card card">
 						<a href={`/song/${song.id}`} class="song-card-main">
 						<div class="song-card-top">
-							<div class="min-w-0">
-								<h3 class="song-card-title">{song.title}</h3>
-								{#if song.artist}
-									<p class="song-card-artist">{song.artist}</p>
-								{/if}
-							</div>
+							<h3 class="song-card-title">{song.title}</h3>
 							{#if song.key}
 								<span class="song-key">{song.key}</span>
 							{/if}
 						</div>
 						</a>
-						{#if (song.categories ?? []).length > 0}
-							<div class="song-card-categories" aria-label={`Kategorier for ${song.title}`}>
-								{#each displayCategoriesForSong(song) as cat (cat)}
-									{@const c = colorForCategory(cat)}
-									<button
-										type="button"
-										class="cat-pill"
-										class:highlighted={cat === highlightedCategoryForSong(song)}
-										style:--pill-line={c.text}
-										onclick={() => searchByCategory(cat)}
-									>{cat}</button>
-								{/each}
+						{#if song.artist || (song.categories ?? []).length > 0}
+							<div class="song-card-sub">
+								{#if song.artist}
+									<a href={`/song/${song.id}`} class="song-card-artist">{song.artist}</a>
+								{/if}
+								{#if song.artist && (song.categories ?? []).length > 0}
+									<span class="artist-sep" aria-hidden="true">|</span>
+								{/if}
+								{#if (song.categories ?? []).length > 0}
+									<div class="song-card-categories" aria-label={`Kategorier for ${song.title}`}>
+										{#each displayCategoriesForSong(song) as cat (cat)}
+											{@const c = colorForCategory(cat)}
+											<button
+												type="button"
+												class="cat-pill"
+												class:highlighted={cat === highlightedCategoryForSong(song)}
+												style:--cat-color={c.text}
+												onclick={() => searchByCategory(cat)}
+											>
+												<span class="cat-mark" aria-hidden="true"></span>
+												{cat}
+											</button>
+										{/each}
+									</div>
+								{/if}
 							</div>
 						{/if}
 					</div>
@@ -1359,8 +1367,7 @@
 	.song-card {
 		display: flex;
 		flex-direction: column;
-		justify-content: space-between;
-		gap: 0.4rem;
+		gap: 0.35rem;
 		min-width: 0;
 		min-height: 5.75rem;
 		padding: 0.7rem 0.8rem 0.65rem;
@@ -1388,14 +1395,34 @@
 		font-weight: 400;
 		letter-spacing: -0.02em;
 		color: var(--color-ink);
+		min-width: 0;
+	}
+	.song-card-sub {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem;
+		min-width: 0;
+		margin-top: auto;
 	}
 	.song-card-artist {
-		margin: 0.08rem 0 0;
+		margin: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-size: 0.78rem;
 		color: var(--color-ink-muted);
+		text-decoration: none;
+		min-width: 0;
+	}
+	.song-card-artist:hover {
+		color: var(--color-ink);
+	}
+	.artist-sep {
+		color: var(--color-ink-faint);
+		font-size: 0.72rem;
+		line-height: 1;
+		user-select: none;
 	}
 	.song-key {
 		flex-shrink: 0;
@@ -1408,43 +1435,43 @@
 	.song-card:hover {
 		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 8px 22px rgba(15, 23, 42, 0.22);
 	}
+	.cat-mark {
+		width: 0.2rem;
+		height: 0.2rem;
+		border-radius: 50%;
+		background: currentColor;
+		flex-shrink: 0;
+	}
 	.cat-pill {
 		flex: 0 0 auto;
-		padding: 0.06rem 0.35rem;
-		border-radius: var(--radius-card);
-		background: transparent;
-		color: var(--pill-line, var(--color-ink-muted));
-		font-size: 0.64rem;
-		line-height: 1.25;
-		font-weight: 500;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.28rem;
+		padding: 0;
 		border: none;
-		box-shadow: 0 0 0 0.5px currentColor;
+		background: transparent;
+		color: var(--cat-color, var(--color-ink-muted));
+		font-size: 0.72rem;
+		line-height: 1.25;
+		font-weight: 400;
 		white-space: nowrap;
 	}
 	button.cat-pill {
 		cursor: pointer;
 	}
 	button.cat-pill:hover {
-		opacity: 0.72;
+		text-decoration: underline;
+		text-underline-offset: 0.16em;
 	}
 	.cat-pill.highlighted {
-		opacity: 1;
+		font-weight: 500;
 	}
 	.song-card-categories {
-		margin-top: 0;
 		display: flex;
-		gap: 0.22rem;
-		overflow-x: auto;
-		overflow-y: hidden;
-		padding: 0;
-		scrollbar-width: thin;
-	}
-	.song-card-categories::-webkit-scrollbar {
-		height: 5px;
-	}
-	.song-card-categories::-webkit-scrollbar-thumb {
-		background: #d1d5db;
-		border-radius: 999px;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem;
+		min-width: 0;
 	}
 	.print-group {
 		display: inline-flex;
