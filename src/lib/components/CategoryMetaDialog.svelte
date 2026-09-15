@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { CategoryMeta } from '$lib/types';
 
 	interface Props {
@@ -33,6 +34,8 @@
 		onRemoveImage
 	}: Props = $props();
 
+	const DEBOUNCE_MS = 800;
+
 	let selectedCategory = $state(
 		initialCategory && categories.includes(initialCategory)
 			? initialCategory
@@ -41,6 +44,9 @@
 	let newCategory = $state('');
 	let displayName = $state('');
 	let introText = $state('');
+	let persistTimer: ReturnType<typeof setTimeout> | null = null;
+	let persistChain = Promise.resolve(true);
+	let skipHydrate = false;
 	const meta = $derived(metaMap[selectedCategory] ?? {});
 
 	$effect(() => {
@@ -54,28 +60,73 @@
 	});
 
 	$effect(() => {
-		displayName = selectedCategory;
-		introText = meta.introText ?? '';
+		const cat = selectedCategory;
+		if (skipHydrate) return;
+		const snapshot = untrack(() => ({
+			name: cat,
+			intro: metaMap[cat]?.introText ?? ''
+		}));
+		displayName = snapshot.name;
+		introText = snapshot.intro;
 	});
 
-	async function handleSubmit() {
-		if (!selectedCategory) return;
-		const nextName = displayName.trim();
-		const categoryToSave = nextName || selectedCategory;
-		const metaToSave = {
-			...meta,
-			introText: introText.trim()
-		};
+	function schedulePersist() {
+		if (persistTimer) clearTimeout(persistTimer);
+		persistTimer = setTimeout(() => {
+			persistChain = persistChain.then(() => persistCurrent());
+		}, DEBOUNCE_MS);
+	}
+
+	async function flushPersist(): Promise<boolean> {
+		if (persistTimer) {
+			clearTimeout(persistTimer);
+			persistTimer = null;
+		}
+		persistChain = persistChain.then(() => persistCurrent());
+		return persistChain;
+	}
+
+	async function persistCurrent(): Promise<boolean> {
+		if (persistTimer) {
+			clearTimeout(persistTimer);
+			persistTimer = null;
+		}
+		if (!selectedCategory) return true;
+		const catBefore = selectedCategory;
+		const previous = { ...(metaMap[catBefore] ?? {}) };
+		const nextName = displayName.trim() || catBefore;
+		const intro = introText.trim();
+		skipHydrate = true;
 		try {
-			if (nextName && nextName !== selectedCategory) {
-				await onRenameCategory(selectedCategory, nextName);
+			let cat = catBefore;
+			if (nextName !== cat) {
+				await onRenameCategory(cat, nextName);
+				cat = nextName;
 				selectedCategory = nextName;
 			}
-			await onSave(categoryToSave, metaToSave);
-			onClose();
+			if ((previous.introText ?? '').trim() !== intro) {
+				await onSave(cat, { ...previous, introText: intro });
+			}
+			return true;
 		} catch {
-			// Parent sets the visible error; keep the modal open.
+			return false;
+		} finally {
+			skipHydrate = false;
 		}
+		} catch {
+			return false;
+		}
+	}
+
+	async function selectCategory(cat: string) {
+		if (cat === selectedCategory) return;
+		await flushPersist();
+		selectedCategory = cat;
+	}
+
+	async function handleClose() {
+		const ok = await flushPersist();
+		if (ok) onClose();
 	}
 
 	function handleFileChange(e: Event) {
@@ -86,9 +137,10 @@
 		input.value = '';
 	}
 
-	function handleAddCategory() {
+	async function handleAddCategory() {
 		const trimmed = newCategory.trim();
 		if (!trimmed) return;
+		await flushPersist();
 		onAddCategory(trimmed);
 		selectedCategory = trimmed;
 		newCategory = '';
@@ -100,13 +152,25 @@
 	}
 </script>
 
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape') void handleClose();
+	}}
+/>
+
 <div class="category-modal-backdrop" role="presentation">
-	<button type="button" class="category-modal-dismiss" aria-label="Luk kategori-editor" onclick={onClose}></button>
+	<button type="button" class="category-modal-dismiss" aria-label="Luk kategori-editor" onclick={() => void handleClose()}></button>
 	<div class="category-modal card" role="dialog" aria-modal="true" aria-labelledby="category-meta-title">
 		<header class="category-modal-header">
 			<div>
 				<p class="category-modal-kicker">Kategorier</p>
 				<h2 id="category-meta-title">Redigér publikums-kategorier</h2>
+			</div>
+			<div class="category-modal-actions">
+				{#if saving || uploading}
+					<span class="category-save-hint">Gemmer…</span>
+				{/if}
+				<button type="button" class="btn-ghost" onclick={() => void handleClose()}>Luk</button>
 			</div>
 		</header>
 
@@ -118,10 +182,10 @@
 						bind:value={newCategory}
 						placeholder="Ny kategori"
 						onkeydown={(e) => {
-							if (e.key === 'Enter') handleAddCategory();
+							if (e.key === 'Enter') void handleAddCategory();
 						}}
 					/>
-					<button type="button" class="btn-secondary btn-sm" onclick={handleAddCategory}>Tilføj</button>
+					<button type="button" class="btn-secondary btn-sm" onclick={() => void handleAddCategory()}>Tilføj</button>
 				</div>
 				<div class="category-list-scroll">
 					{#each categories as cat (cat)}
@@ -129,7 +193,7 @@
 							type="button"
 							class="category-list-item"
 							class:active={selectedCategory === cat}
-							onclick={() => (selectedCategory = cat)}
+							onclick={() => void selectCategory(cat)}
 						>
 							<span>{cat}</span>
 							{#if metaMap[cat]?.imageUrl}<small>Billede</small>{/if}
@@ -154,46 +218,55 @@
 					</div>
 
 					<label class="form-label" for="category-name">Navn</label>
-					<input id="category-name" class="category-name-input" type="text" bind:value={displayName} />
+					<input
+						id="category-name"
+						class="category-name-input"
+						type="text"
+						bind:value={displayName}
+						oninput={schedulePersist}
+					/>
 
 					<label class="form-label mt" for="category-intro">Introtekst til publikums-sangbog</label>
 					<textarea
 						id="category-intro"
 						bind:value={introText}
-						rows="6"
+						rows="5"
 						class="category-textarea"
 						placeholder="Skriv en kort intro, der vises på forsiden for denne kategori…"
+						oninput={schedulePersist}
 					></textarea>
 
 					<div class="category-image-block">
-						<div>
+						<div class="category-image-copy">
 							<p class="form-label">Forsidebillede</p>
 							<p class="category-help">JPG, PNG eller WebP. Bruges kun til publikums-PDF'en.</p>
+							<div class="category-image-actions">
+								<label class="btn-secondary btn-sm">
+									{uploading ? 'Uploader…' : 'Upload billede'}
+									<input
+										type="file"
+										accept="image/png,image/jpeg,image/webp"
+										disabled={uploading || saving}
+										onchange={handleFileChange}
+									/>
+								</label>
+								{#if meta.imageUrl}
+									<button
+										type="button"
+										class="btn-secondary btn-sm !text-[var(--color-error)]"
+										onclick={() => onRemoveImage(selectedCategory)}
+										disabled={uploading || saving}
+									>
+										Fjern billede
+									</button>
+								{/if}
+							</div>
 						</div>
 						{#if meta.imageUrl}
-							<img class="category-preview" src={meta.imageUrl} alt="" />
+							<div class="category-preview-wrap">
+								<img class="category-preview" src={meta.imageUrl} alt="" />
+							</div>
 						{/if}
-						<div class="category-image-actions">
-							<label class="btn-secondary btn-sm">
-								{uploading ? 'Uploader…' : 'Upload billede'}
-								<input
-									type="file"
-									accept="image/png,image/jpeg,image/webp"
-									disabled={uploading || saving}
-									onchange={handleFileChange}
-								/>
-							</label>
-							{#if meta.imageUrl}
-								<button
-									type="button"
-									class="btn-secondary btn-sm !text-[var(--color-error)]"
-									onclick={() => onRemoveImage(selectedCategory)}
-									disabled={uploading || saving}
-								>
-									Fjern billede
-								</button>
-							{/if}
-						</div>
 					</div>
 				{:else}
 					<p class="category-empty">Tilføj en kategori for at redigere intro og billede.</p>
@@ -204,14 +277,6 @@
 		{#if error}
 			<p class="category-error">{error}</p>
 		{/if}
-
-		<footer class="category-modal-footer">
-			{#if selectedCategory}
-				<button type="button" class="btn-primary" onclick={handleSubmit} disabled={saving || uploading}>
-					{saving ? 'Gemmer…' : 'Gem kategori'}
-				</button>
-			{/if}
-		</footer>
 	</div>
 </div>
 
@@ -235,11 +300,14 @@
 	.category-modal {
 		position: relative;
 		z-index: 1;
+		display: flex;
+		flex-direction: column;
 		width: min(60rem, 100%);
+		max-height: calc(100dvh - 2rem);
+		overflow: hidden;
 		padding: 1.4rem;
 	}
 	.category-modal-header,
-	.category-modal-footer,
 	.category-image-actions,
 	.category-editor-title {
 		display: flex;
@@ -248,7 +316,19 @@
 		gap: 0.75rem;
 	}
 	.category-modal-header {
+		flex: 0 0 auto;
+		align-items: flex-start;
 		margin-bottom: 1rem;
+	}
+	.category-modal-actions {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.65rem;
+		flex: 0 0 auto;
+	}
+	.category-save-hint {
+		color: var(--color-ink-faint);
+		font-size: 0.78rem;
 	}
 	.category-modal-kicker,
 	.form-label {
@@ -279,8 +359,13 @@
 		display: grid;
 		grid-template-columns: minmax(13rem, 0.85fr) minmax(0, 1.8fr);
 		gap: 1rem;
+		flex: 1 1 auto;
+		min-height: 0;
 	}
 	.category-list {
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
 		border-right: 1px solid var(--color-border-subtle);
 		padding-right: 1rem;
 	}
@@ -288,6 +373,7 @@
 		display: flex;
 		gap: 0.4rem;
 		margin-bottom: 0.7rem;
+		flex: 0 0 auto;
 	}
 	.category-add input,
 	.category-name-input {
@@ -307,9 +393,11 @@
 		font-weight: 700;
 	}
 	.category-list-scroll {
-		max-height: 26rem;
+		flex: 1 1 auto;
+		min-height: 0;
 		overflow: auto;
 		display: grid;
+		align-content: start;
 		gap: 0.35rem;
 	}
 	.category-list-item {
@@ -337,6 +425,8 @@
 	}
 	.category-editor {
 		min-width: 0;
+		min-height: 0;
+		overflow: auto;
 	}
 	.category-editor-title {
 		margin-bottom: 1rem;
@@ -359,8 +449,17 @@
 	}
 	.category-image-block {
 		margin-top: 1rem;
-		display: grid;
-		gap: 0.75rem;
+		display: flex;
+		align-items: stretch;
+		gap: 0.85rem;
+	}
+	.category-image-copy {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+	.category-image-actions {
+		justify-content: flex-start;
+		margin-top: 0.65rem;
 	}
 	.category-help,
 	.category-empty {
@@ -368,34 +467,46 @@
 		color: var(--color-ink-muted);
 		font-size: 0.85rem;
 	}
-	.category-preview {
-		width: 100%;
-		max-height: 13rem;
-		object-fit: cover;
-		border-radius: 0.7rem;
+	.category-preview-wrap {
+		flex: 0 0 auto;
+		width: 6.75rem;
+		aspect-ratio: 1 / 1;
+		overflow: hidden;
+		border-radius: var(--radius-card);
 		border: 1px solid var(--color-border-subtle);
+	}
+	.category-preview {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 	input[type='file'] {
 		display: none;
 	}
 	.category-error {
+		flex: 0 0 auto;
 		margin: 0.9rem 0 0;
 		color: var(--color-error);
 		font-size: 0.9rem;
 	}
-	.category-modal-footer {
-		justify-content: flex-end;
-		margin-top: 1.2rem;
-	}
 	@media (max-width: 760px) {
 		.category-admin-grid {
 			grid-template-columns: 1fr;
+			overflow: auto;
 		}
 		.category-list {
 			border-right: 0;
 			border-bottom: 1px solid var(--color-border-subtle);
 			padding-right: 0;
 			padding-bottom: 1rem;
+			max-height: 12rem;
+		}
+		.category-image-block {
+			flex-direction: column;
+		}
+		.category-preview-wrap {
+			width: 5.5rem;
 		}
 	}
 </style>
