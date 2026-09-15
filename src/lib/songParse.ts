@@ -114,11 +114,26 @@ export function buildSections(rows: Row[]): Section[] {
 }
 
 /** Find seneste sektion af samme type FØR den givne sektion. */
-export function findPreviousSameType(sections: Section[], headerIdx: number): Section | null {
+export function sectionHasBodyContent(rows: Row[], section: Section): boolean {
+	for (let i = section.bodyStart; i < section.bodyEnd; i++) {
+		const r = rows[i];
+		if (!r || r.kind === 'blank' || r.kind === 'header') continue;
+		if (r.text.trim()) return true;
+	}
+	return false;
+}
+
+export function findPreviousSameType(
+	sections: Section[],
+	headerIdx: number,
+	rows?: Row[]
+): Section | null {
 	const cur = sections[headerIdx];
 	if (!cur) return null;
 	for (let i = headerIdx - 1; i >= 0; i--) {
-		if (sections[i].type === cur.type) return sections[i];
+		if (sections[i].type !== cur.type) continue;
+		if (rows && !sectionHasBodyContent(rows, sections[i])) continue;
+		return sections[i];
 	}
 	return null;
 }
