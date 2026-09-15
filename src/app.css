@@ -30,14 +30,16 @@
 	--color-success: #059669;
 
 	--radius-card: 0.4rem;
-	--radius-button: 0.3rem;
+	--radius-button: 0.4rem;
 
 	--shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 6px 20px rgba(15, 23, 42, 0.18);
 }
 
+html {
+	background: var(--color-bg);
+}
 html,
 body {
-	background: var(--color-bg);
 	color: var(--color-ink-on-dark);
 	font-family: var(--font-sans);
 	-webkit-font-smoothing: antialiased;
@@ -48,20 +50,25 @@ body {
 }
 
 body {
-	isolation: isolate;
+	background: transparent;
 }
 body::before {
 	content: '';
 	position: fixed;
-	inset: -18%;
-	z-index: -1;
+	inset: -12%;
+	z-index: 0;
 	pointer-events: none;
 	background:
-		radial-gradient(ellipse 46% 38% at 16% 6%, rgba(245, 158, 11, 0.16), transparent 62%),
-		radial-gradient(ellipse 40% 34% at 88% 14%, rgba(148, 163, 184, 0.12), transparent 58%),
-		radial-gradient(ellipse 52% 42% at 70% 94%, rgba(37, 99, 235, 0.16), transparent 64%);
-	filter: blur(42px);
-	animation: liquid-wash 38s ease-in-out infinite alternate;
+		radial-gradient(ellipse 58% 48% at 8% -4%, rgba(245, 158, 11, 0.48), transparent 58%),
+		radial-gradient(ellipse 42% 36% at 96% 6%, rgba(125, 211, 252, 0.22), transparent 54%),
+		radial-gradient(ellipse 50% 44% at 82% 108%, rgba(59, 130, 246, 0.28), transparent 60%),
+		radial-gradient(ellipse 38% 32% at 36% 72%, rgba(251, 191, 36, 0.16), transparent 52%);
+	filter: blur(26px);
+	animation: liquid-wash 22s ease-in-out infinite alternate;
+}
+body > * {
+	position: relative;
+	z-index: 1;
 }
 @media (prefers-reduced-motion: reduce) {
 	body::before {
@@ -70,10 +77,10 @@ body::before {
 }
 @keyframes liquid-wash {
 	from {
-		transform: translate3d(0, 0, 0) scale(1);
+		transform: translate3d(-4%, 2%, 0) scale(1);
 	}
 	to {
-		transform: translate3d(3.5%, -2.5%, 0) scale(1.07);
+		transform: translate3d(5%, -4%, 0) scale(1.12);
 	}
 }
 

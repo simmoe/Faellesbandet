@@ -1021,9 +1021,7 @@
 										type="button"
 										class="cat-pill"
 										class:highlighted={cat === highlightedCategoryForSong(song)}
-										style:background={c.bg}
-										style:color={c.text}
-										style:border-color={c.border}
+										style:--pill-line={c.text}
 										onclick={() => searchByCategory(cat)}
 									>{cat}</button>
 								{/each}
@@ -1167,7 +1165,7 @@
 	}
 	.cat-chip {
 		padding: 0.22rem 0.62rem;
-		border-radius: 999px;
+		border-radius: var(--radius-card);
 		border: 1px solid var(--chip-border, var(--color-border));
 		background: var(--chip-bg, rgba(255, 255, 255, 0.04));
 		color: var(--chip-text, var(--color-ink-on-dark));
@@ -1414,25 +1412,24 @@
 	}
 	.cat-pill {
 		flex: 0 0 auto;
-		padding: 0.08rem 0.42rem;
-		border-radius: 999px;
-		background: var(--color-accent-soft);
-		color: #92400e;
+		padding: 0.08rem 0.4rem;
+		border-radius: var(--radius-card);
+		background: transparent;
+		color: var(--color-ink-muted);
 		font-size: 0.64rem;
 		line-height: 1.25;
-		font-weight: 600;
-		border: 1px solid transparent;
+		font-weight: 500;
+		border: 1px solid var(--pill-line, var(--color-border-subtle));
 		white-space: nowrap;
 	}
 	button.cat-pill {
 		cursor: pointer;
-		transition: filter 120ms ease, transform 120ms ease;
 	}
 	button.cat-pill:hover {
-		filter: brightness(0.96);
+		color: var(--pill-line, var(--color-ink));
 	}
 	.cat-pill.highlighted {
-		box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.22);
+		color: var(--pill-line, var(--color-ink));
 	}
 	.song-card-categories {
 		margin-top: 0;
