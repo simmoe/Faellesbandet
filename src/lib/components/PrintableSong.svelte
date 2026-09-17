@@ -100,11 +100,10 @@
 				class:pdf-song-section--unlabeled={!section.label}
 				class:pdf-song-section--compact={section.compact}
 			>
-				{#if section.compact}
-					{#if section.label}
-						<div class="pdf-section-label">{section.label}</div>
-					{/if}
-				{:else}
+				{#if section.label}
+					<div class="pdf-section-label">{section.label}</div>
+				{/if}
+				{#if !section.compact}
 					<div class="pdf-section-grid">
 						{#each section.rows as item}
 							{#if item.row.kind === 'blank'}
@@ -118,9 +117,6 @@
 								<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
 							{/if}
 						{/each}
-						{#if section.label}
-							<div class="pdf-section-label">{section.label}</div>
-						{/if}
 					</div>
 				{/if}
 			</section>

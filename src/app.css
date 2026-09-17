@@ -339,11 +339,8 @@ select {
 	column-gap: 0 !important;
 }
 .no-bass-tabs .pdf-section-grid {
-	grid-template-columns: minmax(0, 1fr) max-content !important;
-	column-gap: calc(3mm * var(--pdf-layout-scale, 1)) !important;
-}
-.no-bass-tabs .pdf-section-grid > .pdf-section-label {
-	grid-column: 2;
+	grid-template-columns: minmax(0, 1fr) !important;
+	column-gap: 0 !important;
 }
 
 /* PDF-snapshot: udnyt A4-arealet. Den normale card-padding er rar på
@@ -404,12 +401,13 @@ select {
 }
 .pdf-song-section {
 	--section-accent: #6b7280;
+	--pdf-label-gutter: 28mm;
 	position: relative;
 	border: 0;
 	border-radius: 0;
 	border-left: 2.25pt solid var(--section-accent);
 	margin-top: 0;
-	padding: 0 0 0 1.6mm;
+	padding: 0 calc(var(--pdf-label-gutter) * var(--pdf-layout-scale, 1)) 0 1.6mm;
 	break-inside: avoid;
 	background: transparent;
 }
@@ -420,19 +418,22 @@ select {
 }
 .pdf-song-section--unlabeled {
 	padding-top: 0;
+	padding-right: 0;
 }
 .pdf-song-section--compact .pdf-section-label {
 	position: static;
 	display: block;
 	width: 100%;
 	max-width: none;
-	text-align: right;
+	text-align: left;
 	transform: none;
 	background: transparent;
 	padding: 0;
 }
 .pdf-section-label {
-	position: static;
+	position: absolute;
+	top: 0;
+	right: 0;
 	display: block;
 	background: transparent;
 	color: var(--section-accent);
@@ -444,7 +445,8 @@ select {
 	letter-spacing: 0.05em;
 	text-transform: uppercase;
 	text-align: right;
-	max-width: 42mm;
+	max-width: calc(var(--pdf-label-gutter) * var(--pdf-layout-scale, 1));
+	z-index: 1;
 }
 .set-break-page {
 	box-sizing: border-box;
@@ -475,24 +477,14 @@ select {
 }
 .pdf-section-grid {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) max-content max-content;
+	grid-template-columns: minmax(0, 1fr) max-content;
 	column-gap: calc(3mm * var(--pdf-layout-scale));
 	row-gap: 0;
 	align-items: baseline;
 }
-.pdf-line {
-	grid-column: 1;
-	min-width: 0;
-}
+.pdf-line,
 .pdf-bass {
-	grid-column: 2;
 	min-width: 0;
-}
-.pdf-section-grid > .pdf-section-label {
-	grid-column: 3;
-	grid-row: 1;
-	justify-self: end;
-	align-self: baseline;
 }
 .pdf-chord,
 .pdf-bass {
