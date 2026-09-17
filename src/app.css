@@ -321,7 +321,7 @@ select {
 	pointer-events: none !important;
 }
 .no-bass-tabs .pdf-bass {
-	visibility: hidden !important;
+	display: none !important;
 }
 /* Sektions-labelen echo'es i højre kolonne ud for hver form-header. Når
  * bas-tabs er fravalgt skal højre kolonne være helt tom — også for
@@ -339,8 +339,11 @@ select {
 	column-gap: 0 !important;
 }
 .no-bass-tabs .pdf-section-grid {
-	grid-template-columns: minmax(0, 1fr) 12mm !important;
-	column-gap: calc(2mm * var(--pdf-layout-scale, 1)) !important;
+	grid-template-columns: minmax(0, 1fr) max-content !important;
+	column-gap: calc(3mm * var(--pdf-layout-scale, 1)) !important;
+}
+.no-bass-tabs .pdf-section-grid > .pdf-section-label {
+	grid-column: 2;
 }
 
 /* PDF-snapshot: udnyt A4-arealet. Den normale card-padding er rar på
@@ -355,7 +358,7 @@ select {
 .pdf-snapshot-page.print-page .chord-grid,
 .pdf-snapshot-page .print-page .chord-grid {
 	grid-template-columns: minmax(0, 145mm) max-content !important;
-	column-gap: 10mm !important;
+	column-gap: 3mm !important;
 	justify-content: start !important;
 	grid-auto-flow: row !important;
 	direction: ltr !important;
@@ -381,8 +384,8 @@ select {
 	align-items: baseline;
 	justify-content: space-between;
 	gap: 1rem;
-	margin-bottom: calc(0.9rem * var(--pdf-layout-scale)) !important;
-	padding-bottom: calc(0.55rem * var(--pdf-layout-scale)) !important;
+	margin-bottom: calc(0.28rem * var(--pdf-layout-scale)) !important;
+	padding-bottom: calc(0.16rem * var(--pdf-layout-scale)) !important;
 }
 .print-song-header h2 {
 	min-width: 0;
@@ -397,29 +400,33 @@ select {
 }
 .pdf-song-sections {
 	display: grid;
-	gap: calc(1mm * var(--pdf-layout-scale, 1));
+	gap: calc(0.7mm * var(--pdf-layout-scale, 1));
 }
 .pdf-song-section {
 	--section-accent: #6b7280;
 	position: relative;
-	border: 0.75pt solid var(--section-accent);
-	border-radius: 7px;
+	border: 0;
+	border-radius: 0;
+	border-left: 2.25pt solid var(--section-accent);
 	margin-top: 0;
-	padding: calc(0.08cm * var(--pdf-layout-scale)) calc(0.18cm * var(--pdf-layout-scale)) calc(0.08cm * var(--pdf-layout-scale));
+	padding: 0 0 0 1.6mm;
 	break-inside: avoid;
 	background: transparent;
 }
 .pdf-song-section--compact {
 	margin-top: 0;
 	min-height: 0;
-	padding: calc(0.08cm * var(--pdf-layout-scale)) calc(0.22cm * var(--pdf-layout-scale)) !important;
+	padding: 0 0 0 1.6mm;
 }
 .pdf-song-section--unlabeled {
-	padding-top: calc(0.06cm * var(--pdf-layout-scale));
+	padding-top: 0;
 }
 .pdf-song-section--compact .pdf-section-label {
 	position: static;
-	display: inline-block;
+	display: block;
+	width: 100%;
+	max-width: none;
+	text-align: right;
 	transform: none;
 	background: transparent;
 	padding: 0;
@@ -432,10 +439,12 @@ select {
 	padding: 0;
 	margin: 0;
 	font-size: calc(8pt * var(--pdf-layout-scale));
-	line-height: calc(1.05 * var(--pdf-layout-scale));
+	line-height: 1.05;
 	font-weight: 800;
 	letter-spacing: 0.05em;
 	text-transform: uppercase;
+	text-align: right;
+	max-width: 42mm;
 }
 .set-break-page {
 	box-sizing: border-box;
@@ -466,13 +475,24 @@ select {
 }
 .pdf-section-grid {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) max-content;
-	column-gap: calc(10mm * var(--pdf-layout-scale));
+	grid-template-columns: minmax(0, 1fr) max-content max-content;
+	column-gap: calc(3mm * var(--pdf-layout-scale));
+	row-gap: 0;
 	align-items: baseline;
 }
-.pdf-line,
-.pdf-bass {
+.pdf-line {
+	grid-column: 1;
 	min-width: 0;
+}
+.pdf-bass {
+	grid-column: 2;
+	min-width: 0;
+}
+.pdf-section-grid > .pdf-section-label {
+	grid-column: 3;
+	grid-row: 1;
+	justify-self: end;
+	align-self: baseline;
 }
 .pdf-chord,
 .pdf-bass {
@@ -482,7 +502,7 @@ select {
 .pdf-bass {
 	font-family: var(--font-mono);
 	font-size: calc(8.5pt * var(--pdf-layout-scale));
-	line-height: calc(1.1 * var(--pdf-layout-scale));
+	line-height: 1;
 }
 .pdf-chord .bass-chord {
 	color: var(--color-chord);
@@ -498,7 +518,7 @@ select {
 }
 .pdf-lyric {
 	font-size: calc(9.2pt * var(--pdf-layout-scale));
-	line-height: calc(1.12 * var(--pdf-layout-scale));
+	line-height: 1.05;
 	font-weight: 700;
 	white-space: pre-wrap;
 	overflow-wrap: break-word;

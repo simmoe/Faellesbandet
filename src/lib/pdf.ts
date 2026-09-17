@@ -190,8 +190,8 @@ function sectionBreaksForCanvas(pageEl: HTMLElement, canvas: HTMLCanvasElement):
 		const rect = section.getBoundingClientRect();
 		const label = section.querySelector<HTMLElement>('.pdf-section-label');
 		const labelRect = label?.getBoundingClientRect();
-		// Section labels sit slightly above the section border; include their
-		// visual bounds so a page slice cannot cut the label in half.
+		// Include label bounds so a page slice cannot cut a right-edge form
+		// cue that sits on the first content row.
 		const visualTop = labelRect ? Math.min(rect.top, labelRect.top) : rect.top;
 		const visualBottom = labelRect ? Math.max(rect.bottom, labelRect.bottom) : rect.bottom;
 		const top = Math.max(0, Math.round((visualTop - pageRect.top) * scaleY));
