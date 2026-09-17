@@ -37,8 +37,22 @@
 		label: string;
 		type: ReturnType<typeof sectionHeaderType>;
 		compact: boolean;
+		framed: boolean;
+		chorusCue: string;
 		rows: PrintableRow[];
 	};
+
+	function chorusCueLyric(text: string): string {
+		const trimmed = text.trim().replace(/[.,;:!?…]+$/u, '').trim();
+		return trimmed ? `${trimmed}...` : '';
+	}
+
+	function firstChorusCue(sectionRows: PrintableRow[]): string {
+		const lyric = sectionRows.find(
+			({ row }) => row.kind === 'lyric' && row.text.trim() !== ''
+		);
+		return lyric && lyric.row.kind === 'lyric' ? chorusCueLyric(lyric.row.text) : '';
+	}
 
 	function buildPrintableSections(rs: Row[], collapsed: Set<number>): PrintableSection[] {
 		const built = buildSections(rs);
@@ -48,26 +62,42 @@
 					label: '',
 					type: 'other',
 					compact: false,
+					framed: false,
+					chorusCue: '',
 					rows: rs.map((row, rowIdx) => ({ rowIdx, row }))
 				}
 			];
 		}
-		return built
-			.map((section) => {
-				const sectionRows = rs
-					.slice(section.bodyStart, section.bodyEnd)
-					.map((row, offset) => ({ rowIdx: section.bodyStart + offset, row }));
-				const hasContent = sectionRows.some(
-					({ row }) => row.kind !== 'blank' && (row.kind === 'header' || row.text.trim() !== '')
-				);
-				const compact = collapsed.has(section.headerIdx) || !hasContent;
-				return {
-					label: section.headerText,
-					type: section.type,
-					compact,
-					rows: compact ? [] : sectionRows
-				};
-			});
+		let seenFullChorus = false;
+		return built.map((section) => {
+			const sectionRows = rs
+				.slice(section.bodyStart, section.bodyEnd)
+				.map((row, offset) => ({ rowIdx: section.bodyStart + offset, row }));
+			const hasContent = sectionRows.some(
+				({ row }) => row.kind !== 'blank' && (row.kind === 'header' || row.text.trim() !== '')
+			);
+			const compact = collapsed.has(section.headerIdx) || !hasContent;
+			let framed = false;
+			let chorusCue = '';
+			let rows = compact ? [] : sectionRows;
+			if (!compact && section.type === 'chorus') {
+				if (!seenFullChorus) {
+					framed = true;
+					seenFullChorus = true;
+				} else {
+					chorusCue = firstChorusCue(sectionRows);
+					rows = [];
+				}
+			}
+			return {
+				label: section.headerText,
+				type: section.type,
+				compact: compact || (!framed && rows.length === 0 && !chorusCue),
+				framed,
+				chorusCue,
+				rows
+			};
+		});
 	}
 
 	function bassHtmlFor(rowIdx: number): string {
@@ -99,25 +129,36 @@
 				class="pdf-song-section pdf-song-section--{section.type}"
 				class:pdf-song-section--unlabeled={!section.label}
 				class:pdf-song-section--compact={section.compact}
+				class:pdf-song-section--framed={section.framed}
+				class:pdf-song-section--chorus-cue={Boolean(section.chorusCue)}
 			>
-				{#if section.label}
-					<div class="pdf-section-label">{section.label}</div>
-				{/if}
-				{#if !section.compact}
-					<div class="pdf-section-grid">
-						{#each section.rows as item}
-							{#if item.row.kind === 'blank'}
-								<div class="pdf-line pdf-line--blank"></div>
-								<div class="pdf-bass pdf-line--blank">{@html bassHtmlFor(item.rowIdx)}</div>
-							{:else if item.row.kind === 'chord'}
-								<div class="pdf-line pdf-chord">{@html renderPrintableBarLine(item.row.text)}</div>
-								<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
-							{:else if item.row.kind === 'lyric'}
-								<div class="pdf-line pdf-lyric">{item.row.text}</div>
-								<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
-							{/if}
-						{/each}
+				{#if section.chorusCue}
+					<div class="pdf-chorus-cue">
+						{#if section.label}
+							<span class="pdf-section-label">{section.label}</span>
+						{/if}
+						<span class="pdf-chorus-cue-lyric">{section.chorusCue}</span>
 					</div>
+				{:else}
+					{#if section.label}
+						<div class="pdf-section-label">{section.label}</div>
+					{/if}
+					{#if !section.compact}
+						<div class="pdf-section-grid">
+							{#each section.rows as item}
+								{#if item.row.kind === 'blank'}
+									<div class="pdf-line pdf-line--blank"></div>
+									<div class="pdf-bass pdf-line--blank">{@html bassHtmlFor(item.rowIdx)}</div>
+								{:else if item.row.kind === 'chord'}
+									<div class="pdf-line pdf-chord">{@html renderPrintableBarLine(item.row.text)}</div>
+									<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
+								{:else if item.row.kind === 'lyric'}
+									<div class="pdf-line pdf-lyric">{item.row.text}</div>
+									<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
+								{/if}
+							{/each}
+						</div>
+					{/if}
 				{/if}
 			</section>
 		{/each}
