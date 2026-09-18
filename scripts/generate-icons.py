@@ -48,14 +48,9 @@ def in_polygon(x: float, y: float, pts: tuple[tuple[float, float], ...]) -> bool
 	return inside
 
 
-def in_rounded_rect(x: float, y: float, w: float, h: float, r: float) -> bool:
-	if x < 0 or y < 0 or x >= w or y >= h:
-		return False
-	hx, hy = w / 2, h / 2
-	dx, dy = abs(x - hx), abs(y - hy)
-	if dx <= hx - r or dy <= hy - r:
-		return dx <= hx and dy <= hy
-	return (dx - (hx - r)) ** 2 + (dy - (hy - r)) ** 2 <= r * r
+def in_circle(x: float, y: float, size: float = 128) -> bool:
+	c = size / 2
+	return (x - c) ** 2 + (y - c) ** 2 <= c * c
 
 
 def is_note(x: float, y: float) -> bool:
@@ -66,12 +61,11 @@ def is_note(x: float, y: float) -> bool:
 	return in_polygon(x, y, BEAM)
 
 
-def render(size: int, *, rounded: bool, samples: int = 3) -> bytes:
+def render(size: int, *, circle: bool, samples: int = 3) -> bytes:
 	"""Return RGBA bytes, row-major, `size`×`size`."""
 	out = bytearray(size * size * 4)
 	scale = 128 / size
 	inv = 1.0 / samples
-	r_px = 28.0  # matches SVG rx on the 128 grid
 
 	for py in range(size):
 		for px in range(size):
@@ -82,7 +76,7 @@ def render(size: int, *, rounded: bool, samples: int = 3) -> bytes:
 				for sx in range(samples):
 					x = (px + (sx + 0.5) * inv) * scale
 					y = (py + (sy + 0.5) * inv) * scale
-					if rounded and not in_rounded_rect(x, y, 128, 128, r_px):
+					if circle and not in_circle(x, y):
 						clear += 1
 						continue
 					if is_note(x, y):
@@ -91,7 +85,7 @@ def render(size: int, *, rounded: bool, samples: int = 3) -> bytes:
 						navy += 1
 			total = samples * samples
 			i = (py * size + px) * 4
-			if rounded:
+			if circle:
 				a = 255 * (total - clear) // total
 				if a == 0:
 					out[i : i + 4] = bytes(TRANSPARENT)
@@ -152,16 +146,17 @@ def main() -> None:
 	STATIC.mkdir(exist_ok=True)
 
 	square = {
-		16: render(16, rounded=False, samples=5),
-		32: render(32, rounded=False, samples=4),
-		48: render(48, rounded=False, samples=4),
-		180: render(180, rounded=False, samples=3),
-		192: render(192, rounded=False, samples=3),
-		512: render(512, rounded=False, samples=3),
+		180: render(180, circle=False, samples=3),
+		192: render(192, circle=False, samples=3),
+		512: render(512, circle=False, samples=3),
 	}
-	rounded_32 = render(32, rounded=True, samples=4)
+	round_tab = {
+		16: render(16, circle=True, samples=5),
+		32: render(32, circle=True, samples=4),
+		48: render(48, circle=True, samples=4),
+	}
 
-	write_png(STATIC / "favicon-32.png", 32, rounded_32)
+	write_png(STATIC / "favicon-32.png", 32, round_tab[32])
 	write_png(STATIC / "apple-touch-icon.png", 180, square[180])
 	write_png(STATIC / "icon-192.png", 192, square[192])
 	write_png(STATIC / "icon-512.png", 512, square[512])
@@ -169,9 +164,9 @@ def main() -> None:
 	write_ico(
 		STATIC / "favicon.ico",
 		[
-			(16, png_bytes(16, square[16])),
-			(32, png_bytes(32, square[32])),
-			(48, png_bytes(48, square[48])),
+			(16, png_bytes(16, round_tab[16])),
+			(32, png_bytes(32, round_tab[32])),
+			(48, png_bytes(48, round_tab[48])),
 		],
 	)
 	print("wrote icons in", STATIC)

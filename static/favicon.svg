@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Fællesbandet">
-	<rect width="128" height="128" rx="28" fill="#0f172a"/>
+	<circle cx="64" cy="64" r="64" fill="#0f172a"/>
 	<g fill="#f59e0b">
 		<ellipse cx="42" cy="94" rx="17.5" ry="12.8" transform="rotate(-24 42 94)"/>
 		<ellipse cx="86" cy="85" rx="17.5" ry="12.8" transform="rotate(-24 86 85)"/>
