@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Fællesbandet">
+	<rect width="128" height="128" rx="28" fill="#0f172a"/>
+	<g fill="#f59e0b">
+		<ellipse cx="42" cy="94" rx="17.5" ry="12.8" transform="rotate(-24 42 94)"/>
+		<ellipse cx="86" cy="85" rx="17.5" ry="12.8" transform="rotate(-24 86 85)"/>
+		<rect x="51.25" y="36" width="8.5" height="62"/>
+		<rect x="95.25" y="27" width="8.5" height="62"/>
+		<polygon points="51.25,36 103.75,27 103.75,38 51.25,47"/>
+	</g>
+</svg>
