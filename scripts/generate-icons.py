@@ -13,12 +13,15 @@ import struct
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "scripts" / "brand" / "logo-night-source.jpg"
+NOTES_SOURCE = ROOT / "scripts" / "brand" / "favicon-notes.png"
 STATIC = ROOT / "static"
 NAVY = (15, 23, 42, 255)
+NIGHT = (11, 18, 36, 255)
+MOON = (238, 246, 251, 255)
 
 
 def crop_circle(im: Image.Image) -> Image.Image:
@@ -123,13 +126,73 @@ def write_ico(path: Path, master: Image.Image) -> None:
 	path.write_bytes(struct.pack("<HHH", 0, 1, len(images)) + b"".join(entries) + payload)
 
 
+def load_note_masks() -> list[Image.Image]:
+	im = Image.open(NOTES_SOURCE).convert("RGBA")
+	arr = np.asarray(im)
+	lum = 0.2126 * arr[:, :, 0] + 0.7152 * arr[:, :, 1] + 0.0722 * arr[:, :, 2]
+	dark = lum < 100
+	runs = [(35, 355), (442, 685), (776, 988)]
+	notes: list[Image.Image] = []
+	for left, right in runs:
+		strip = dark[:, left : right + 1]
+		ys, xs = np.where(strip)
+		top, bot = int(ys.min()), int(ys.max())
+		l, r = int(xs.min()), int(xs.max())
+		pad = 2
+		top = max(0, top - pad)
+		bot = min(strip.shape[0] - 1, bot + pad)
+		l = max(0, l - pad)
+		r = min(strip.shape[1] - 1, r + pad)
+		notes.append(Image.fromarray((strip[top : bot + 1, l : r + 1].astype(np.uint8) * 255), "L"))
+	return notes
+
+
+def simple_circle_mark(size: int, notes: list[Image.Image] | None = None) -> Image.Image:
+	"""Round night disc + crescent + the three brand notes."""
+	if notes is None:
+		notes = load_note_masks()
+	s = max(512, size * 16)
+	im = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+	draw = ImageDraw.Draw(im)
+	pad = s * 0.04
+	draw.ellipse((pad, pad, s - 1 - pad, s - 1 - pad), fill=NIGHT)
+
+	moon = Image.new("L", (s, s), 0)
+	md = ImageDraw.Draw(moon)
+	mx, my, mr = 0.72 * s, 0.22 * s, 0.145 * s
+	bx, by, br = 0.635 * s, 0.185 * s, 0.125 * s
+	md.ellipse((mx - mr, my - mr, mx + mr, my + mr), fill=255)
+	md.ellipse((bx - br, by - br, bx + br, by + br), fill=0)
+	im.paste(Image.new("RGBA", (s, s), MOON), (0, 0), moon)
+
+	placements = [
+		(0, 0.26, 0.62, 0.30, -12),
+		(1, 0.50, 0.70, 0.28, 0),
+		(2, 0.74, 0.55, 0.27, 10),
+	]
+	for idx, cx, cy, hf, rot in placements:
+		n = notes[idx]
+		nh = int(s * hf)
+		nw = max(1, int(n.size[0] * nh / n.size[1]))
+		scaled = n.resize((nw, nh), Image.Resampling.LANCZOS)
+		if rot:
+			scaled = scaled.rotate(rot, resample=Image.Resampling.BICUBIC, expand=True)
+		layer = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+		x = int(cx * s - scaled.size[0] / 2)
+		y = int(cy * s - scaled.size[1] / 2)
+		layer.paste(Image.new("RGBA", scaled.size, MOON), (x, y), scaled)
+		im = Image.alpha_composite(im, layer)
+
+	return im.resize((size, size), Image.Resampling.LANCZOS)
+
+
 def write_favicon_svg(path: Path, master: Image.Image) -> None:
 	buf = io.BytesIO()
-	master.resize((256, 256), Image.Resampling.LANCZOS).save(buf, "PNG", optimize=True)
+	master.resize((128, 128), Image.Resampling.LANCZOS).save(buf, "PNG", optimize=True)
 	b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 	path.write_text(
-		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Fællesbandet">\n'
-		f'	<image href="data:image/png;base64,{b64}" width="256" height="256"/>\n'
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Fællesbandet">\n'
+		f'	<image href="data:image/png;base64,{b64}" width="128" height="128"/>\n'
 		"</svg>\n",
 		encoding="utf-8",
 	)
@@ -137,8 +200,8 @@ def write_favicon_svg(path: Path, master: Image.Image) -> None:
 
 def write_pinned_tab(path: Path) -> None:
 	path.write_text(
-		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">\n'
-		'	<circle cx="64" cy="64" r="58" fill="#0f172a"/>\n'
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">\n'
+		'	<circle cx="16" cy="16" r="15"/>\n'
 		"</svg>\n",
 		encoding="utf-8",
 	)
@@ -155,26 +218,34 @@ def write_og(path: Path, master: Image.Image) -> None:
 def main() -> None:
 	if not SOURCE.exists():
 		raise SystemExit(f"Missing source drawing: {SOURCE}")
+	if not NOTES_SOURCE.exists():
+		raise SystemExit(f"Missing note source: {NOTES_SOURCE}")
 	STATIC.mkdir(exist_ok=True)
 
+	# Full illustration for on-page mark
 	mark = master_mark()
-	app = flatten_navy(padded(mark, 0.06, 1024))
-	tight = flatten_navy(padded(mark, 0.02, 256))
-	safe = flatten_navy(padded(mark, 0.18, 512))
+	# Simplified round mark for tabs / home screen
+	notes = load_note_masks()
+	fav = simple_circle_mark(512, notes)
+	app = flatten_navy(fav)
+	fav_safe = Image.new("RGBA", (512, 512), NAVY)
+	inner = simple_circle_mark(420, notes)
+	fav_safe.paste(inner, ((512 - 420) // 2, (512 - 420) // 2), inner)
+	fav_safe_rgb = fav_safe.convert("RGB")
 
 	save_png(padded(mark, 0.06, 256), STATIC / "logo-mark.png")
 	save_png(app.resize((180, 180), Image.Resampling.LANCZOS), STATIC / "faellesbandet-icon-v2.png")
 	save_png(app.resize((180, 180), Image.Resampling.LANCZOS), STATIC / "apple-touch-icon.png")
 	save_png(app.resize((192, 192), Image.Resampling.LANCZOS), STATIC / "icon-192.png")
 	save_png(app.resize((512, 512), Image.Resampling.LANCZOS), STATIC / "icon-512.png")
-	save_png(safe, STATIC / "icon-512-maskable.png")
-	save_png(tight.resize((32, 32), Image.Resampling.LANCZOS), STATIC / "favicon-32.png")
-	save_png(tight.resize((32, 32), Image.Resampling.LANCZOS), STATIC / "favicon-32x32.png")
-	save_png(tight.resize((96, 96), Image.Resampling.LANCZOS), STATIC / "favicon-96x96.png")
-	write_ico(STATIC / "favicon.ico", tight.convert("RGBA"))
-	write_favicon_svg(STATIC / "favicon.svg", tight.convert("RGBA"))
+	save_png(fav_safe_rgb, STATIC / "icon-512-maskable.png")
+	save_png(simple_circle_mark(32, notes), STATIC / "favicon-32.png")
+	save_png(simple_circle_mark(32, notes), STATIC / "favicon-32x32.png")
+	save_png(simple_circle_mark(96, notes), STATIC / "favicon-96x96.png")
+	write_ico(STATIC / "favicon.ico", simple_circle_mark(256, notes))
+	write_favicon_svg(STATIC / "favicon.svg", simple_circle_mark(128, notes))
 	write_pinned_tab(STATIC / "safari-pinned-tab.svg")
-	write_og(STATIC / "og-image.png", mark)
+	write_og(STATIC / "og-image.png", fav)
 	print("wrote icons in", STATIC)
 
 

@@ -22,16 +22,23 @@
 	$effect(() => {
 		if (!browser || !modalHost) return;
 		document.body.appendChild(modalHost);
-		return () => modalHost?.remove();
+		return () => {
+			if (modalHost?.parentNode === document.body) modalHost.remove();
+		};
 	});
 
 	$effect(() => {
 		if (!playing || !browser) return;
+		const previous = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') playing = null;
 		};
 		window.addEventListener('keydown', onKey);
-		return () => window.removeEventListener('keydown', onKey);
+		return () => {
+			document.body.style.overflow = previous;
+			window.removeEventListener('keydown', onKey);
+		};
 	});
 
 	function addLink() {
@@ -105,7 +112,11 @@
 	</div>
 </div>
 
-<div bind:this={modalHost}>
+<div
+	class="yt-modal-host"
+	class:is-open={!!playing}
+	bind:this={modalHost}
+>
 	{#if playing && embedSrc}
 		<div class="yt-modal-backdrop" role="presentation">
 			<button type="button" class="yt-modal-dismiss" aria-label="Luk video" onclick={() => (playing = null)}
@@ -235,14 +246,25 @@
 		font-size: 0.78rem;
 		color: #b42318;
 	}
-	.yt-modal-backdrop {
+	.yt-modal-host {
+		display: none;
+	}
+	.yt-modal-host.is-open {
+		display: block;
 		position: fixed;
 		inset: 0;
-		z-index: 300;
+		z-index: 10000;
+		isolation: isolate;
+		pointer-events: auto;
+	}
+	.yt-modal-backdrop {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
 		display: grid;
 		place-items: center;
 		padding: 1rem;
-		background: rgba(15, 23, 42, 0.72);
+		background: rgba(15, 23, 42, 0.78);
 		backdrop-filter: blur(4px);
 	}
 	.yt-modal-dismiss {
