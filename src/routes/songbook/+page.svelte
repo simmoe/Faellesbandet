@@ -743,7 +743,7 @@
 <main class="mx-auto max-w-6xl px-6 py-5">
 	<header class="page-head">
 		<div class="page-brand">
-			<img class="page-mark" src="/icon-192.png" alt="" />
+			<img class="page-mark" src="/logo-mark.png" alt="" />
 			<div>
 				<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
 					{BAND.name}
@@ -1154,10 +1154,9 @@
 		min-width: 0;
 	}
 	.page-mark {
-		width: 2.6rem;
-		height: 2.6rem;
-		border-radius: 50%;
-		object-fit: cover;
+		width: 3.75rem;
+		height: 3.75rem;
+		object-fit: contain;
 		flex: 0 0 auto;
 	}
 	.page-tagline {
