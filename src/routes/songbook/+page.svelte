@@ -742,11 +742,14 @@
 
 <main class="mx-auto max-w-6xl px-6 py-5">
 	<header class="page-head">
-		<div>
-			<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
-				{BAND.name}
-			</h1>
-			<p class="page-tagline">{BAND.name}s samlede sangbog</p>
+		<div class="page-brand">
+			<img class="page-mark" src="/icon-192.png" alt="" />
+			<div>
+				<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
+					{BAND.name}
+				</h1>
+				<p class="page-tagline">{BAND.name}s samlede sangbog</p>
+			</div>
 		</div>
 		{#if authState.profile}
 			<div class="flex items-center gap-3 text-sm">
@@ -1143,6 +1146,19 @@
 		justify-content: space-between;
 		gap: 0.75rem 1.25rem;
 		margin-bottom: 1rem;
+	}
+	.page-brand {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		min-width: 0;
+	}
+	.page-mark {
+		width: 2.6rem;
+		height: 2.6rem;
+		border-radius: 50%;
+		object-fit: cover;
+		flex: 0 0 auto;
 	}
 	.page-tagline {
 		margin: 0.15rem 0 0;

@@ -1,137 +1,106 @@
 #!/usr/bin/env python3
-"""Rasterize Fællesbandet note icons from the shared 128-unit geometry."""
+"""Build Fællesbandet icons from the hand-drawn circular mark.
+
+Requires Pillow + numpy (local tools, not an app dependency).
+Source: scripts/brand/logo-source.jpg
+"""
 
 from __future__ import annotations
 
-import math
+import base64
+import io
 import struct
-import zlib
 from pathlib import Path
 
+import numpy as np
+from PIL import Image, ImageFilter
+
 ROOT = Path(__file__).resolve().parents[1]
+SOURCE = ROOT / "scripts" / "brand" / "logo-source.jpg"
 STATIC = ROOT / "static"
 
-NAVY = (15, 23, 42, 255)  # #0f172a
-AMBER = (245, 158, 11, 255)  # #f59e0b
-TRANSPARENT = (0, 0, 0, 0)
-
-# Geometry on a 128×128 grid (same numbers as the SVG files).
-LEFT_HEAD = (42.0, 94.0, 17.5, 12.8, math.radians(-24))
-RIGHT_HEAD = (86.0, 85.0, 17.5, 12.8, math.radians(-24))
-LEFT_STEM = (51.25, 36.0, 8.5, 62.0)  # x, y, w, h
-RIGHT_STEM = (95.25, 27.0, 8.5, 62.0)
-BEAM = ((51.25, 36.0), (103.75, 27.0), (103.75, 38.0), (51.25, 47.0))
+CREAM = np.array([244, 234, 214], dtype=np.float32)
+GRAPHITE = np.array([32, 28, 24], dtype=np.float32)
+MASK_COLOR = "#2a2622"
 
 
-def in_ellipse(x: float, y: float, cx: float, cy: float, rx: float, ry: float, theta: float) -> bool:
-	dx, dy = x - cx, y - cy
-	ct, st = math.cos(theta), math.sin(theta)
-	u = dx * ct + dy * st
-	v = -dx * st + dy * ct
-	return (u / rx) ** 2 + (v / ry) ** 2 <= 1.0
+def find_circle(gray: np.ndarray) -> tuple[float, float, float]:
+	dark = gray < 90
+	ys, xs = np.where(dark)
+	if len(xs) == 0:
+		raise SystemExit("Could not find the drawn circle in the source photo.")
+	cx = float(xs.mean())
+	cy = float(ys.mean())
+	dist = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2)
+	return cx, cy, float(np.percentile(dist, 99.2))
 
 
-def in_rect(x: float, y: float, rx: float, ry: float, rw: float, rh: float) -> bool:
-	return rx <= x < rx + rw and ry <= y < ry + rh
+def crop_square(im: Image.Image, cx: float, cy: float, radius: float, pad: float) -> Image.Image:
+	half = radius * (1.0 + pad)
+	w, h = im.size
+	left = int(round(cx - half))
+	top = int(round(cy - half))
+	right = int(round(cx + half))
+	bottom = int(round(cy + half))
+	side = max(right - left, bottom - top)
+	left = int(round(cx - side / 2))
+	top = int(round(cy - side / 2))
+	right = left + side
+	bottom = top + side
+	# If the photo clips one side, keep the square and let PIL pad via crop clamp + paste
+	canvas = Image.new("RGB", (side, side), tuple(int(c) for c in CREAM))
+	src_left = max(0, left)
+	src_top = max(0, top)
+	src_right = min(w, right)
+	src_bottom = min(h, bottom)
+	piece = im.crop((src_left, src_top, src_right, src_bottom))
+	canvas.paste(piece, (src_left - left, src_top - top))
+	return canvas
 
 
-def in_polygon(x: float, y: float, pts: tuple[tuple[float, float], ...]) -> bool:
-	inside = False
-	n = len(pts)
-	j = n - 1
-	for i in range(n):
-		xi, yi = pts[i]
-		xj, yj = pts[j]
-		if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi:
-			inside = not inside
-		j = i
-	return inside
+def grade(im: Image.Image) -> Image.Image:
+	c = np.asarray(im, dtype=np.float32)
+	h, w, _ = c.shape
+	band = max(8, h // 20)
+	paper = np.concatenate(
+		[
+			c[:band, :].reshape(-1, 3),
+			c[-band:, :].reshape(-1, 3),
+			c[:, :band].reshape(-1, 3),
+			c[:, -band:].reshape(-1, 3),
+		],
+		axis=0,
+	)
+	paper_rgb = np.median(paper, axis=0)
+	lum = 0.2126 * c[:, :, 0] + 0.7152 * c[:, :, 1] + 0.0722 * c[:, :, 2]
+	p_lum = float(0.2126 * paper_rgb[0] + 0.7152 * paper_rgb[1] + 0.0722 * paper_rgb[2])
+	dark = lum[lum < 100]
+	d_lum = float(np.percentile(dark, 8)) if dark.size else float(lum.min())
+	t = np.clip((lum - d_lum) / max(8.0, p_lum - d_lum), 0, 1)
+	t = np.power(t, 0.92)
+	out = GRAPHITE[None, None, :] * (1 - t)[..., None] + CREAM[None, None, :] * t[..., None]
+	graded = Image.fromarray(out.clip(0, 255).astype(np.uint8), "RGB")
+	return graded.filter(ImageFilter.UnsharpMask(radius=1.6, percent=90, threshold=2))
 
 
-def in_circle(x: float, y: float, size: float = 128) -> bool:
-	c = size / 2
-	return (x - c) ** 2 + (y - c) ** 2 <= c * c
+def master_from_source(pad: float) -> Image.Image:
+	im = Image.open(SOURCE).convert("RGB")
+	gray = np.asarray(im.convert("L"), dtype=np.float32)
+	cx, cy, radius = find_circle(gray)
+	return grade(crop_square(im, cx, cy, radius, pad))
 
 
-def is_note(x: float, y: float) -> bool:
-	if in_ellipse(x, y, *LEFT_HEAD) or in_ellipse(x, y, *RIGHT_HEAD):
-		return True
-	if in_rect(x, y, *LEFT_STEM) or in_rect(x, y, *RIGHT_STEM):
-		return True
-	return in_polygon(x, y, BEAM)
+def save_png(im: Image.Image, path: Path, size: int) -> None:
+	im.resize((size, size), Image.Resampling.LANCZOS).save(path, "PNG", optimize=True)
 
 
-def render(size: int, *, circle: bool, samples: int = 3) -> bytes:
-	"""Return RGBA bytes, row-major, `size`×`size`."""
-	out = bytearray(size * size * 4)
-	scale = 128 / size
-	inv = 1.0 / samples
-
-	for py in range(size):
-		for px in range(size):
-			navy = 0
-			amber = 0
-			clear = 0
-			for sy in range(samples):
-				for sx in range(samples):
-					x = (px + (sx + 0.5) * inv) * scale
-					y = (py + (sy + 0.5) * inv) * scale
-					if circle and not in_circle(x, y):
-						clear += 1
-						continue
-					if is_note(x, y):
-						amber += 1
-					else:
-						navy += 1
-			total = samples * samples
-			i = (py * size + px) * 4
-			if circle:
-				a = 255 * (total - clear) // total
-				if a == 0:
-					out[i : i + 4] = bytes(TRANSPARENT)
-					continue
-				covered = total - clear
-				out[i] = (AMBER[0] * amber + NAVY[0] * navy) // covered
-				out[i + 1] = (AMBER[1] * amber + NAVY[1] * navy) // covered
-				out[i + 2] = (AMBER[2] * amber + NAVY[2] * navy) // covered
-				out[i + 3] = a
-			else:
-				out[i] = (AMBER[0] * amber + NAVY[0] * navy) // total
-				out[i + 1] = (AMBER[1] * amber + NAVY[1] * navy) // total
-				out[i + 2] = (AMBER[2] * amber + NAVY[2] * navy) // total
-				out[i + 3] = 255
-	return bytes(out)
-
-
-def write_png(path: Path, size: int, rgba: bytes) -> None:
-	raw = b"".join(b"\x00" + rgba[y * size * 4 : (y + 1) * size * 4] for y in range(size))
-
-	def chunk(tag: bytes, data: bytes) -> bytes:
-		return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-
-	png = b"\x89PNG\r\n\x1a\n"
-	png += chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
-	png += chunk(b"IDAT", zlib.compress(raw, 9))
-	png += chunk(b"IEND", b"")
-	path.write_bytes(png)
-
-
-def png_bytes(size: int, rgba: bytes) -> bytes:
-	raw = b"".join(b"\x00" + rgba[y * size * 4 : (y + 1) * size * 4] for y in range(size))
-
-	def chunk(tag: bytes, data: bytes) -> bytes:
-		return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-
-	png = b"\x89PNG\r\n\x1a\n"
-	png += chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
-	png += chunk(b"IDAT", zlib.compress(raw, 9))
-	png += chunk(b"IEND", b"")
-	return png
-
-
-def write_ico(path: Path, images: list[tuple[int, bytes]]) -> None:
-	n = len(images)
-	offset = 6 + 16 * n
+def write_ico(path: Path, master: Image.Image) -> None:
+	images: list[tuple[int, bytes]] = []
+	for size in (16, 32, 48):
+		buf = io.BytesIO()
+		master.resize((size, size), Image.Resampling.LANCZOS).save(buf, "PNG", optimize=True)
+		images.append((size, buf.getvalue()))
+	offset = 6 + 16 * len(images)
 	entries = []
 	payload = b""
 	for size, png in images:
@@ -139,36 +108,58 @@ def write_ico(path: Path, images: list[tuple[int, bytes]]) -> None:
 		entries.append(struct.pack("<BBBBHHII", w, w, 0, 0, 1, 32, len(png), offset))
 		payload += png
 		offset += len(png)
-	path.write_bytes(struct.pack("<HHH", 0, 1, n) + b"".join(entries) + payload)
+	path.write_bytes(struct.pack("<HHH", 0, 1, len(images)) + b"".join(entries) + payload)
+
+
+def write_favicon_svg(path: Path, master: Image.Image) -> None:
+	buf = io.BytesIO()
+	master.resize((256, 256), Image.Resampling.LANCZOS).save(buf, "PNG", optimize=True)
+	b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+	path.write_text(
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Fællesbandet">\n'
+		f'	<image href="data:image/png;base64,{b64}" width="256" height="256"/>\n'
+		"</svg>\n",
+		encoding="utf-8",
+	)
+
+
+def write_pinned_tab(path: Path) -> None:
+	path.write_text(
+		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">\n'
+		f'	<circle cx="64" cy="64" r="58" fill="{MASK_COLOR}"/>\n'
+		"</svg>\n",
+		encoding="utf-8",
+	)
+
+
+def write_og(path: Path, master: Image.Image) -> None:
+	canvas = Image.new("RGB", (1200, 630), tuple(int(c) for c in CREAM))
+	mark = master.resize((520, 520), Image.Resampling.LANCZOS)
+	canvas.paste(mark, ((1200 - 520) // 2, (630 - 520) // 2))
+	canvas.save(path, "PNG", optimize=True)
 
 
 def main() -> None:
+	if not SOURCE.exists():
+		raise SystemExit(f"Missing source drawing: {SOURCE}")
 	STATIC.mkdir(exist_ok=True)
 
-	square = {
-		180: render(180, circle=False, samples=3),
-		192: render(192, circle=False, samples=3),
-		512: render(512, circle=False, samples=3),
-	}
-	round_tab = {
-		16: render(16, circle=True, samples=5),
-		32: render(32, circle=True, samples=4),
-		48: render(48, circle=True, samples=4),
-	}
+	app = master_from_source(pad=0.14)
+	tight = master_from_source(pad=0.06)
+	safe = master_from_source(pad=0.28)
 
-	write_png(STATIC / "favicon-32.png", 32, round_tab[32])
-	write_png(STATIC / "apple-touch-icon.png", 180, square[180])
-	write_png(STATIC / "icon-192.png", 192, square[192])
-	write_png(STATIC / "icon-512.png", 512, square[512])
-
-	write_ico(
-		STATIC / "favicon.ico",
-		[
-			(16, png_bytes(16, round_tab[16])),
-			(32, png_bytes(32, round_tab[32])),
-			(48, png_bytes(48, round_tab[48])),
-		],
-	)
+	save_png(app, STATIC / "faellesbandet-icon-v1.png", 180)
+	save_png(app, STATIC / "apple-touch-icon.png", 180)
+	save_png(app, STATIC / "icon-192.png", 192)
+	save_png(app, STATIC / "icon-512.png", 512)
+	save_png(safe, STATIC / "icon-512-maskable.png", 512)
+	save_png(tight, STATIC / "favicon-32.png", 32)
+	save_png(tight, STATIC / "favicon-32x32.png", 32)
+	save_png(tight, STATIC / "favicon-96x96.png", 96)
+	write_ico(STATIC / "favicon.ico", tight)
+	write_favicon_svg(STATIC / "favicon.svg", tight)
+	write_pinned_tab(STATIC / "safari-pinned-tab.svg")
+	write_og(STATIC / "og-image.png", app)
 	print("wrote icons in", STATIC)
 
 
