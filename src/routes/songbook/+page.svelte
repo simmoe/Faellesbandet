@@ -743,7 +743,7 @@
 <main class="mx-auto max-w-6xl px-6 py-5">
 	<header class="page-head">
 		<div class="page-brand">
-			<img class="page-mark" src="/logo-mark.png" alt="" />
+			<img class="page-mark" src="/logo-mark.png?v=4" alt="" />
 			<div>
 				<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
 					{BAND.name}
