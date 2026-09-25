@@ -161,11 +161,7 @@
 		const filtered = songs.filter((s) => {
 			if (activeCategory && !(s.categories ?? []).includes(activeCategory)) return false;
 			if (!q) return true;
-			return (
-				s.title.toLowerCase().includes(q) ||
-				(s.artist ?? '').toLowerCase().includes(q) ||
-				(s.categories ?? []).some((c) => c.toLowerCase().includes(q))
-			);
+			return s.title.toLowerCase().includes(q) || (s.artist ?? '').toLowerCase().includes(q);
 		});
 		if (!activeCategory) return filtered;
 		return sortSongsForCategory(activeCategory, filtered);
@@ -743,7 +739,7 @@
 <main class="mx-auto max-w-6xl px-6 py-5">
 	<header class="page-head">
 		<div class="page-brand">
-			<img class="page-mark" src="/logo-mark.png?v=6" alt="" />
+			<img class="page-mark" src="/logo-mark.png?v=7" alt="" />
 			<div>
 				<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
 					{BAND.name}
@@ -772,7 +768,7 @@
 		<input
 			class="toolbar-search"
 			type="search"
-			placeholder="Søg titel, kunstner eller kategori"
+			placeholder="Søg titel eller kunstner"
 			bind:value={search}
 			oninput={onSearchInput}
 			aria-label="Søg i sangbogen"

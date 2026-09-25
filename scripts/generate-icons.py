@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build Fællesbandet icons from the hand-drawn circular mark.
+"""Build Fællesbandet icons from the cold-moon circular mark.
 
 Requires Pillow + numpy (local tools, not an app dependency).
-Source: scripts/brand/logo-source.jpg
+Source: scripts/brand/logo-night-source.jpg
 """
 
 from __future__ import annotations
@@ -16,82 +16,94 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "scripts" / "brand" / "logo-source.jpg"
+SOURCE = ROOT / "scripts" / "brand" / "logo-night-source.jpg"
 STATIC = ROOT / "static"
-
-CREAM = np.array([244, 234, 214], dtype=np.float32)
-GRAPHITE = np.array([32, 28, 24], dtype=np.float32)
-MASK_COLOR = "#2a2622"
+NAVY = (15, 23, 42, 255)
 
 
-def find_circle(gray: np.ndarray) -> tuple[float, float, float]:
-	dark = gray < 90
-	ys, xs = np.where(dark)
-	if len(xs) == 0:
-		raise SystemExit("Could not find the drawn circle in the source photo.")
-	cx = float(xs.mean())
-	cy = float(ys.mean())
-	dist = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2)
-	return cx, cy, float(np.percentile(dist, 99.2))
-
-
-def crop_square(im: Image.Image, cx: float, cy: float, radius: float, pad: float) -> Image.Image:
-	half = radius * (1.0 + pad)
-	w, h = im.size
-	left = int(round(cx - half))
-	top = int(round(cy - half))
-	right = int(round(cx + half))
-	bottom = int(round(cy + half))
+def crop_circle(im: Image.Image) -> Image.Image:
+	g = np.asarray(im.convert("L"), dtype=np.float32)
+	mask = g < 245
+	ys, xs = np.where(mask)
+	pad = 4
+	left, top, right, bottom = xs.min() - pad, ys.min() - pad, xs.max() + 1 + pad, ys.max() + 1 + pad
+	left = max(0, left)
+	top = max(0, top)
+	right = min(im.size[0], right)
+	bottom = min(im.size[1], bottom)
+	cx, cy = (left + right) / 2, (top + bottom) / 2
 	side = max(right - left, bottom - top)
 	left = int(round(cx - side / 2))
 	top = int(round(cy - side / 2))
-	right = left + side
-	bottom = top + side
-	# If the photo clips one side, keep the square and let PIL pad via crop clamp + paste
-	canvas = Image.new("RGB", (side, side), tuple(int(c) for c in CREAM))
-	src_left = max(0, left)
-	src_top = max(0, top)
-	src_right = min(w, right)
-	src_bottom = min(h, bottom)
-	piece = im.crop((src_left, src_top, src_right, src_bottom))
-	canvas.paste(piece, (src_left - left, src_top - top))
+	crop = im.crop((left, top, left + side, top + side)).convert("RGBA")
+	px = np.asarray(crop).copy()
+	h, w = px.shape[:2]
+	yy, xx = np.ogrid[:h, :w]
+	r = min(h, w) / 2 - 0.5
+	inside = (xx - (w - 1) / 2) ** 2 + (yy - (h - 1) / 2) ** 2 <= r * r
+	px[~inside, 3] = 0
+	return Image.fromarray(px, "RGBA")
+
+
+def add_head_rim(im: Image.Image) -> Image.Image:
+	px = np.asarray(im).astype(np.float32)
+	h, w = px.shape[:2]
+	yy, xx = np.ogrid[:h, :w]
+	r = min(h, w) / 2 - 0.5
+	circle = (xx - (w - 1) / 2) ** 2 + (yy - (h - 1) / 2) ** 2 <= r * r
+	lum = 0.2126 * px[:, :, 0] + 0.7152 * px[:, :, 1] + 0.0722 * px[:, :, 2]
+	moon = (lum > 200) & (yy < h * 0.55) & circle
+	moon_rgb = px[moon, :3].mean(0) if moon.any() else np.array([224.0, 239.0, 249.0])
+	heads = (lum < 70) & circle & (yy > h * 0.42) & (yy < h * 0.97) & (xx > w * 0.06) & (xx < w * 0.78)
+
+	def filt(m: np.ndarray, kind: str, k: int) -> np.ndarray:
+		img = Image.fromarray((m.astype(np.uint8) * 255), "L")
+		f = ImageFilter.MinFilter(k) if kind == "erode" else ImageFilter.MaxFilter(k)
+		return np.asarray(img.filter(f)) > 127
+
+	edge_in = heads & ~filt(heads, "erode", 3)
+	edge_out = filt(heads, "dilate", 3) & ~heads & circle & (lum > 40)
+	gy, gx = np.gradient(heads.astype(np.float32))
+	nx, ny = -gx, -gy
+	norm = np.sqrt(nx * nx + ny * ny) + 1e-6
+	nx, ny = nx / norm, ny / norm
+	ldx, ldy = 0.56 * w - xx, 0.30 * h - yy
+	ln = np.sqrt(ldx * ldx + ldy * ldy) + 1e-6
+	ldx, ldy = ldx / ln, ldy / ln
+	strength = np.clip((nx * ldx + ny * ldy - 0.18) / 0.65, 0, 1)
+	lit = strength > 0
+	out = px.copy()
+	for c in range(3):
+		out[:, :, c] = np.where(
+			edge_in & lit, out[:, :, c] * (1 - 0.55 * strength) + moon_rgb[c] * (0.55 * strength), out[:, :, c]
+		)
+		out[:, :, c] = np.where(
+			edge_out & lit, out[:, :, c] * (1 - 0.12 * strength) + moon_rgb[c] * (0.12 * strength), out[:, :, c]
+		)
+	out[:, :, 3] = px[:, :, 3]
+	return Image.fromarray(out.clip(0, 255).astype(np.uint8), "RGBA")
+
+
+def master_mark() -> Image.Image:
+	return add_head_rim(crop_circle(Image.open(SOURCE).convert("RGB")))
+
+
+def padded(im: Image.Image, pad: float, size: int) -> Image.Image:
+	inner = int(round(size / (1 + 2 * pad)))
+	mark = im.resize((inner, inner), Image.Resampling.LANCZOS)
+	canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+	off = (size - inner) // 2
+	canvas.paste(mark, (off, off), mark)
 	return canvas
 
 
-def grade(im: Image.Image) -> Image.Image:
-	c = np.asarray(im, dtype=np.float32)
-	h, w, _ = c.shape
-	band = max(8, h // 20)
-	paper = np.concatenate(
-		[
-			c[:band, :].reshape(-1, 3),
-			c[-band:, :].reshape(-1, 3),
-			c[:, :band].reshape(-1, 3),
-			c[:, -band:].reshape(-1, 3),
-		],
-		axis=0,
-	)
-	paper_rgb = np.median(paper, axis=0)
-	lum = 0.2126 * c[:, :, 0] + 0.7152 * c[:, :, 1] + 0.0722 * c[:, :, 2]
-	p_lum = float(0.2126 * paper_rgb[0] + 0.7152 * paper_rgb[1] + 0.0722 * paper_rgb[2])
-	dark = lum[lum < 100]
-	d_lum = float(np.percentile(dark, 8)) if dark.size else float(lum.min())
-	t = np.clip((lum - d_lum) / max(8.0, p_lum - d_lum), 0, 1)
-	t = np.power(t, 0.92)
-	out = GRAPHITE[None, None, :] * (1 - t)[..., None] + CREAM[None, None, :] * t[..., None]
-	graded = Image.fromarray(out.clip(0, 255).astype(np.uint8), "RGB")
-	return graded.filter(ImageFilter.UnsharpMask(radius=1.6, percent=90, threshold=2))
+def flatten_navy(im: Image.Image) -> Image.Image:
+	bg = Image.new("RGBA", im.size, NAVY)
+	return Image.alpha_composite(bg, im.convert("RGBA")).convert("RGB")
 
 
-def master_from_source(pad: float) -> Image.Image:
-	im = Image.open(SOURCE).convert("RGB")
-	gray = np.asarray(im.convert("L"), dtype=np.float32)
-	cx, cy, radius = find_circle(gray)
-	return grade(crop_square(im, cx, cy, radius, pad))
-
-
-def save_png(im: Image.Image, path: Path, size: int) -> None:
-	im.resize((size, size), Image.Resampling.LANCZOS).save(path, "PNG", optimize=True)
+def save_png(im: Image.Image, path: Path) -> None:
+	im.save(path, "PNG", optimize=True)
 
 
 def write_ico(path: Path, master: Image.Image) -> None:
@@ -126,16 +138,17 @@ def write_favicon_svg(path: Path, master: Image.Image) -> None:
 def write_pinned_tab(path: Path) -> None:
 	path.write_text(
 		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">\n'
-		f'	<circle cx="64" cy="64" r="58" fill="{MASK_COLOR}"/>\n'
+		'	<circle cx="64" cy="64" r="58" fill="#0f172a"/>\n'
 		"</svg>\n",
 		encoding="utf-8",
 	)
 
 
 def write_og(path: Path, master: Image.Image) -> None:
-	canvas = Image.new("RGB", (1200, 630), tuple(int(c) for c in CREAM))
+	canvas = Image.new("RGB", (1200, 630), NAVY[:3])
 	mark = master.resize((520, 520), Image.Resampling.LANCZOS)
-	canvas.paste(mark, ((1200 - 520) // 2, (630 - 520) // 2))
+	flat = flatten_navy(mark)
+	canvas.paste(flat, ((1200 - 520) // 2, (630 - 520) // 2))
 	canvas.save(path, "PNG", optimize=True)
 
 
@@ -144,22 +157,24 @@ def main() -> None:
 		raise SystemExit(f"Missing source drawing: {SOURCE}")
 	STATIC.mkdir(exist_ok=True)
 
-	app = master_from_source(pad=0.14)
-	tight = master_from_source(pad=0.06)
-	safe = master_from_source(pad=0.28)
+	mark = master_mark()
+	app = flatten_navy(padded(mark, 0.06, 1024))
+	tight = flatten_navy(padded(mark, 0.02, 256))
+	safe = flatten_navy(padded(mark, 0.18, 512))
 
-	save_png(app, STATIC / "faellesbandet-icon-v1.png", 180)
-	save_png(app, STATIC / "apple-touch-icon.png", 180)
-	save_png(app, STATIC / "icon-192.png", 192)
-	save_png(app, STATIC / "icon-512.png", 512)
-	save_png(safe, STATIC / "icon-512-maskable.png", 512)
-	save_png(tight, STATIC / "favicon-32.png", 32)
-	save_png(tight, STATIC / "favicon-32x32.png", 32)
-	save_png(tight, STATIC / "favicon-96x96.png", 96)
-	write_ico(STATIC / "favicon.ico", tight)
-	write_favicon_svg(STATIC / "favicon.svg", tight)
+	save_png(padded(mark, 0.06, 256), STATIC / "logo-mark.png")
+	save_png(app.resize((180, 180), Image.Resampling.LANCZOS), STATIC / "faellesbandet-icon-v2.png")
+	save_png(app.resize((180, 180), Image.Resampling.LANCZOS), STATIC / "apple-touch-icon.png")
+	save_png(app.resize((192, 192), Image.Resampling.LANCZOS), STATIC / "icon-192.png")
+	save_png(app.resize((512, 512), Image.Resampling.LANCZOS), STATIC / "icon-512.png")
+	save_png(safe, STATIC / "icon-512-maskable.png")
+	save_png(tight.resize((32, 32), Image.Resampling.LANCZOS), STATIC / "favicon-32.png")
+	save_png(tight.resize((32, 32), Image.Resampling.LANCZOS), STATIC / "favicon-32x32.png")
+	save_png(tight.resize((96, 96), Image.Resampling.LANCZOS), STATIC / "favicon-96x96.png")
+	write_ico(STATIC / "favicon.ico", tight.convert("RGBA"))
+	write_favicon_svg(STATIC / "favicon.svg", tight.convert("RGBA"))
 	write_pinned_tab(STATIC / "safari-pinned-tab.svg")
-	write_og(STATIC / "og-image.png", app)
+	write_og(STATIC / "og-image.png", mark)
 	print("wrote icons in", STATIC)
 
 
