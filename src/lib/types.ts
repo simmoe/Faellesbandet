@@ -56,6 +56,12 @@ export type CategoryMetaMap = Record<string, CategoryMeta>;
  */
 export type CollapsedSections = number[];
 
+export interface YoutubeLink {
+	id: string;
+	title: string;
+	url: string;
+}
+
 export interface SongDoc {
 	id: string;
 	title: string;
@@ -83,6 +89,8 @@ export interface SongDoc {
 	categories?: string[];
 	sourceUrl?: string;
 	notes?: string;
+	/** YouTube-links under sangens oplysninger. Alle medlemmer kan tilføje. */
+	youtubeLinks?: YoutubeLink[];
 	/**
 	 * Skema-version.
 	 * - v3 = ren WYSIWYG: chord-linjen er literal, bass-linjen er kun

@@ -51,7 +51,11 @@ function sanitizeSong(s: SongDoc): SongDoc {
 		key: s.key != null ? decodeHtmlEntities(s.key) : s.key,
 		rawInput: decodeHtmlEntities(s.rawInput ?? ''),
 		rows: s.rows ? decodeRows(s.rows) : s.rows,
-		categories: s.categories?.map((c) => decodeHtmlEntities(c))
+		categories: s.categories?.map((c) => decodeHtmlEntities(c)),
+		youtubeLinks: s.youtubeLinks?.map((link) => ({
+			...link,
+			title: decodeHtmlEntities(link.title)
+		}))
 	};
 	return migrateSong(cleaned);
 }

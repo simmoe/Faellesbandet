@@ -21,6 +21,7 @@
 	import { parseRows, serializeRows, transposeRows, type Row } from '$lib/songParse';
 	import EditableSong from '$lib/components/EditableSong.svelte';
 	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
+	import SongYoutubeLinks from '$lib/components/SongYoutubeLinks.svelte';
 	import { persistSongbookCategory } from '$lib/songbookSelection';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
 	import {
@@ -35,7 +36,8 @@
 		CategoryColorMap,
 		CategoryMetaMap,
 		CollapsedSections,
-		SongDoc
+		SongDoc,
+		YoutubeLink
 	} from '$lib/types';
 
 	$effect(() => {
@@ -59,6 +61,7 @@
 	let showBassTabs = $state(true);
 	let fitSinglePage = $state(true);
 	let infoOpen = $state(false);
+	let youtubeLinks = $state<YoutubeLink[]>([]);
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
@@ -124,6 +127,7 @@
 				collapsedSections = [...(s.collapsedSections ?? [])];
 				showBassTabs = s.showBassTabs ?? true;
 				fitSinglePage = s.fitSinglePage ?? true;
+				youtubeLinks = [...(s.youtubeLinks ?? [])];
 			})
 			.catch((err) => (loadError = err instanceof Error ? err.message : 'Ukendt fejl'))
 			.finally(() => (loading = false));
@@ -169,6 +173,7 @@
 				collapsedSections,
 				showBassTabs,
 				fitSinglePage,
+				youtubeLinks,
 				schemaVersion: 4
 			};
 			await updateSong(song.id, patch, authState.user.uid);
@@ -216,6 +221,16 @@
 
 	function onCollapsedSectionsChange(next: CollapsedSections) {
 		collapsedSections = next;
+		scheduleSave();
+	}
+
+	function addYoutubeLink(link: YoutubeLink) {
+		youtubeLinks = [...youtubeLinks, link];
+		scheduleSave();
+	}
+
+	function removeYoutubeLink(id: string) {
+		youtubeLinks = youtubeLinks.filter((link) => link.id !== id);
 		scheduleSave();
 	}
 
@@ -669,6 +684,11 @@
 								placeholder="Kunstner"
 							/>
 						</label>
+						<SongYoutubeLinks
+							links={youtubeLinks}
+							onAdd={addYoutubeLink}
+							onRemove={removeYoutubeLink}
+						/>
 					</div>
 				</div>
 			</div>
