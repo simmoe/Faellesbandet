@@ -19,7 +19,8 @@
 	import {
 		cleanSectionHeader,
 		normalizeAccidentals,
-		renderBarLine
+		renderBarLine,
+		splitChordLyric
 	} from '$lib/chordFormatter';
 	import { normalizeBassLine } from '$lib/migrate';
 	import {
@@ -113,6 +114,31 @@
 		if (end <= 0) return [] as number[];
 		return Array.from({ length: end }, (_, i) => i);
 	});
+
+	type LineItem = { type: 'pair'; a: number; b: number } | { type: 'row'; a: number };
+
+	function lineItems(from: number, to: number): LineItem[] {
+		const items: LineItem[] = [];
+		for (let i = from; i < to; i++) {
+			if (rows[i]?.kind === 'chord' && i + 1 < to && rows[i + 1]?.kind === 'lyric') {
+				items.push({ type: 'pair', a: i, b: i + 1 });
+				i += 1;
+			} else {
+				items.push({ type: 'row', a: i });
+			}
+		}
+		return items;
+	}
+
+	function onPairLyricBlur(e: FocusEvent, lyricIdx: number) {
+		const wrap = (e.currentTarget as HTMLElement).closest('.song-pair');
+		if (!wrap) return;
+		const text = [...wrap.querySelectorAll('.seg-lyric')]
+			.map((el) => (el.textContent ?? '').replace(/\u00a0/g, ' '))
+			.join('')
+			.replace(/\n+$/, '');
+		setField(lyricIdx, text);
+	}
 	const isPristineSong = $derived.by(() => {
 		if (readOnly || rows.length > 1) return false;
 		if (rows.length === 0) return true;
@@ -1187,6 +1213,64 @@
 	{/if}
 {/snippet}
 
+{#snippet pairedLine(chordIdx: number, lyricIdx: number)}
+	{@const chordRow = rows[chordIdx]}
+	{@const lyricRow = rows[lyricIdx]}
+	{@const segs = splitChordLyric(
+		chordRow?.kind === 'chord' ? chordRow.text : '',
+		lyricRow?.kind === 'lyric' || lyricRow?.kind === 'header' ? lyricRow.text : ''
+	)}
+	<div
+		class="song-line-wrap song-pair-wrap is-chord"
+		class:is-empty={isEmptyRow(chordRow) && isEmptyRow(lyricRow)}
+	>
+		<div class="song-pair">
+			{#each segs as seg, s (`${chordIdx}-${s}-${seg.chord}`)}
+				<div class="song-seg">
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<div
+						class="seg-chord chord-cell"
+						class:chord-cell-clickable={!readOnly}
+						class:drop-target={dropTarget?.rowIdx === chordIdx && dropTarget?.col === 'chord'}
+						class:drag-source={dragInfo?.rowIdx === chordIdx && dragInfo?.col === 'chord'}
+						data-row={chordIdx}
+						title={readOnly ? undefined : 'Klik for at redigere · træk for at kopiere til en anden linje'}
+						draggable={readOnly ? 'false' : 'true'}
+						ondragstart={readOnly ? undefined : (e) => onLineDragStart(e, chordIdx, 'chord')}
+						ondragend={readOnly ? undefined : onLineDragEnd}
+						ondragover={readOnly ? undefined : (e) => onLineDragOver(e, chordIdx, 'chord')}
+						ondragleave={readOnly ? undefined : () => onLineDragLeave(chordIdx, 'chord')}
+						ondrop={readOnly ? undefined : (e) => onLineDrop(e, chordIdx, 'chord')}
+						onclick={readOnly ? undefined : () => openChordModal(chordIdx)}
+						role={readOnly ? 'presentation' : 'button'}
+						tabindex={readOnly ? undefined : 0}
+					>
+						{#if seg.chord.trim()}{@html renderBarLine(seg.chord)}{:else}&nbsp;{/if}
+					</div>
+					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="seg-lyric lyrics-cell lyric-cell"
+						contenteditable={readOnly ? 'false' : 'plaintext-only'}
+						use:init={seg.lyric}
+						data-row={lyricIdx}
+						data-field="text"
+						data-seg={s}
+						onblur={readOnly ? undefined : (e) => onPairLyricBlur(e, lyricIdx)}
+						onkeydown={readOnly ? undefined : (e) => onCellKeydown(e, lyricIdx)}
+						onpaste={readOnly ? undefined : (e) => onCellPaste(e, lyricIdx)}
+						role={readOnly ? 'presentation' : 'textbox'}
+						tabindex={readOnly ? undefined : 0}
+					></div>
+				</div>
+			{/each}
+		</div>
+		{@render lineActions(lyricIdx)}
+	</div>
+	{@render bassCell(bassLines[String(lyricIdx)]?.trim() ? lyricIdx : chordIdx)}
+{/snippet}
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
@@ -1206,8 +1290,12 @@
 		<section class="song-section song-section--unlabeled">
 			{@render sectionInserts(0, unlabeledEnd)}
 			<div class="song-section-grid chord-grid">
-				{#each unlabeledRowIdxs as i (i)}
-					{@render songLine(i)}
+				{#each lineItems(0, unlabeledEnd) as item (item.type === 'pair' ? `p-${item.a}` : `r-${item.a}`)}
+					{#if item.type === 'pair'}
+						{@render pairedLine(item.a, item.b)}
+					{:else}
+						{@render songLine(item.a)}
+					{/if}
 				{/each}
 			</div>
 		</section>
@@ -1350,8 +1438,12 @@
 				</div>
 				<div class="song-section-end"></div>
 				{#if !hideBody}
-					{#each Array.from({ length: section.bodyEnd - section.bodyStart }, (_, offset) => section.bodyStart + offset) as i (i)}
-						{@render songLine(i)}
+					{#each lineItems(section.bodyStart, section.bodyEnd) as item (item.type === 'pair' ? `p-${item.a}` : `r-${item.a}`)}
+						{#if item.type === 'pair'}
+							{@render pairedLine(item.a, item.b)}
+						{:else}
+							{@render songLine(item.a)}
+						{/if}
 					{/each}
 				{/if}
 			</div>
@@ -1677,11 +1769,41 @@
 	}
 	.editable-song .song-section-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(8em, max-content);
+		grid-template-columns: minmax(0, 1fr) auto;
 		column-gap: 1em;
 		row-gap: 0.18em;
 		align-items: center;
 		width: 100%;
+		min-width: 0;
+	}
+	.editable-song .rhythm-cell.rhythm-cell-empty {
+		display: none;
+	}
+	.editable-song .song-pair {
+		display: flex;
+		flex-wrap: wrap;
+		column-gap: 0.7em;
+		row-gap: 0.55em;
+		align-items: start;
+		min-width: 0;
+		max-width: 100%;
+	}
+	.editable-song .song-seg {
+		display: grid;
+		grid-template-rows: auto auto;
+		justify-items: start;
+		min-width: 0;
+		max-width: 100%;
+	}
+	.editable-song .seg-chord {
+		white-space: nowrap;
+		min-height: 1.2em;
+		line-height: 1.15;
+	}
+	.editable-song .seg-lyric {
+		min-height: 1.2em;
+		white-space: pre-wrap;
+		overflow-wrap: break-word;
 	}
 	.editable-song .song-section-grid :global(.rhythm-cell) {
 		justify-self: stretch;
@@ -1830,6 +1952,13 @@
 		padding: 0 0.15rem;
 		min-height: 1.2em;
 		transition: background-color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
+	}
+	.editable-song .song-line-wrap.is-chord .chord-cell-clickable:not(.seg-chord) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.15em 0.7em;
+		white-space: normal;
+		max-width: 100%;
 	}
 	.editable-song .rhythm-cell-clickable,
 	.editable-song .rhythm-cell-clickable :global(*),
