@@ -147,8 +147,8 @@ def load_note_masks() -> list[Image.Image]:
 	return notes
 
 
-def simple_circle_mark(size: int, notes: list[Image.Image] | None = None) -> Image.Image:
-	"""Round night disc + crescent + the three brand notes."""
+def favicon_mark(size: int, notes: list[Image.Image] | None = None) -> Image.Image:
+	"""Dark-blue circle with one centered note — no moon, nothing else."""
 	if notes is None:
 		notes = load_note_masks()
 	s = max(512, size * 16)
@@ -157,31 +157,16 @@ def simple_circle_mark(size: int, notes: list[Image.Image] | None = None) -> Ima
 	pad = s * 0.04
 	draw.ellipse((pad, pad, s - 1 - pad, s - 1 - pad), fill=NIGHT)
 
-	moon = Image.new("L", (s, s), 0)
-	md = ImageDraw.Draw(moon)
-	mx, my, mr = 0.72 * s, 0.22 * s, 0.145 * s
-	bx, by, br = 0.635 * s, 0.185 * s, 0.125 * s
-	md.ellipse((mx - mr, my - mr, mx + mr, my + mr), fill=255)
-	md.ellipse((bx - br, by - br, bx + br, by + br), fill=0)
-	im.paste(Image.new("RGBA", (s, s), MOON), (0, 0), moon)
-
-	placements = [
-		(0, 0.26, 0.62, 0.30, -12),
-		(1, 0.50, 0.70, 0.28, 0),
-		(2, 0.74, 0.55, 0.27, 10),
-	]
-	for idx, cx, cy, hf, rot in placements:
-		n = notes[idx]
-		nh = int(s * hf)
-		nw = max(1, int(n.size[0] * nh / n.size[1]))
-		scaled = n.resize((nw, nh), Image.Resampling.LANCZOS)
-		if rot:
-			scaled = scaled.rotate(rot, resample=Image.Resampling.BICUBIC, expand=True)
-		layer = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-		x = int(cx * s - scaled.size[0] / 2)
-		y = int(cy * s - scaled.size[1] / 2)
-		layer.paste(Image.new("RGBA", scaled.size, MOON), (x, y), scaled)
-		im = Image.alpha_composite(im, layer)
+	# Single eighth note (index 0), optically centered in the disc.
+	note = notes[0]
+	nh = int(s * 0.52)
+	nw = max(1, int(note.size[0] * nh / note.size[1]))
+	scaled = note.resize((nw, nh), Image.Resampling.LANCZOS)
+	layer = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+	x = int(s / 2 - scaled.size[0] / 2)
+	y = int(s / 2 - scaled.size[1] / 2 + s * 0.02)
+	layer.paste(Image.new("RGBA", scaled.size, MOON), (x, y), scaled)
+	im = Image.alpha_composite(im, layer)
 
 	return im.resize((size, size), Image.Resampling.LANCZOS)
 
@@ -222,30 +207,31 @@ def main() -> None:
 		raise SystemExit(f"Missing note source: {NOTES_SOURCE}")
 	STATIC.mkdir(exist_ok=True)
 
-	# Full illustration for on-page mark
+	# Homepage / app icons: full cold-moon circular logo
 	mark = master_mark()
-	# Simplified round mark for tabs / home screen
+	app = flatten_navy(padded(mark, 0.04, 512))
+	maskable = Image.new("RGBA", (512, 512), NAVY)
+	inner = padded(mark, 0.14, 420)
+	maskable.paste(inner, ((512 - 420) // 2, (512 - 420) // 2), inner)
+	maskable_rgb = maskable.convert("RGB")
+
+	# Favicon only: one note on a dark-blue disc
 	notes = load_note_masks()
-	fav = simple_circle_mark(512, notes)
-	app = flatten_navy(fav)
-	fav_safe = Image.new("RGBA", (512, 512), NAVY)
-	inner = simple_circle_mark(420, notes)
-	fav_safe.paste(inner, ((512 - 420) // 2, (512 - 420) // 2), inner)
-	fav_safe_rgb = fav_safe.convert("RGB")
+	fav = favicon_mark(512, notes)
 
 	save_png(padded(mark, 0.06, 256), STATIC / "logo-mark.png")
 	save_png(app.resize((180, 180), Image.Resampling.LANCZOS), STATIC / "faellesbandet-icon-v2.png")
 	save_png(app.resize((180, 180), Image.Resampling.LANCZOS), STATIC / "apple-touch-icon.png")
 	save_png(app.resize((192, 192), Image.Resampling.LANCZOS), STATIC / "icon-192.png")
 	save_png(app.resize((512, 512), Image.Resampling.LANCZOS), STATIC / "icon-512.png")
-	save_png(fav_safe_rgb, STATIC / "icon-512-maskable.png")
-	save_png(simple_circle_mark(32, notes), STATIC / "favicon-32.png")
-	save_png(simple_circle_mark(32, notes), STATIC / "favicon-32x32.png")
-	save_png(simple_circle_mark(96, notes), STATIC / "favicon-96x96.png")
-	write_ico(STATIC / "favicon.ico", simple_circle_mark(256, notes))
-	write_favicon_svg(STATIC / "favicon.svg", simple_circle_mark(128, notes))
+	save_png(maskable_rgb, STATIC / "icon-512-maskable.png")
+	save_png(favicon_mark(32, notes), STATIC / "favicon-32.png")
+	save_png(favicon_mark(32, notes), STATIC / "favicon-32x32.png")
+	save_png(favicon_mark(96, notes), STATIC / "favicon-96x96.png")
+	write_ico(STATIC / "favicon.ico", favicon_mark(256, notes))
+	write_favicon_svg(STATIC / "favicon.svg", favicon_mark(128, notes))
 	write_pinned_tab(STATIC / "safari-pinned-tab.svg")
-	write_og(STATIC / "og-image.png", fav)
+	write_og(STATIC / "og-image.png", mark)
 	print("wrote icons in", STATIC)
 
 

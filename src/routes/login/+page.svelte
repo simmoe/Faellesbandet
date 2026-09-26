@@ -62,7 +62,7 @@
 
 <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
 	<div class="mb-10 text-center">
-		<img class="mx-auto mb-5 h-28 w-28" src="/logo-mark.png?v=7" alt="" />
+		<img class="mx-auto mb-5 h-28 w-28" src="/logo-mark.png?v=10" alt="" />
 		<h1 class="font-display text-4xl font-bold tracking-tight text-[var(--color-accent)]">
 			{BAND.name}
 		</h1>

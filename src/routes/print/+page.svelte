@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { authState } from '$lib/auth.svelte';
 	import { BAND } from '$lib/data/band';
@@ -8,15 +7,11 @@
 	import { exportSongsAsPdf } from '$lib/pdf';
 	import type { SongDoc } from '$lib/types';
 
-	$effect(() => {
-		if (!authState.loading && !authState.user) goto('/login');
-	});
-
 	let allSongs = $state<SongDoc[]>([]);
 	let loading = $state(true);
 
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeSongs((s) => {
 			allSongs = s;
 			loading = false;

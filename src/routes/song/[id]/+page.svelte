@@ -40,9 +40,7 @@
 		YoutubeLink
 	} from '$lib/types';
 
-	$effect(() => {
-		if (!authState.loading && !authState.user) goto('/login');
-	});
+	const canEdit = $derived(!!authState.user);
 
 	let song = $state<SongDoc | null>(null);
 	let loading = $state(true);
@@ -65,7 +63,7 @@
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeSongs((s) => (allSongs = s));
 		return () => unsub();
 	});
@@ -88,12 +86,12 @@
 	}
 
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeCategoryColors((colors) => (categoryColorMap = colors));
 		return () => unsub();
 	});
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeCategoryMeta((meta) => (categoryMetaMap = meta));
 		return () => unsub();
 	});
@@ -107,7 +105,7 @@
 
 	$effect(() => {
 		const id = $page.params.id;
-		if (!id || !authState.user) return;
+		if (!id || authState.loading) return;
 		loading = true;
 		loadError = null;
 		getSong(id)
@@ -486,40 +484,54 @@
 					Sangbogen
 				</a>
 				<div class="song-chrome-status">
-					{#if saveStatus === 'saving'}
-						<span>Gemmer…</span>
-					{:else if saveStatus === 'saved'}
-						<span class="text-[var(--color-success)]">Gemt</span>
-					{:else if saveStatus === 'error'}
-						<span class="text-[var(--color-error)]" title={saveError ?? ''}>Fejl ved gem</span>
-					{/if}
-					{#if authState.profile}
-						<span>{authState.profile.displayName}</span>
+					{#if canEdit}
+						{#if saveStatus === 'saving'}
+							<span>Gemmer…</span>
+						{:else if saveStatus === 'saved'}
+							<span class="text-[var(--color-success)]">Gemt</span>
+						{:else if saveStatus === 'error'}
+							<span class="text-[var(--color-error)]" title={saveError ?? ''}>Fejl ved gem</span>
+						{/if}
+						{#if authState.profile}
+							<span>{authState.profile.displayName}</span>
+						{/if}
+					{:else}
+						<a href={`/login?next=${encodeURIComponent(`/song/${song.id}`)}`} class="btn-ghost text-sm"
+							>Log ind for at redigere</a
+						>
 					{/if}
 				</div>
 			</div>
 
 			<div class="song-head no-print-toolbar">
 				<div class="title-line">
-					<input
-						class="title-input"
-						type="text"
-						bind:value={title}
-						oninput={() => scheduleSave()}
-						placeholder="Titel"
-						style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
-					/>
+					{#if canEdit}
+						<input
+							class="title-input"
+							type="text"
+							bind:value={title}
+							oninput={() => scheduleSave()}
+							placeholder="Titel"
+							style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
+						/>
+					{:else}
+						<h1 class="title-input" style="width: auto; margin: 0">{title || 'Uden titel'}</h1>
+					{/if}
 				</div>
 				<div class="song-actions">
 					<label class="print-toggle" title="Vis bass-tabs på siden og tag dem med ved print">
-						<input type="checkbox" bind:checked={showBassTabs} onchange={() => scheduleSave()} />
+						<input type="checkbox" bind:checked={showBassTabs} onchange={() => canEdit && scheduleSave()} />
 						Bass
 					</label>
 					<label
 						class="print-toggle"
 						title="Skalér sangen proportionalt så den fylder maks én A4-side"
 					>
-						<input type="checkbox" bind:checked={fitSinglePage} onchange={() => scheduleSave()} />
+						<input
+							type="checkbox"
+							bind:checked={fitSinglePage}
+							onchange={() => canEdit && scheduleSave()}
+						/>
 						Én side
 					</label>
 					<button
@@ -570,56 +582,68 @@
 						</svg>
 						{audiencePdfBusy ? 'Genererer…' : 'Tekst'}
 					</button>
-					<button
-						type="button"
-						class="song-tool song-tool-danger"
-						onclick={handleDelete}
-						title="Slet sang">Slet</button
-					>
+					{#if canEdit}
+						<button
+							type="button"
+							class="song-tool song-tool-danger"
+							onclick={handleDelete}
+							title="Slet sang">Slet</button
+						>
+					{/if}
 				</div>
 
 				<div class="song-sub">
-					<input
-						class="artist-input"
-						type="text"
-						bind:value={artist}
-						oninput={() => scheduleSave()}
-						placeholder="Kunstner"
-						style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
-					/>
+					{#if canEdit}
+						<input
+							class="artist-input"
+							type="text"
+							bind:value={artist}
+							oninput={() => scheduleSave()}
+							placeholder="Kunstner"
+							style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
+						/>
+					{:else if artist}
+						<p class="artist-input" style="width: auto; margin: 0">{artist}</p>
+					{/if}
 				</div>
 				<div class="song-functions">
-					<span class="key-cluster" aria-label="Toneart, transponér">
-						<button
-							type="button"
-							class="key-btn"
-							title="Transponér ned"
-							onclick={() => transpose(-1)}>−</button
-						>
-						<input
-							class="key-input"
-							type="text"
-							bind:value={key}
-							oninput={() => scheduleSave()}
-							placeholder="—"
-							spellcheck="false"
+					{#if canEdit}
+						<span class="key-cluster" aria-label="Toneart, transponér">
+							<button
+								type="button"
+								class="key-btn"
+								title="Transponér ned"
+								onclick={() => transpose(-1)}>−</button
+							>
+							<input
+								class="key-input"
+								type="text"
+								bind:value={key}
+								oninput={() => scheduleSave()}
+								placeholder="—"
+								spellcheck="false"
+							/>
+							<button
+								type="button"
+								class="key-btn"
+								title="Transponér op"
+								onclick={() => transpose(1)}>+</button
+							>
+						</span>
+						<CategoryPicker
+							options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
+							selected={categories}
+							triggerLabel="Kategori"
+							ariaLabel="Tilføj eller fjern kategori"
+							allowCreate
+							colorFor={colorForCategory}
+							onToggle={toggleCategory}
 						/>
-						<button
-							type="button"
-							class="key-btn"
-							title="Transponér op"
-							onclick={() => transpose(1)}>+</button
-						>
-					</span>
-					<CategoryPicker
-						options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
-						selected={categories}
-						triggerLabel="Kategori"
-						ariaLabel="Tilføj eller fjern kategori"
-						allowCreate
-						colorFor={colorForCategory}
-						onToggle={toggleCategory}
-					/>
+					{:else if key.trim()}
+						<span class="key-cluster" aria-label="Toneart">
+							<span class="key-input" style="pointer-events: none">{key}</span>
+						</span>
+					{/if}
 					{#if categories.length > 0}
 						<div class="function-cats">
 							{#each categories as cat (cat)}
@@ -638,60 +662,67 @@
 						</div>
 					{/if}
 				</div>
-				<button
-					type="button"
-					class="info-toggle no-print"
-					class:is-open={infoOpen}
-					aria-expanded={infoOpen}
-					onclick={() => (infoOpen = !infoOpen)}
-				>
-					Oplysninger
-					<svg
-						class="info-chevron"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 12 12"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.4"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
+				{#if canEdit || youtubeLinks.length > 0}
+					<button
+						type="button"
+						class="info-toggle no-print"
+						class:is-open={infoOpen}
+						aria-expanded={infoOpen}
+						onclick={() => (infoOpen = !infoOpen)}
 					>
-						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
-					</svg>
-				</button>
+						Oplysninger
+						<svg
+							class="info-chevron"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 12 12"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.4"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M2.25 4.25 6 8l3.75-3.75"></path>
+						</svg>
+					</button>
+				{/if}
 			</div>
+			{#if canEdit || youtubeLinks.length > 0}
 			<div class="info-fold no-print" class:is-open={infoOpen}>
 				<div class="info-inner">
 					<div class="info-panel">
-						<label class="info-field">
-							<span>Titel</span>
-							<input
-								class="info-input"
-								type="text"
-								bind:value={title}
-								oninput={() => scheduleSave()}
-								placeholder="Titel"
-							/>
-						</label>
-						<label class="info-field">
-							<span>Kunstner</span>
-							<input
-								class="info-input"
-								type="text"
-								bind:value={artist}
-								oninput={() => scheduleSave()}
-								placeholder="Kunstner"
-							/>
-						</label>
+						{#if canEdit}
+							<label class="info-field">
+								<span>Titel</span>
+								<input
+									class="info-input"
+									type="text"
+									bind:value={title}
+									oninput={() => scheduleSave()}
+									placeholder="Titel"
+								/>
+							</label>
+							<label class="info-field">
+								<span>Kunstner</span>
+								<input
+									class="info-input"
+									type="text"
+									bind:value={artist}
+									oninput={() => scheduleSave()}
+									placeholder="Kunstner"
+								/>
+							</label>
+						{/if}
 						<SongYoutubeLinks
 							links={youtubeLinks}
 							onAdd={addYoutubeLink}
 							onRemove={removeYoutubeLink}
+							readOnly={!canEdit}
 						/>
 					</div>
 				</div>
 			</div>
+			{/if}
 
 			<div class="print-header" aria-hidden="true">
 				<div>
@@ -714,6 +745,7 @@
 					{onRowsChange}
 					{onBassLinesChange}
 					{onCollapsedSectionsChange}
+					readOnly={!canEdit}
 				/>
 			</div>
 

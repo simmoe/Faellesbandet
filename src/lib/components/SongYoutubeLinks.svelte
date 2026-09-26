@@ -7,9 +7,10 @@
 		links: YoutubeLink[];
 		onAdd: (link: YoutubeLink) => void;
 		onRemove: (id: string) => void;
+		readOnly?: boolean;
 	}
 
-	const { links, onAdd, onRemove }: Props = $props();
+	const { links, onAdd, onRemove, readOnly = false }: Props = $props();
 
 	let titleDraft = $state('');
 	let urlDraft = $state('');
@@ -78,19 +79,22 @@
 						<button type="button" class="yt-title" onclick={() => (playing = link)}>
 							{link.title}
 						</button>
-						<button
-							type="button"
-							class="yt-remove"
-							title="Fjern"
-							aria-label="Fjern {link.title}"
-							onclick={() => onRemove(link.id)}
-						>
-							×
-						</button>
+						{#if !readOnly}
+							<button
+								type="button"
+								class="yt-remove"
+								title="Fjern"
+								aria-label="Fjern {link.title}"
+								onclick={() => onRemove(link.id)}
+							>
+								×
+							</button>
+						{/if}
 					</li>
 				{/each}
 			</ul>
 		{/if}
+		{#if !readOnly}
 		<form class="yt-add" onsubmit={handleSubmit}>
 			<input
 				class="info-input"
@@ -108,6 +112,7 @@
 		</form>
 		{#if error}
 			<p class="yt-error">{error}</p>
+		{/if}
 		{/if}
 	</div>
 </div>

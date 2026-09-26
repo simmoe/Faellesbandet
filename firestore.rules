@@ -18,6 +18,39 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/mat_teacher_users/$(request.auth.uid)).data.role == 'teacher';
     }
 
+    // Simon Moe portfolio (`here`, GitHub Pages: simmoe.github.io/here)
+    // Public READ. WRITE only for the owner.
+    function isHereOwner() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'simmoe@gmail.com';
+    }
+
+    match /here_content/{docId} {
+      allow read: if true;
+      allow write: if isHereOwner();
+    }
+
+    match /here_cv/{docId} {
+      allow read: if true;
+      allow write: if isHereOwner();
+    }
+
+    match /here_projects/{docId} {
+      allow read: if true;
+      allow write: if isHereOwner();
+    }
+
+    match /here_applications/{docId} {
+      allow read: if true;
+      allow write: if isHereOwner();
+    }
+
+    match /here_recommendations/{docId} {
+      allow read: if true;
+      allow write: if isHereOwner();
+    }
+
     // ----------------------------------------------------------
     // Generic drag-and-drop lists — `ddu-dragdrop` (rewritten).
     // Any signed-in user can create lists. Owner controls visibility:
@@ -154,14 +187,33 @@ service cloud.firestore {
       allow create: if false; // opret via Admin SDK
       allow delete: if false;
 
-      // Sangbog
+      // Sangbog — offentlig læsning; skrivning kun bandmedlemmer.
       match /songs/{songId} {
-        allow read, write: if isChordBandMember(bandId);
+        allow read: if true;
+        allow write: if isChordBandMember(bandId);
+
+        match /recordings/{recordingId} {
+          allow read: if isChordBandMember(bandId);
+          allow create: if isChordBandMember(bandId)
+                        && request.resource.data.createdBy == request.auth.uid
+                        && request.resource.data.podcastStatus == "pending"
+                        && request.resource.data.podcastAttemptCount == 0
+                        && !("podcastMp3Path" in request.resource.data)
+                        && !("podcastMp3Url" in request.resource.data);
+          allow update: if isChordBandMember(bandId)
+                        && resource.data.createdBy == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          "title", "recordedAt", "venue", "notes", "updatedBy", "updatedAt"
+                        ]);
+          allow delete: if isChordBandMember(bandId)
+                        && resource.data.createdBy == request.auth.uid;
+        }
       }
 
       // Fælles klient-indstillinger for sangbogen (fx kategori-farver).
       match /settings/{settingsId} {
-        allow read, write: if isChordBandMember(bandId);
+        allow read: if true;
+        allow write: if isChordBandMember(bandId);
       }
 
       // Sætlister
@@ -172,7 +224,7 @@ service cloud.firestore {
 
     // ================================================================
     // Informatik C — fagbegrebs-wiki / opslagsbog.
-    // Tilføjet 2026-05-12. Alle indloggede må læse og skrive (Google).
+    // Tilføjet 2026-05-12. Offentlig læsning; skrivning kræver Google-login.
     // Hvert opslag har en forfatter; redigering bevarer historik via
     // separate explanations-dokumenter under hvert opslag.
     // ================================================================
@@ -199,7 +251,9 @@ service cloud.firestore {
 
     // Hovedopslag — slug som document-id.
     match /informatik_c_entries/{slug} {
-      allow read: if signedIn();
+      // Offentlig læsning: fagbogen skal kunne bruges uden login.
+      // Skrivning kræver stadig Google-login.
+      allow read: if true;
 
       allow create: if signedIn()
         && request.resource.data.term is string
@@ -225,7 +279,7 @@ service cloud.firestore {
 
       // Ekstra forklaringer — ét link/sti i nye opslag; legacy: tekst uden link.
       match /explanations/{explId} {
-        allow read: if signedIn();
+        allow read: if true;
         allow create: if signedIn()
           && request.resource.data.kind in ['text', 'image', 'video', 'audio', 'link']
           && request.resource.data.body is string
@@ -247,5 +301,478 @@ service cloud.firestore {
           && resource.data.author.uid == request.auth.uid;
       }
     }
+
+    // ================================================================
+    // Informatik C — eksamensopgaver (FORTROLIGE).
+    // Tilføjet 2026-06-08. Eksamensmateriale må ALDRIG være offentligt.
+    // Kun ejeren (verificeret Google-konto) må læse og skrive. Indholdet
+    // hentes runtime, så det ikke ligger i den offentlige JS-bundle.
+    // ================================================================
+    function isInfcExamOwner() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'simmoe@gmail.com';
+    }
+
+    match /informatik_c_exam/{docId} {
+      allow read, write: if isInfcExamOwner();
+    }
+
+    // ================================================================
+    // Informatik C — Eigils tømrerord.
+    // Offentlig, simpel flashcard-side uden login. Indholdet er ikke
+    // fortroligt, men Firestore er stadig source of truth.
+    // ================================================================
+    function isEigilWord(data) {
+      return data.keys().hasOnly([
+          'word',
+          'explanation',
+          'alternatives',
+          'image',
+          'order',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.word is string
+        && data.word.size() > 0
+        && data.word.size() < 80
+        && data.explanation is string
+        && data.explanation.size() > 0
+        && data.explanation.size() < 1200
+        && data.order is int
+        && (!('alternatives' in data) || data.alternatives is list)
+        && (!('image' in data) || (data.image is string && data.image.size() < 900000));
+    }
+
+    match /informatik_c_eigil_words/{wordId} {
+      allow read: if true;
+      allow create, update: if isEigilWord(request.resource.data);
+      allow delete: if true;
+    }
+
+    // ================================================================
+    // Min økonomi — private, UID-isolerede økonomidata.
+    // Kun den indloggede bruger må læse og skrive sit eget namespace.
+    // Rod-dokumentet bærer schemaVersion; underkollektionerne indeholder
+    // konti, kilder, transaktioner og senere budgetter/scenarier.
+    // ================================================================
+    match /min_oekonomi/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.schemaVersion == 1;
+      allow delete: if false;
+
+      match /{document=**} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // ================================================================
+    // Teknikfag DDU — forløb, elever (fornavne), grupper, eksterne links, UIFlow-videoer, idepulje, copy, designprincipper.
+    // Offentlig læsning: ingen følsomme persondata i disse collections.
+    // Elever: ejer opretter/sletter; alle må opdatere `device` uden login.
+    // Gruppeværktøjet og linksamlingen er bevidst åbne.
+    // Prefix: teknikfag_ddu_*
+    // ================================================================
+    function isTeknikfagDduOwner() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'simmoe@gmail.com';
+    }
+
+    function isPublicStudentDeviceUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['device'])
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.klass == resource.data.klass
+        && request.resource.data.active == resource.data.active
+        && request.resource.data.order == resource.data.order
+        && request.resource.data.device is string
+        && request.resource.data.device.size() <= 80;
+    }
+
+    function isValidTeknikfagDduGroup(data) {
+      return data.keys().hasAll([
+          'forlobId',
+          'name',
+          'memberIds',
+          'roleAssignments',
+          'order'
+        ])
+        && data.forlobId is string
+        && data.forlobId.size() > 0
+        && data.forlobId.size() <= 80
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 80
+        && data.memberIds is list
+        && data.memberIds.size() <= 40
+        && data.memberIds.hasOnly([
+          'ameli',
+          'asbjorn',
+          'asta',
+          'bastian',
+          'benjamin',
+          'bertil',
+          'caroline-louise',
+          'elias',
+          'floki',
+          'freja',
+          'frida',
+          'gilbert',
+          'ishana',
+          'john',
+          'josefine',
+          'kamille',
+          'liv',
+          'ludvig',
+          'mads',
+          'noah',
+          'ronja',
+          'sebastian',
+          'selma',
+          'tobias',
+          'victor',
+          'viggo',
+          'william'
+        ])
+        && data.memberIds.toSet().size() == data.memberIds.size()
+        && data.roleAssignments is map
+        && data.roleAssignments.keys().hasAll(['projektleder', 'ui', 'ux', 'qa'])
+        && data.roleAssignments.keys().hasOnly(['projektleder', 'ui', 'ux', 'qa'])
+        && data.roleAssignments.projektleder is string
+        && data.roleAssignments.ui is string
+        && data.roleAssignments.ux is string
+        && data.roleAssignments.qa is string
+        && (data.roleAssignments.projektleder == ''
+            || data.roleAssignments.projektleder in data.memberIds)
+        && (data.roleAssignments.ui == ''
+            || data.roleAssignments.ui in data.memberIds)
+        && (data.roleAssignments.ux == ''
+            || data.roleAssignments.ux in data.memberIds)
+        && (data.roleAssignments.qa == ''
+            || data.roleAssignments.qa in data.memberIds)
+        && (data.roleAssignments.projektleder == ''
+            || (data.roleAssignments.projektleder != data.roleAssignments.ui
+                && data.roleAssignments.projektleder != data.roleAssignments.ux
+                && data.roleAssignments.projektleder != data.roleAssignments.qa))
+        && (data.roleAssignments.ui == ''
+            || (data.roleAssignments.ui != data.roleAssignments.ux
+                && data.roleAssignments.ui != data.roleAssignments.qa))
+        && (data.roleAssignments.ux == ''
+            || data.roleAssignments.ux != data.roleAssignments.qa)
+        && (
+          (
+            data.forlobId == 'forlob-2'
+            && data.keys().hasAll(['project'])
+            && data.keys().hasOnly([
+              'forlobId',
+              'name',
+              'memberIds',
+              'roleAssignments',
+              'project',
+              'order'
+            ])
+            && data.project is map
+            && data.project.size() <= 30
+            && data.project.keys().hasAll([
+              'projectTitle',
+              'concept',
+              'rules',
+              'gameGoal',
+              'playerCount',
+              'coreMechanic',
+              'secondaryMechanic'
+            ])
+            && data.project.projectTitle is string
+            && data.project.projectTitle.size() <= 120
+            && data.project.concept is string
+            && data.project.concept.size() <= 2000
+            && data.project.rules is string
+            && data.project.rules.size() <= 4000
+            && data.project.gameGoal is string
+            && data.project.gameGoal.size() <= 500
+            && data.project.playerCount is string
+            && data.project.playerCount.size() <= 40
+            && data.project.coreMechanic is string
+            && data.project.coreMechanic.size() <= 500
+            && data.project.secondaryMechanic is string
+            && data.project.secondaryMechanic.size() <= 500
+          )
+          ||
+          (
+            data.forlobId != 'forlob-2'
+            && data.keys().hasAll([
+              'conceptVideoUrl',
+              'figmaUrl',
+              'productVideoUrl'
+            ])
+            && data.keys().hasOnly([
+              'forlobId',
+              'name',
+              'memberIds',
+              'roleAssignments',
+              'conceptVideoUrl',
+              'figmaUrl',
+              'productVideoUrl',
+              'order'
+            ])
+            && data.conceptVideoUrl is string
+            && data.conceptVideoUrl.size() <= 500
+            && (data.conceptVideoUrl == ''
+                || data.conceptVideoUrl.matches(
+                  'https://www[.]youtube[.]com/watch[?]v=[A-Za-z0-9_-]{11}'
+                ))
+            && data.figmaUrl is string
+            && data.figmaUrl.size() <= 500
+            && (data.figmaUrl == ''
+                || data.figmaUrl.matches(
+                  'https://([A-Za-z0-9-]+[.])?figma[.]com/.+'
+                )
+                || data.figmaUrl.matches(
+                  'https://[A-Za-z0-9-]+[.]github[.]io/.*'
+                ))
+            && data.productVideoUrl is string
+            && data.productVideoUrl.size() <= 500
+            && (data.productVideoUrl == ''
+                || data.productVideoUrl.matches(
+                  'https://www[.]youtube[.]com/watch[?]v=[A-Za-z0-9_-]{11}'
+                ))
+          )
+        )
+        && data.order is int
+        && data.order >= 0
+        && data.order <= 100;
+    }
+
+    match /teknikfag_ddu_forlob/{id} {
+      allow read: if true;
+      allow create, update, delete: if isTeknikfagDduOwner();
+    }
+
+    match /teknikfag_ddu_students/{id} {
+      allow read: if true;
+      allow create, delete: if isTeknikfagDduOwner();
+      allow update: if isTeknikfagDduOwner()
+        || isPublicStudentDeviceUpdate();
+    }
+
+    match /teknikfag_ddu_groups/{id} {
+      allow read: if true;
+      allow create: if isValidTeknikfagDduGroup(request.resource.data);
+      allow update: if isValidTeknikfagDduGroup(request.resource.data);
+      allow delete: if true;
+    }
+
+    function isValidTeknikfagDduLink(data) {
+      return data.keys().hasOnly(['title', 'url', 'blurb', 'createdAt'])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 80
+        && data.url is string
+        && data.url.size() > 10
+        && data.url.size() <= 500
+        && data.url.matches('^https://.*')
+        && data.blurb is string
+        && data.blurb.size() > 0
+        && data.blurb.size() <= 160
+        && data.createdAt == request.time;
+    }
+
+    match /teknikfag_ddu_links/{id} {
+      allow read: if true;
+      allow create: if isValidTeknikfagDduLink(request.resource.data);
+      allow update: if false;
+      allow delete: if isTeknikfagDduOwner();
+    }
+
+    function isValidTeknikfagDduM5Video(data) {
+      return data.keys().hasOnly(['title', 'url', 'youtubeId', 'createdAt'])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 80
+        && data.url is string
+        && data.url.size() > 10
+        && data.url.size() <= 500
+        && data.url.matches('^https://.*')
+        && data.youtubeId is string
+        && data.youtubeId.matches('^[A-Za-z0-9_-]{11}$')
+        && data.createdAt == request.time;
+    }
+
+    match /teknikfag_ddu_m5_videos/{id} {
+      allow read: if true;
+      allow create: if isValidTeknikfagDduM5Video(request.resource.data);
+      allow update: if false;
+      allow delete: if isTeknikfagDduOwner();
+    }
+
+    function isValidTeknikfagDduIdeaImage(item) {
+      return item is map
+        && item.keys().hasOnly(['url', 'path'])
+        && item.url is string
+        && item.url.size() > 0
+        && item.url.size() <= 2000
+        && item.url.matches('^https://.*')
+        && item.path is string
+        && item.path.size() <= 200
+        && item.path.matches('^teknikfag_ddu_ideas/.+/image(-[0-9]+)?[.](jpg|png|webp|gif|avif)$');
+    }
+
+    function teknikfagDduIdeaShape(data) {
+      return data.keys().hasOnly([
+          'pool',
+          'title',
+          'body',
+          'imageUrl',
+          'imagePath',
+          'images',
+          'youtubeId',
+          'createdAt'
+        ])
+        && data.pool is string
+        && (data.pool == 'ideer' || data.pool == 'inspiration')
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 80
+        && data.body is string
+        && data.body.size() > 0
+        && data.body.size() <= 50000
+        && data.imageUrl is string
+        && data.imageUrl.size() <= 2000
+        && (data.imageUrl == '' || data.imageUrl.matches('^https://.*'))
+        && data.imagePath is string
+        && data.imagePath.size() <= 200
+        && (data.imagePath == ''
+            || data.imagePath.matches('^teknikfag_ddu_ideas/.+/image(-[0-9]+)?[.](jpg|png|webp|gif|avif)$'))
+        && data.images is list
+        && data.images.size() <= 8
+        && (data.images.size() == 0 || isValidTeknikfagDduIdeaImage(data.images[0]))
+        && (data.images.size() < 2 || isValidTeknikfagDduIdeaImage(data.images[1]))
+        && (data.images.size() < 3 || isValidTeknikfagDduIdeaImage(data.images[2]))
+        && (data.images.size() < 4 || isValidTeknikfagDduIdeaImage(data.images[3]))
+        && (data.images.size() < 5 || isValidTeknikfagDduIdeaImage(data.images[4]))
+        && (data.images.size() < 6 || isValidTeknikfagDduIdeaImage(data.images[5]))
+        && (data.images.size() < 7 || isValidTeknikfagDduIdeaImage(data.images[6]))
+        && (data.images.size() < 8 || isValidTeknikfagDduIdeaImage(data.images[7]))
+        && data.youtubeId is string
+        && (data.youtubeId == '' || data.youtubeId.matches('^[A-Za-z0-9_-]{11}$'))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidTeknikfagDduIdea(data) {
+      return teknikfagDduIdeaShape(data)
+        && data.createdAt == request.time;
+    }
+
+    match /teknikfag_ddu_ideas/{id} {
+      allow read: if true;
+      allow create: if isValidTeknikfagDduIdea(request.resource.data);
+      allow update: if teknikfagDduIdeaShape(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['images', 'imageUrl', 'imagePath']);
+      allow delete: if isTeknikfagDduOwner();
+    }
+
+    function isValidTeknikfagDduCopy(data) {
+      return data.keys().hasOnly(['text'])
+        && data.text is string
+        && data.text.size() <= 50000;
+    }
+
+    match /teknikfag_ddu_copy/{id} {
+      allow read: if true;
+      allow create, update: if id.matches('^[A-Za-z0-9._:-]{1,120}$')
+        && isValidTeknikfagDduCopy(request.resource.data);
+      allow delete: if isTeknikfagDduOwner();
+    }
+
+    function isValidTeknikfagDduPrinciple(data) {
+      return data.keys().hasOnly(['text', 'createdAt'])
+        && data.text is string
+        && data.text.size() > 0
+        && data.text.size() <= 120
+        && data.createdAt == request.time;
+    }
+
+    match /teknikfag_ddu_principles/{id} {
+      allow read: if true;
+      allow create: if isValidTeknikfagDduPrinciple(request.resource.data);
+      allow update: if false;
+      allow delete: if isTeknikfagDduOwner();
+    }
+
+    function isValidTeknikfagDduPage(data) {
+      return data.keys().hasOnly(['content', 'updatedAt'])
+        && data.content is map
+        && data.content.version == 1
+        && (data.content.kind == 'content'
+            || data.content.kind == 'progression')
+        && data.updatedAt == request.time;
+    }
+
+    match /teknikfag_ddu_pages/{id} {
+      allow read: if true;
+      allow create, update: if isTeknikfagDduOwner()
+        && id.matches('^[A-Za-z0-9._:-]{1,120}$')
+        && isValidTeknikfagDduPage(request.resource.data);
+      allow delete: if isTeknikfagDduOwner();
+    }
+
+    // ----------------------------------------------------------
+    // SOP (studieområdeprojektet). Isoleret under sop_years/{år}/…
+    // Offentlig læsning. Elever skriver uden login (tjeklister, senere noter).
+    // `students` / `config` / `teachers` er reserveret — kun owner.
+    // Sletning kun owner. Dok. højst 40 felter. Id'er er slug-agtige.
+    // ----------------------------------------------------------
+
+    function sopYearOk(year) {
+      return year.matches('^[0-9]{4}$');
+    }
+
+    function sopIdOk(id) {
+      return id.matches('^[a-z][a-z0-9_-]{0,79}$');
+    }
+
+    function sopReservedCol(col) {
+      return col == 'students' || col == 'config' || col == 'teachers';
+    }
+
+    function sopDocOk(data) {
+      return data is map && data.size() <= 40;
+    }
+
+    function sopWriteOk(year, col, id, data) {
+      return sopYearOk(year)
+        && sopIdOk(col)
+        && sopIdOk(id)
+        && !sopReservedCol(col)
+        && sopDocOk(data);
+    }
+
+    match /sop_years/{year}/students/{slug} {
+      allow read: if true;
+      allow create, update, delete: if isHereOwner();
+    }
+
+    match /sop_years/{year}/{col}/{id} {
+      allow read: if true;
+      allow create, update: if isHereOwner()
+        || sopWriteOk(year, col, id, request.resource.data);
+      allow delete: if isHereOwner();
+
+      match /{subcol}/{subid} {
+        allow read: if true;
+        allow create, update: if isHereOwner()
+          || (sopWriteOk(year, col, id, request.resource.data)
+              && sopIdOk(subcol)
+              && sopIdOk(subid)
+              && !sopReservedCol(subcol));
+        allow delete: if isHereOwner();
+      }
+    }
+
+
   }
 }

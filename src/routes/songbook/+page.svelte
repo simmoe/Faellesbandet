@@ -74,12 +74,10 @@
 
 	const SET_ORDER_PREFIX = '__set__:';
 
-	$effect(() => {
-		if (!authState.loading && !authState.user) goto('/login');
-	});
+	const canEdit = $derived(!!authState.user);
 
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeSongs(
 			(s) => {
 				songs = s;
@@ -94,12 +92,12 @@
 	});
 
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeCategoryColors((colors) => (categoryColorMap = colors));
 		return () => unsub();
 	});
 	$effect(() => {
-		if (!authState.user) return;
+		if (authState.loading) return;
 		const unsub = subscribeCategoryMeta((meta) => (categoryMetaMap = meta));
 		return () => unsub();
 	});
@@ -177,7 +175,7 @@
 
 	async function handleSignOut() {
 		await authState.signOut();
-		goto('/login');
+		goto('/songbook');
 	}
 
 	async function openProfileDialog(): Promise<void> {
@@ -739,7 +737,7 @@
 <main class="mx-auto max-w-6xl px-6 py-5">
 	<header class="page-head">
 		<div class="page-brand">
-			<img class="page-mark" src="/logo-mark.png?v=7" alt="" />
+			<img class="page-mark" src="/logo-mark.png?v=10" alt="" />
 			<div>
 				<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
 					{BAND.name}
@@ -761,6 +759,8 @@
 				</span>
 				<button class="btn-ghost" onclick={handleSignOut}>Log ud</button>
 			</div>
+		{:else if !authState.loading}
+			<a href="/login?next=/songbook" class="btn-ghost text-sm">Log ind</a>
 		{/if}
 	</header>
 
@@ -774,7 +774,9 @@
 			aria-label="Søg i sangbogen"
 		/>
 		<div class="toolbar-actions">
-			<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj sang</a>
+			{#if canEdit}
+				<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj sang</a>
+			{/if}
 			<div class="print-group">
 			<CategoryPicker
 				options={allCategoryNames.map((cat) => ({ value: cat, label: printOptionLabel(cat) }))}
@@ -881,9 +883,11 @@
 				{cat} ({songCountLabel(count)}{setCount ? `, ${setCountLabel(setCount)}` : ''})
 			</button>
 		{/each}
-		<button type="button" class="cat-manage" onclick={openCategoryEditor}>
-			Redigér kategorier
-		</button>
+		{#if canEdit}
+			<button type="button" class="cat-manage" onclick={openCategoryEditor}>
+				Redigér kategorier
+			</button>
+		{/if}
 	</div>
 
 	{#if printCategory}
@@ -915,30 +919,32 @@
 					{/if}
 				</div>
 				<div class="print-order-actions">
-					{#if editingPrintOrder === printCategory}
+					{#if canEdit}
+						{#if editingPrintOrder === printCategory}
+							<button
+								type="button"
+								class="panel-link"
+								onclick={() => (editingPrintOrder = null)}
+							>
+								Færdig
+							</button>
+						{:else}
+							<button
+								type="button"
+								class="panel-link"
+								onclick={() => (editingPrintOrder = printCategory)}
+							>
+								Redigér rækkefølge
+							</button>
+						{/if}
 						<button
 							type="button"
 							class="panel-link"
-							onclick={() => (editingPrintOrder = null)}
+							onclick={() => openCategoryEditor(printCategory)}
 						>
-							Færdig
-						</button>
-					{:else}
-						<button
-							type="button"
-							class="panel-link"
-							onclick={() => (editingPrintOrder = printCategory)}
-						>
-							Redigér rækkefølge
+							Redigér kategori
 						</button>
 					{/if}
-					<button
-						type="button"
-						class="panel-link"
-						onclick={() => openCategoryEditor(printCategory)}
-					>
-						Redigér kategori
-					</button>
 				</div>
 				{#if categoryMeta?.imageUrl}
 					<div class="print-order-image-wrap">
@@ -1023,9 +1029,11 @@
 		<div class="card p-10 text-center">
 			{#if songs.length === 0}
 				<p class="text-lg font-semibold text-[var(--color-ink)]">Ingen sange endnu</p>
-				<p class="mt-2 text-sm text-[var(--color-ink-muted)]">
-					Klik på <span class="font-semibold">Tilføj sang</span> for at lægge den første sang i sangbogen.
-				</p>
+				{#if canEdit}
+					<p class="mt-2 text-sm text-[var(--color-ink-muted)]">
+						Klik på <span class="font-semibold">Tilføj sang</span> for at lægge den første sang i sangbogen.
+					</p>
+				{/if}
 			{:else}
 				<p class="text-[var(--color-ink-muted)]">Ingen sange matcher dit filter.</p>
 			{/if}

@@ -5,11 +5,7 @@
 
 	$effect(() => {
 		if (authState.loading) return;
-		if (!authState.user) {
-			goto('/login');
-		} else {
-			goto('/songbook');
-		}
+		goto('/songbook');
 	});
 </script>
 
