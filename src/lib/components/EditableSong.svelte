@@ -664,6 +664,34 @@
 		}
 	}
 
+	function fitChordLine(node: HTMLElement) {
+		const fit = () => {
+			node.style.fontSize = '';
+			node.style.transform = '';
+			const avail = node.clientWidth;
+			const need = node.scrollWidth;
+			if (avail <= 0 || need <= avail + 1) return;
+			const base = parseFloat(getComputedStyle(node).fontSize) || 14;
+			node.style.fontSize = `${Math.max(8, base * (avail / need))}px`;
+			if (node.scrollWidth > node.clientWidth + 1) {
+				node.style.transform = `scaleX(${node.clientWidth / node.scrollWidth})`;
+				node.style.transformOrigin = 'left center';
+			}
+		};
+		const ro = new ResizeObserver(fit);
+		ro.observe(node);
+		if (node.parentElement) ro.observe(node.parentElement);
+		requestAnimationFrame(fit);
+		return {
+			update() {
+				requestAnimationFrame(fit);
+			},
+			destroy() {
+				ro.disconnect();
+			}
+		};
+	}
+
 	// Action der initierer cell-indhold uden at konkurrere med cursoren.
 	function init(node: HTMLElement, text: string) {
 		if (node.innerText !== text) node.innerText = text;
@@ -1169,6 +1197,7 @@
 				class="lyrics-cell chord-cell chord-cell-clickable song-line"
 				class:drop-target={dropTarget?.rowIdx === i && dropTarget?.col === 'chord'}
 				class:drag-source={dragInfo?.rowIdx === i && dragInfo?.col === 'chord'}
+				use:fitChordLine={row.text}
 				data-row={i}
 				title={readOnly ? undefined : 'Klik for at redigere · træk for at kopiere til en anden linje'}
 				draggable={readOnly ? 'false' : 'true'}
@@ -1836,12 +1865,15 @@
 		min-height: 1.2em;
 		transition: background-color 100ms ease, box-shadow 100ms ease, opacity 100ms ease;
 	}
-	.editable-song .song-line-wrap.is-chord .chord-cell-clickable:not(.seg-chord) {
+	.editable-song .song-line-wrap.is-chord .chord-cell-clickable {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.15em 0.7em;
-		white-space: normal;
+		flex-wrap: nowrap;
+		justify-content: space-between;
+		align-items: baseline;
+		column-gap: 0.35em;
+		white-space: nowrap;
 		max-width: 100%;
+		overflow: hidden;
 	}
 	.editable-song .rhythm-cell-clickable,
 	.editable-song .rhythm-cell-clickable :global(*),
@@ -1870,6 +1902,9 @@
 			cursor: auto;
 			background: transparent !important;
 			box-shadow: none !important;
+			font-size: 14px !important;
+			transform: none !important;
+			overflow: visible !important;
 		}
 		.editable-song .section-drag-handle,
 		.editable-song .section-insert,
