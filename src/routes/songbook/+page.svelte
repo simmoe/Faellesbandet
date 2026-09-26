@@ -144,25 +144,35 @@
 		return paletteColorForCategory(cat, effectiveCategoryColorMap);
 	}
 
-	const recentCategories = $derived.by(() =>
-		[...allCategoryNames]
-			.sort((a, b) => categorySortTime(b) - categorySortTime(a))
-			.slice(0, 3)
-	);
-
-	function categorySortTime(cat: string): number {
-		return categoryMetaMap[cat]?.updatedAt ?? categoryMetaMap[cat]?.createdAt ?? 0;
-	}
-
 	const filteredSongs = $derived.by(() => {
 		const q = search.trim().toLowerCase();
-		const filtered = songs.filter((s) => {
-			if (activeCategory && !(s.categories ?? []).includes(activeCategory)) return false;
-			if (!q) return true;
-			return s.title.toLowerCase().includes(q) || (s.artist ?? '').toLowerCase().includes(q);
-		});
-		if (!activeCategory) return filtered;
-		return sortSongsForCategory(activeCategory, filtered);
+		return [...songs]
+			.filter((s) => {
+				if (activeCategory && !(s.categories ?? []).includes(activeCategory)) return false;
+				if (!q) return true;
+				return s.title.toLowerCase().includes(q) || (s.artist ?? '').toLowerCase().includes(q);
+			})
+			.sort((a, b) => a.title.localeCompare(b.title, 'da'));
+	});
+
+	type SongLetterGroup = { letter: string; songs: SongDoc[] };
+
+	function songLetter(title: string): string {
+		const ch = title.trim().charAt(0).toLocaleUpperCase('da');
+		return /[A-ZÆØÅ]/.test(ch) ? ch : '#';
+	}
+
+	const groupedSongs = $derived.by<SongLetterGroup[]>(() => {
+		const groups = new Map<string, SongDoc[]>();
+		for (const song of filteredSongs) {
+			const letter = songLetter(song.title);
+			const bucket = groups.get(letter);
+			if (bucket) bucket.push(song);
+			else groups.set(letter, [song]);
+		}
+		return [...groups.entries()]
+			.sort(([a], [b]) => (a === '#' ? 1 : b === '#' ? -1 : a.localeCompare(b, 'da')))
+			.map(([letter, group]) => ({ letter, songs: group }));
 	});
 
 	function onSearchInput(): void {
@@ -520,22 +530,6 @@
 		return out;
 	}
 
-	function sortSongsForCategory(cat: string, input: SongDoc[]): SongDoc[] {
-		const order = printOrderForCategory(cat)
-			.filter((entry) => entry.type === 'song')
-			.map((entry) => entry.songId);
-		if (order.length === 0) return input;
-		const position = new Map(order.map((id, index) => [id, index]));
-		return [...input].sort((a, b) => {
-			const aPos = position.get(a.id);
-			const bPos = position.get(b.id);
-			if (aPos != null && bPos != null) return aPos - bPos;
-			if (aPos != null) return -1;
-			if (bPos != null) return 1;
-			return a.title.localeCompare(b.title, 'da');
-		});
-	}
-
 	function countSetsForCategory(cat: string): number {
 		return printOrderForCategory(cat).filter((entry) => entry.type === 'set').length + 1;
 	}
@@ -655,10 +649,6 @@
 		search = '';
 	}
 
-	function selectSongbookCategory(cat: string | null): void {
-		selectPrintCategory(cat ?? '');
-	}
-
 	function pickPrintCategory(cat: string): void {
 		if (cat && cat === printCategory) {
 			selectPrintCategory('');
@@ -668,32 +658,9 @@
 	}
 
 	function printOptionLabel(cat: string): string {
-		if (!cat) return `Hele sangbogen (${songs.length})`;
+		if (!cat) return `Alle (${songs.length})`;
 		const count = songs.filter((s) => (s.categories ?? []).includes(cat)).length;
-		const sets = countSetsForCategory(cat);
-		return `${cat} (${songCountLabel(count)}${sets ? `, ${setCountLabel(sets)}` : ''})`;
-	}
-
-	function categorySortKey(cat: string): string {
-		return cat.toLowerCase();
-	}
-
-	function highlightedCategoryForSong(song: SongDoc): string | null {
-		const songCategories = song.categories ?? [];
-		if (activeCategory && songCategories.includes(activeCategory)) return activeCategory;
-		const q = search.trim().toLowerCase();
-		if (!q) return null;
-		return songCategories.find((cat) => cat.toLowerCase().includes(q)) ?? null;
-	}
-
-	function displayCategoriesForSong(song: SongDoc): string[] {
-		const songCategories = [...(song.categories ?? [])];
-		const highlighted = highlightedCategoryForSong(song);
-		return songCategories.sort((a, b) => {
-			if (a === highlighted) return -1;
-			if (b === highlighted) return 1;
-			return categorySortKey(a).localeCompare(categorySortKey(b), 'da');
-		});
+		return `${cat} (${count})`;
 	}
 
 	const printCount = $derived.by(() => {
@@ -734,160 +701,125 @@
 
 <svelte:head><title>Sangbog · {BAND.name}</title></svelte:head>
 
-<main class="mx-auto max-w-6xl px-6 py-5">
-	<header class="page-head">
-		<div class="page-brand">
-			<img class="page-mark" src="/logo-mark.png?v=10" alt="" />
-			<div>
-				<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
-					{BAND.name}
-				</h1>
-				<p class="page-tagline">{BAND.name}s samlede sangbog</p>
+<main class="songbook">
+	<div class="songbook-chrome">
+		<header class="page-head">
+			<div class="page-brand">
+				<img class="page-mark" src="/logo-mark.png?v=10" alt="" />
+				<div>
+					<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
+						{BAND.name}
+					</h1>
+					<p class="page-tagline">{BAND.name}s samlede sangbog</p>
+				</div>
 			</div>
-		</div>
-		{#if authState.profile}
-			<div class="flex items-center gap-3 text-sm">
-				<span class="text-[var(--color-ink-faint)]">
-					Logget ind som
+			<div class="page-account">
+				{#if authState.profile}
 					<button
 						type="button"
 						class="profile-name-button"
 						onclick={openProfileDialog}
 						aria-label="Åbn profil og invitationer"
-						>{authState.profile.displayName}</button
-					>
-				</span>
-				<button class="btn-ghost" onclick={handleSignOut}>Log ud</button>
+					>{authState.profile.displayName}</button>
+					<button type="button" class="account-link" onclick={handleSignOut}>Log ud</button>
+				{:else if !authState.loading}
+					<a href="/login?next=/songbook" class="account-link">Log ind</a>
+				{/if}
+				{#if canEdit}
+					<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj</a>
+					<button type="button" class="cat-manage" onclick={openCategoryEditor}>Kategorier</button>
+				{/if}
 			</div>
-		{:else if !authState.loading}
-			<a href="/login?next=/songbook" class="btn-ghost text-sm">Log ind</a>
-		{/if}
-	</header>
+		</header>
 
-	<div class="toolbar">
-		<input
-			class="toolbar-search"
-			type="search"
-			placeholder="Søg titel eller kunstner"
-			bind:value={search}
-			oninput={onSearchInput}
-			aria-label="Søg i sangbogen"
-		/>
-		<div class="toolbar-actions">
-			{#if canEdit}
-				<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj sang</a>
-			{/if}
-			<div class="print-group">
-			<CategoryPicker
-				options={allCategoryNames.map((cat) => ({ value: cat, label: printOptionLabel(cat) }))}
-				selected={printCategory ? [printCategory] : []}
-				triggerLabel={printOptionLabel(printCategory)}
-				triggerValue={printCategory}
-				emptyOption={{ value: '', label: `Hele sangbogen (${songs.length})` }}
-				ariaLabel="Vælg hvad der skal eksporteres som PDF"
-				variant="joined"
-				colorFor={colorForCategory}
-				onToggle={pickPrintCategory}
+		<div class="toolbar">
+			<input
+				class="toolbar-search"
+				type="search"
+				placeholder="Søg titel eller kunstner"
+				bind:value={search}
+				oninput={onSearchInput}
+				aria-label="Søg i sangbogen"
 			/>
-			<button
-				type="button"
-				class="pdf-choice"
-				class:is-busy={pdfBusy}
-				onclick={handlePdfBook}
-				disabled={printCount === 0 || pdfGenerating}
-				aria-label={printCategory
-					? `Lav akkord-PDF for kategorien ${printCategory}`
-					: 'Lav akkord-PDF for hele sangbogen'}
-				aria-busy={pdfBusy}
-			>
-				{#if pdfBusy}
-					<span class="pdf-spinner" aria-hidden="true"></span>
-				{:else}
-					<svg
-						class="print-icon"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.7"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M7 8V3h10v5"></path>
-						<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-						<path d="M7 13h10v8H7z"></path>
-					</svg>
-				{/if}
-				<span>{pdfBusy ? 'Bygger…' : 'Akkorder'}</span>
-			</button>
-			<button
-				type="button"
-				class="pdf-choice"
-				class:is-busy={audiencePdfBusy}
-				onclick={handleAudiencePdfBook}
-				disabled={printCount === 0 || pdfGenerating}
-				aria-label={printCategory
-					? `Lav publikums-PDF for kategorien ${printCategory}`
-					: 'Lav publikums-PDF for hele sangbogen'}
-				aria-busy={audiencePdfBusy}
-				title="Publikums-PDF uden akkorder"
-			>
-				{#if audiencePdfBusy}
-					<span class="pdf-spinner" aria-hidden="true"></span>
-				{:else}
-					<svg
-						class="print-icon"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.7"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M7 8V3h10v5"></path>
-						<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-						<path d="M7 13h10v8H7z"></path>
-					</svg>
-				{/if}
-				<span>{audiencePdfBusy ? 'Bygger…' : 'Tekster'}</span>
-			</button>
+			<div class="print-group">
+				<CategoryPicker
+					options={allCategoryNames.map((cat) => ({ value: cat, label: printOptionLabel(cat) }))}
+					selected={printCategory ? [printCategory] : []}
+					triggerLabel={printOptionLabel(printCategory)}
+					triggerValue={printCategory}
+					emptyOption={{ value: '', label: `Alle (${songs.length})` }}
+					ariaLabel="Filtrér og vælg hvad der skal eksporteres som PDF"
+					variant="joined"
+					colorFor={colorForCategory}
+					onToggle={pickPrintCategory}
+				/>
+				<button
+					type="button"
+					class="pdf-choice"
+					class:is-busy={pdfBusy}
+					onclick={handlePdfBook}
+					disabled={printCount === 0 || pdfGenerating}
+					aria-label={printCategory
+						? `Lav akkord-PDF for kategorien ${printCategory}`
+						: 'Lav akkord-PDF for hele sangbogen'}
+					aria-busy={pdfBusy}
+				>
+					{#if pdfBusy}
+						<span class="pdf-spinner" aria-hidden="true"></span>
+					{:else}
+						<svg
+							class="print-icon"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M7 8V3h10v5"></path>
+							<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+							<path d="M7 13h10v8H7z"></path>
+						</svg>
+					{/if}
+					<span class="pdf-choice-label">{pdfBusy ? 'Bygger…' : 'Akkorder'}</span>
+				</button>
+				<button
+					type="button"
+					class="pdf-choice"
+					class:is-busy={audiencePdfBusy}
+					onclick={handleAudiencePdfBook}
+					disabled={printCount === 0 || pdfGenerating}
+					aria-label={printCategory
+						? `Lav publikums-PDF for kategorien ${printCategory}`
+						: 'Lav publikums-PDF for hele sangbogen'}
+					aria-busy={audiencePdfBusy}
+					title="Publikums-PDF uden akkorder"
+				>
+					{#if audiencePdfBusy}
+						<span class="pdf-spinner" aria-hidden="true"></span>
+					{:else}
+						<svg
+							class="print-icon"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M7 8V3h10v5"></path>
+							<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+							<path d="M7 13h10v8H7z"></path>
+						</svg>
+					{/if}
+					<span class="pdf-choice-label">{audiencePdfBusy ? 'Bygger…' : 'Tekster'}</span>
+				</button>
 			</div>
 		</div>
-	</div>
-
-	<div class="cat-row">
-		<button
-			type="button"
-			class="cat-chip"
-			class:active={activeCategory === null}
-			onclick={() => selectSongbookCategory(null)}
-		>
-			Alle ({songs.length})
-		</button>
-		{#each recentCategories as cat (cat)}
-			{@const count = songs.filter((s) => (s.categories ?? []).includes(cat)).length}
-			{@const setCount = countSetsForCategory(cat)}
-			{@const c = colorForCategory(cat)}
-			<button
-				type="button"
-				class="cat-chip"
-				class:active={activeCategory === cat}
-				style:--chip-bg={c.bg}
-				style:--chip-text={c.text}
-				style:--chip-border={c.border}
-				onclick={() => selectSongbookCategory(cat)}
-			>
-				{cat} ({songCountLabel(count)}{setCount ? `, ${setCountLabel(setCount)}` : ''})
-			</button>
-		{/each}
-		{#if canEdit}
-			<button type="button" class="cat-manage" onclick={openCategoryEditor}>
-				Redigér kategorier
-			</button>
-		{/if}
 	</div>
 
 	{#if printCategory}
@@ -1039,46 +971,28 @@
 			{/if}
 		</div>
 	{:else}
-		<ul class="song-grid">
-			{#each filteredSongs as song (song.id)}
-				<li>
-					<div class="song-card card">
-						<a href={`/song/${song.id}`} class="song-card-main">
-						<div class="song-card-top">
-							<h3 class="song-card-title">{song.title}</h3>
-							{#if song.key}
-								<span class="song-key">{song.key}</span>
-							{/if}
-						</div>
-						</a>
-						{#if song.artist || (song.categories ?? []).length > 0}
-							<div class="song-card-sub">
-								{#if song.artist}
-									<a href={`/song/${song.id}`} class="song-card-artist">{song.artist}</a>
-								{/if}
-								{#if (song.categories ?? []).length > 0}
-									<div class="song-card-categories" aria-label={`Kategorier for ${song.title}`}>
-										{#each displayCategoriesForSong(song) as cat (cat)}
-											{@const c = colorForCategory(cat)}
-											<button
-												type="button"
-												class="cat-pill"
-												class:highlighted={cat === highlightedCategoryForSong(song)}
-												style:--cat-color={c.text}
-												onclick={() => selectSongbookCategory(cat)}
-											>
-												<span class="cat-mark" aria-hidden="true"></span>
-												{cat}
-											</button>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</div>
-				</li>
+		<div class="song-alpha">
+			{#each groupedSongs as group (group.letter)}
+				<section class="letter-group" aria-labelledby={`letter-${group.letter}`}>
+					<h2 class="letter-head" id={`letter-${group.letter}`}>{group.letter}</h2>
+					<ul class="letter-list">
+						{#each group.songs as song (song.id)}
+							<li>
+								<a href={`/song/${song.id}`} class="song-row">
+									<span class="song-row-title">{song.title}</span>
+									{#if song.artist}
+										<span class="song-row-artist">{song.artist}</span>
+									{/if}
+									{#if song.key}
+										<span class="song-row-key">{song.key}</span>
+									{/if}
+								</a>
+							</li>
+						{/each}
+					</ul>
+				</section>
 			{/each}
-		</ul>
+		</div>
 	{/if}
 
 	{#if editingCategories}
@@ -1143,6 +1057,14 @@
 		text-decoration-color: currentColor;
 	}
 
+	.songbook {
+		margin: 0 auto;
+		max-width: 72rem;
+		padding: 1.25rem 1.5rem 2.5rem;
+	}
+	.songbook-chrome {
+		margin-bottom: 0.85rem;
+	}
 	.page-head {
 		display: flex;
 		flex-wrap: wrap;
@@ -1168,31 +1090,43 @@
 		font-size: 0.78rem;
 		color: var(--color-ink-faint);
 	}
+	.page-account {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.45rem 0.65rem;
+	}
+	.account-link {
+		color: var(--color-ink-faint);
+		font-size: 0.78rem;
+		text-decoration: none;
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+	}
+	.account-link:hover {
+		color: var(--color-ink-on-dark);
+	}
 
 	.toolbar {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: stretch;
-		gap: 0.55rem;
-		margin-bottom: 0.85rem;
-	}
-	.toolbar-actions {
-		display: flex;
-		align-items: stretch;
 		gap: 0.5rem;
-		flex: 0 0 auto;
 	}
 	.toolbar-add {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		flex: 0 0 auto;
-		height: 2.35rem;
-		padding: 0 0.95rem;
+		height: 2rem;
+		padding: 0 0.75rem;
 		border-radius: var(--radius-button);
 		background: var(--color-accent);
 		color: #ffffff;
-		font-size: 0.82rem;
+		font-size: 0.78rem;
 		font-weight: 600;
 		letter-spacing: 0.02em;
 		white-space: nowrap;
@@ -1202,8 +1136,8 @@
 		background: var(--color-accent-hover);
 	}
 	.toolbar-search {
-		flex: 1 1 16rem;
-		min-width: 12rem;
+		flex: 1 1 12rem;
+		min-width: 8rem;
 		height: 2.35rem;
 		padding: 0 0.85rem;
 		border: 1px solid rgba(226, 232, 240, 0.16);
@@ -1220,30 +1154,6 @@
 		outline-offset: -1px;
 	}
 
-	.cat-row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.35rem 0.4rem;
-		margin-bottom: 0.9rem;
-	}
-	.cat-chip {
-		padding: 0.22rem 0.62rem;
-		border-radius: var(--radius-card);
-		border: 1px solid var(--chip-border, var(--color-border));
-		background: var(--chip-bg, rgba(255, 255, 255, 0.04));
-		color: var(--chip-text, var(--color-ink-on-dark));
-		font-size: 0.75rem;
-		font-weight: 600;
-	}
-	.cat-chip:hover {
-		filter: brightness(0.96);
-	}
-	.cat-chip.active {
-		background: var(--color-accent);
-		color: #ffffff;
-		border-color: var(--color-accent);
-	}
 	.cat-manage {
 		padding: 0.22rem 0.55rem;
 		border: none;
@@ -1444,144 +1354,91 @@
 		border-color: var(--color-accent);
 		color: #92400e;
 	}
-	.song-grid {
+	.song-alpha {
 		display: grid;
-		gap: 0.5rem;
-		grid-template-columns: 1fr;
+		gap: 1.15rem;
 	}
-	@media (min-width: 40rem) {
-		.song-grid {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
-	}
-	@media (min-width: 64rem) {
-		.song-grid {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
-		}
-	}
-	.song-card {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
+	.letter-group {
 		min-width: 0;
-		min-height: 5.75rem;
-		padding: 0.7rem 0.8rem 0.65rem;
-		border-radius: var(--radius-card);
 	}
-	.song-card-main {
-		display: block;
+	.letter-head {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		margin: 0 0 0.15rem;
+		padding: 0.15rem 0;
+		font-family: var(--font-display);
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--color-ink-faint);
+		background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+		backdrop-filter: blur(8px);
+	}
+	.letter-list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.song-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-rows: auto auto;
+		column-gap: 0.65rem;
+		align-items: baseline;
+		padding: 0.42rem 0;
+		border-bottom: 1px solid rgba(226, 232, 240, 0.08);
 		color: inherit;
 		text-decoration: none;
-		min-width: 0;
 	}
-	.song-card-top {
-		display: flex;
-		align-items: start;
-		justify-content: space-between;
-		gap: 0.5rem;
-	}
-	.song-card-title {
-		margin: 0;
+	.song-row-title {
+		grid-column: 1;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-family: var(--font-title);
 		font-size: 0.98rem;
-		font-weight: 400;
 		letter-spacing: -0.02em;
-		color: var(--color-ink);
-		min-width: 0;
+		color: var(--color-ink-on-dark);
 	}
-	.song-card-artist {
-		margin: 0;
+	.song-row-artist {
+		grid-column: 1;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-size: 0.78rem;
-		color: var(--color-ink-muted);
-		text-decoration: none;
-		min-width: 0;
-		flex: 0 1 auto;
-	}
-	.song-card-artist:hover {
-		color: var(--color-ink);
-	}
-	.song-card-sub {
-		display: flex;
-		flex-wrap: nowrap;
-		align-items: center;
-		gap: 0.45rem;
-		min-width: 0;
-		margin-top: auto;
-	}
-	.song-key {
-		flex-shrink: 0;
-		padding-top: 0.12rem;
 		font-size: 0.72rem;
+		color: var(--color-ink-faint);
+	}
+	.song-row-key {
+		grid-column: 2;
+		grid-row: 1 / span 2;
+		align-self: center;
+		font-size: 0.7rem;
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		color: var(--color-chord);
 	}
-	.song-card:hover {
-		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 8px 22px rgba(15, 23, 42, 0.22);
-	}
-	.cat-mark {
-		width: 0.2rem;
-		height: 0.2rem;
-		border-radius: 50%;
-		background: currentColor;
-		flex-shrink: 0;
-	}
-	.cat-pill {
-		flex: 0 0 auto;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.28rem;
-		padding: 0;
-		border: none;
-		background: transparent;
-		color: var(--cat-color, var(--color-ink-muted));
-		font-size: 0.72rem;
-		line-height: 1.25;
-		font-weight: 400;
-		white-space: nowrap;
-	}
-	button.cat-pill {
-		cursor: pointer;
-	}
-	button.cat-pill:hover {
-		text-decoration: underline;
-		text-underline-offset: 0.16em;
-	}
-	.cat-pill.highlighted {
-		font-weight: 500;
-	}
-	.song-card-categories {
-		display: flex;
-		flex-wrap: nowrap;
-		align-items: center;
-		gap: 0.45rem;
-		min-width: 0;
-		flex: 1 1 auto;
-		overflow-x: auto;
-		overflow-y: hidden;
-		scrollbar-width: thin;
-		overscroll-behavior-x: contain;
-	}
-	.song-card-categories::-webkit-scrollbar {
-		height: 3px;
-	}
-	.song-card-categories::-webkit-scrollbar-thumb {
-		background: color-mix(in srgb, var(--color-ink-faint) 45%, transparent);
-		border-radius: 999px;
+	.song-row:hover .song-row-title {
+		color: #ffffff;
 	}
 	.print-group {
 		display: inline-flex;
 		align-items: stretch;
-		flex: 0 0 auto;
+		flex: 1 1 16rem;
+		min-width: 0;
 		height: 2.35rem;
 		position: relative;
 		z-index: 2;
+	}
+	.print-group :global(.category-picker) {
+		flex: 1 1 8rem;
+		min-width: 0;
+	}
+	.print-group :global(.category-picker-trigger) {
+		min-width: 0;
+		max-width: none;
+		width: 100%;
 	}
 	.pdf-choice {
 		display: inline-flex;
@@ -1596,7 +1453,7 @@
 		font-size: 0.82rem;
 		font-weight: 500;
 		letter-spacing: 0.01em;
-		min-width: 6.1rem;
+		min-width: 0;
 		transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 	}
 	.print-icon {
@@ -1633,5 +1490,148 @@
 	}
 	.print-group .pdf-choice:last-child {
 		border-radius: 0 var(--radius-button) var(--radius-button) 0 !important;
+	}
+
+	@media (max-width: 48rem) {
+		.songbook {
+			padding: 0.65rem 0.85rem 5.5rem;
+		}
+		.page-brand {
+			display: none;
+		}
+		.page-head {
+			margin-bottom: 0.45rem;
+		}
+		.page-account {
+			width: 100%;
+			justify-content: flex-end;
+		}
+		.songbook-chrome {
+			position: sticky;
+			top: 0;
+			z-index: 20;
+			margin: 0 -0.85rem 0.55rem;
+			padding: 0.55rem 0.85rem 0.5rem;
+			background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+			backdrop-filter: blur(12px);
+		}
+		.toolbar {
+			flex-direction: column;
+			gap: 0.4rem;
+		}
+		.toolbar-search {
+			flex: 1 1 auto;
+			min-width: 0;
+			width: 100%;
+			height: 2.2rem;
+			font-size: 1rem;
+		}
+		.print-group {
+			flex: 1 1 auto;
+			width: 100%;
+			height: 2.2rem;
+		}
+		.print-group :global(.category-picker-menu) {
+			min-width: 100%;
+			max-width: calc(100vw - 1.7rem);
+			right: 0;
+			left: auto;
+		}
+		.pdf-choice {
+			padding: 0 0.55rem;
+			font-size: 0.75rem;
+		}
+		.letter-head {
+			position: static;
+			padding-top: 0.35rem;
+		}
+		.song-row {
+			padding: 0.5rem 0;
+		}
+		.print-order-head {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.print-order-image-wrap {
+			display: none;
+		}
+	}
+
+	@media (max-width: 28rem) {
+		.pdf-choice-label {
+			display: none;
+		}
+		.pdf-choice {
+			padding: 0 0.62rem;
+		}
+	}
+
+	@media (orientation: landscape) and (max-height: 520px) {
+		.songbook {
+			padding: 0.4rem 0.85rem 3.5rem;
+		}
+		.page-brand {
+			display: none;
+		}
+		.page-head {
+			margin-bottom: 0;
+		}
+		.page-account {
+			width: auto;
+		}
+		.songbook-chrome {
+			position: sticky;
+			top: 0;
+			z-index: 20;
+			display: flex;
+			align-items: center;
+			gap: 0.55rem;
+			margin: 0 -0.85rem 0.4rem;
+			padding: 0.4rem 0.85rem;
+			background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+			backdrop-filter: blur(12px);
+		}
+		.toolbar {
+			flex: 1 1 auto;
+			flex-direction: row;
+			flex-wrap: nowrap;
+			min-width: 0;
+		}
+		.toolbar-search {
+			flex: 1 1 10rem;
+			width: auto;
+			height: 2.1rem;
+		}
+		.print-group {
+			flex: 1 1 14rem;
+			width: auto;
+			height: 2.1rem;
+		}
+		.song-alpha {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.35rem 1.5rem;
+		}
+		.letter-head {
+			position: static;
+			padding-top: 0.15rem;
+		}
+		.song-row {
+			padding: 0.32rem 0;
+		}
+		.print-order-panel {
+			display: none;
+		}
+	}
+
+	@media (min-width: 48.01rem) {
+		.song-alpha {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 1.25rem 2.5rem;
+		}
+	}
+
+	@media (min-width: 72rem) {
+		.song-alpha {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
 	}
 </style>
