@@ -378,6 +378,7 @@
 
 	let playing = $state(false);
 	let playSpeed = $state(1);
+	let playHost: HTMLDivElement | undefined = $state();
 	let playRaf: number | null = null;
 	let playLastTs = 0;
 	/** Fractional scroll-position — undgår at sub-pixel-deltaer forsvinder via scrollY. */
@@ -461,6 +462,14 @@
 	});
 
 	$effect(() => {
+		if (!browser || !playHost) return;
+		document.body.appendChild(playHost);
+		return () => {
+			if (playHost?.parentNode === document.body) playHost.remove();
+		};
+	});
+
+	$effect(() => {
 		if (!playing) return;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') stopPlay();
@@ -536,7 +545,6 @@
 					<h1 class="title-input">{title || 'Uden titel'}</h1>
 				{/if}
 
-				<div class="song-toolbar">
 				<div class="song-prints">
 					<button
 						type="button"
@@ -586,46 +594,6 @@
 						</svg>
 						<span>{audiencePdfBusy ? '…' : 'Tekst'}</span>
 					</button>
-				</div>
-				<div
-					class="play-controls no-print"
-					class:is-docked={playing}
-					class:is-playing={playing}
-					title="Løbende scroll gennem sangen"
-				>
-					<button
-						type="button"
-						class="play-side"
-						onclick={slowerPlay}
-						title={`Langsommere (÷${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
-						aria-label="Langsommere"
-						>−</button
-					>
-					<button
-						type="button"
-						class="play-main"
-						onclick={startPlay}
-						title={playing
-							? `Stop (Esc) · tempo ×${formatPlaySpeed(playSpeed)}`
-							: `Løbende scroll · tempo ×${formatPlaySpeed(playSpeed)}`}
-					>
-						{#if playing}
-							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
-							Stop
-						{:else}
-							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
-							Spil
-						{/if}
-					</button>
-					<button
-						type="button"
-						class="play-side"
-						onclick={fasterPlay}
-						title={`Hurtigere (×${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
-						aria-label="Hurtigere"
-						>+</button
-					>
-				</div>
 				</div>
 
 				<div class="song-meta">
@@ -787,6 +755,47 @@
 				/>
 			</div>
 		</article>
+
+		<div class="play-host no-print" bind:this={playHost}>
+			<div
+				class="play-controls"
+				class:is-playing={playing}
+				title="Løbende scroll gennem sangen"
+			>
+				<button
+					type="button"
+					class="play-side"
+					onclick={slowerPlay}
+					title={`Langsommere (÷${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
+					aria-label="Langsommere"
+					>−</button
+				>
+				<button
+					type="button"
+					class="play-main"
+					onclick={startPlay}
+					title={playing
+						? `Stop (Esc) · tempo ×${formatPlaySpeed(playSpeed)}`
+						: `Løbende scroll · tempo ×${formatPlaySpeed(playSpeed)}`}
+				>
+					{#if playing}
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
+						Stop
+					{:else}
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+						Spil
+					{/if}
+				</button>
+				<button
+					type="button"
+					class="play-side"
+					onclick={fasterPlay}
+					title={`Hurtigere (×${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
+					aria-label="Hurtigere"
+					>+</button
+				>
+			</div>
+		</div>
 	{/if}
 </div>
 
@@ -804,7 +813,7 @@
 		width: 100%;
 		margin-inline: 0;
 		padding: var(--pad);
-		padding-bottom: calc(var(--pad) + 2.5rem);
+		padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 		background: #ffffff;
 		color: var(--color-ink);
 	}
@@ -856,13 +865,6 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: 0.2rem;
-		min-width: 0;
-	}
-	.song-toolbar {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		align-items: center;
-		gap: var(--gap);
 		min-width: 0;
 	}
 	.song-prints {
@@ -917,25 +919,26 @@
 	.song-tool-danger {
 		color: var(--color-error);
 	}
+	.play-host,
+	:global(body > .play-host) {
+		position: fixed !important;
+		left: 0;
+		right: 0;
+		bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+		z-index: 80;
+		display: grid;
+		justify-content: center;
+		pointer-events: none;
+	}
 	.play-controls {
+		pointer-events: auto;
 		display: grid;
 		grid-template-columns: auto minmax(5.2rem, auto) auto;
 		align-items: stretch;
-		justify-self: end;
 		border: 1px solid var(--color-border-subtle);
 		border-radius: var(--radius-button);
 		overflow: hidden;
 		background: #ffffff;
-	}
-	.play-controls.is-docked {
-		position: fixed;
-		bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
-		left: 0;
-		right: 0;
-		z-index: 80;
-		justify-self: stretch;
-		width: max-content;
-		margin-inline: auto;
 		box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14);
 	}
 	.play-controls.is-playing {
