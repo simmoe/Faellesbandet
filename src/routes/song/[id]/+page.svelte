@@ -663,7 +663,7 @@
 									</div>
 								</div>
 								<div class="info-flags">
-									<label class="print-toggle">
+									<label class="print-toggle bass-toggle">
 										<input
 											type="checkbox"
 											bind:checked={showBassTabs}
@@ -1093,15 +1093,22 @@
 		display: none !important;
 	}
 
+	@media (max-width: 40rem) and (orientation: portrait),
+		(orientation: landscape) and (max-height: 34rem) {
+		.bass-toggle {
+			display: none;
+		}
+	}
+
 	@media (orientation: landscape) and (max-height: 34rem) {
 		.song-page {
-			--pad: clamp(10px, 2.4vw, 18px);
+			--pad: clamp(14px, 2.8vw, 22px);
 			--gap: clamp(4px, 1.2vw, 8px);
 			--type: clamp(15px, 2.2vw, 17px);
 			padding-top: calc(var(--pad) + env(safe-area-inset-top, 0px));
-			padding-right: calc(var(--pad) + env(safe-area-inset-right, 0px));
+			padding-right: max(3.5rem, calc(var(--pad) + env(safe-area-inset-right, 0px)));
 			padding-bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px));
-			padding-left: calc(var(--pad) + env(safe-area-inset-left, 0px));
+			padding-left: max(3.5rem, calc(var(--pad) + env(safe-area-inset-left, 0px)));
 		}
 		.title-input {
 			font-size: clamp(1.15rem, 3.6vw, 1.45rem);

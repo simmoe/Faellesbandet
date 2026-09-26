@@ -424,6 +424,22 @@ select {
 	column-gap: 0 !important;
 }
 
+/* Telefon: ingen bas-kolonne. iPad og opefter beholder den.
+ * iPhone landscape er ofte bredere end iPad-portræt, så vi bruger højde. */
+@media screen and (max-width: 40rem) and (orientation: portrait),
+	screen and (orientation: landscape) and (max-height: 34rem) {
+	.editable-song .rhythm-cell,
+	.editable-song .song-section-end,
+	.song-area .rhythm-cell {
+		display: none !important;
+	}
+	.editable-song .song-section-grid,
+	.song-area .chord-grid {
+		grid-template-columns: minmax(0, 1fr) !important;
+		column-gap: 0 !important;
+	}
+}
+
 /* PDF-snapshot: udnyt A4-arealet. Den normale card-padding er rar på
  * skærm, men i raster-PDF'en tæller hver millimeter. */
 .pdf-snapshot-page.print-page,
