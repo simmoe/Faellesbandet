@@ -464,20 +464,17 @@
 	<title>{title || song?.title || 'Sang'} · {BAND.name}</title>
 </svelte:head>
 
-<main class="mx-auto max-w-5xl px-6 py-5">
+<main class="song-page">
 	{#if loading}
-		<div class="card p-8 text-center text-[var(--color-ink-muted)]">Henter sang…</div>
+		<p class="song-status">Henter sang…</p>
 	{:else if loadError}
-		<a href="/songbook" class="back-link no-print mb-3 inline-flex items-center">
+		<a href="/songbook" class="back-link no-print">
 			<span class="site-caret" aria-hidden="true"></span>
 			Sangbogen
 		</a>
-		<div class="card p-6">
-			<p class="text-[var(--color-error)] font-semibold">Fejl</p>
-			<p class="mt-1 text-sm text-[var(--color-ink-muted)]">{loadError}</p>
-		</div>
+		<p class="song-status is-error">{loadError}</p>
 	{:else if song}
-		<article class="card song-card">
+		<article class="song-sheet">
 			<div class="song-chrome no-print">
 				<a href="/songbook" class="back-link">
 					<span class="site-caret" aria-hidden="true"></span>
@@ -496,50 +493,31 @@
 							<span>{authState.profile.displayName}</span>
 						{/if}
 					{:else}
-						<a href={`/login?next=${encodeURIComponent(`/song/${song.id}`)}`} class="btn-ghost text-sm"
-							>Log ind for at redigere</a
-						>
+						<a href={`/login?next=${encodeURIComponent(`/song/${song.id}`)}`}>Log ind</a>
 					{/if}
 				</div>
 			</div>
 
 			<div class="song-head no-print-toolbar">
-				<div class="title-line">
-					{#if canEdit}
-						<input
-							class="title-input"
-							type="text"
-							bind:value={title}
-							oninput={() => scheduleSave()}
-							placeholder="Titel"
-							style="width: {Math.max(6, (title || 'Titel').length + 1)}ch"
-						/>
-					{:else}
-						<h1 class="title-input" style="width: auto; margin: 0">{title || 'Uden titel'}</h1>
-					{/if}
-				</div>
-				<div class="song-actions">
-					<label class="print-toggle" title="Vis bass-tabs på siden og tag dem med ved print">
-						<input type="checkbox" bind:checked={showBassTabs} onchange={() => canEdit && scheduleSave()} />
-						Bass
-					</label>
-					<label
-						class="print-toggle"
-						title="Skalér sangen proportionalt så den fylder maks én A4-side"
-					>
-						<input
-							type="checkbox"
-							bind:checked={fitSinglePage}
-							onchange={() => canEdit && scheduleSave()}
-						/>
-						Én side
-					</label>
+				{#if canEdit}
+					<input
+						class="title-input"
+						type="text"
+						bind:value={title}
+						oninput={() => scheduleSave()}
+						placeholder="Titel"
+					/>
+				{:else}
+					<h1 class="title-input">{title || 'Uden titel'}</h1>
+				{/if}
+
+				<div class="song-prints">
 					<button
 						type="button"
 						class="song-tool"
 						onclick={handlePdf}
 						disabled={pdfBusy}
-						title="Generér akkord-PDF og hent direkte"
+						title="Generér akkord-PDF"
 					>
 						<svg
 							class="print-icon"
@@ -556,14 +534,14 @@
 							<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
 							<path d="M7 13h10v8H7z"></path>
 						</svg>
-						{pdfBusy ? 'Genererer…' : 'Akkorder'}
+						<span>{pdfBusy ? '…' : 'Akkorder'}</span>
 					</button>
 					<button
 						type="button"
 						class="song-tool"
 						onclick={handleAudiencePdf}
 						disabled={audiencePdfBusy}
-						title="Generér publikums-PDF uden akkorder"
+						title="Generér publikums-PDF"
 					>
 						<svg
 							class="print-icon"
@@ -580,128 +558,46 @@
 							<path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
 							<path d="M7 13h10v8H7z"></path>
 						</svg>
-						{audiencePdfBusy ? 'Genererer…' : 'Tekst'}
+						<span>{audiencePdfBusy ? '…' : 'Tekst'}</span>
 					</button>
-					{#if canEdit}
-						<button
-							type="button"
-							class="song-tool song-tool-danger"
-							onclick={handleDelete}
-							title="Slet sang">Slet</button
-						>
-					{/if}
 				</div>
 
-				<div class="song-sub">
-					{#if canEdit}
-						<input
-							class="artist-input"
-							type="text"
-							bind:value={artist}
-							oninput={() => scheduleSave()}
-							placeholder="Kunstner"
-							style="width: {Math.max(8, (artist || 'Kunstner').length + 1)}ch"
-						/>
-					{:else if artist}
-						<p class="artist-input" style="width: auto; margin: 0">{artist}</p>
+				<div class="song-meta">
+					{#if artist}
+						<p class="artist-line">{artist}</p>
 					{/if}
-				</div>
-				<div class="song-functions">
-					{#if canEdit}
-						<span class="key-cluster" aria-label="Toneart, transponér">
-							<button
-								type="button"
-								class="key-btn"
-								title="Transponér ned"
-								onclick={() => transpose(-1)}>−</button
-							>
-							<input
-								class="key-input"
-								type="text"
-								bind:value={key}
-								oninput={() => scheduleSave()}
-								placeholder="—"
-								spellcheck="false"
-							/>
-							<button
-								type="button"
-								class="key-btn"
-								title="Transponér op"
-								onclick={() => transpose(1)}>+</button
-							>
-						</span>
-						<CategoryPicker
-							options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
-							selected={categories}
-							triggerLabel="Kategori"
-							ariaLabel="Tilføj eller fjern kategori"
-							allowCreate
-							colorFor={colorForCategory}
-							onToggle={toggleCategory}
-						/>
-					{:else if key.trim()}
-						<span class="key-cluster" aria-label="Toneart">
-							<span class="key-input" style="pointer-events: none">{key}</span>
-						</span>
-					{/if}
-					{#if categories.length > 0}
-						<div class="function-cats">
-							{#each categories as cat (cat)}
-								{@const c = colorForCategory(cat)}
-								<button
-									type="button"
-									class="artist-cat"
-									style:--cat-color={c.text}
-									title="Vis {cat} i sangbogen"
-									onclick={() => goToSongbookCategory(cat)}
-								>
-									<span class="cat-mark" aria-hidden="true"></span>
-									{cat}
-								</button>
-							{/each}
-						</div>
-					{/if}
-				</div>
-				{#if canEdit || youtubeLinks.length > 0}
-					<button
-						type="button"
-						class="info-toggle no-print"
-						class:is-open={infoOpen}
-						aria-expanded={infoOpen}
-						onclick={() => (infoOpen = !infoOpen)}
-					>
-						Oplysninger
-						<svg
-							class="info-chevron"
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 12 12"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.4"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
+					{#if canEdit || youtubeLinks.length > 0}
+						<button
+							type="button"
+							class="info-toggle"
+							class:is-open={infoOpen}
+							aria-expanded={infoOpen}
+							onclick={() => (infoOpen = !infoOpen)}
 						>
-							<path d="M2.25 4.25 6 8l3.75-3.75"></path>
-						</svg>
-					</button>
-				{/if}
+							Oplysninger
+							<svg
+								class="info-chevron"
+								xmlns="http://www.w3.org/2000/svg"
+								viewBox="0 0 12 12"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.4"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M2.25 4.25 6 8l3.75-3.75"></path>
+							</svg>
+						</button>
+					{/if}
+				</div>
 			</div>
+
 			{#if canEdit || youtubeLinks.length > 0}
 			<div class="info-fold no-print" class:is-open={infoOpen}>
 				<div class="info-inner">
 					<div class="info-panel">
 						{#if canEdit}
-							<label class="info-field">
-								<span>Titel</span>
-								<input
-									class="info-input"
-									type="text"
-									bind:value={title}
-									oninput={() => scheduleSave()}
-									placeholder="Titel"
-								/>
-							</label>
 							<label class="info-field">
 								<span>Kunstner</span>
 								<input
@@ -712,6 +608,82 @@
 									placeholder="Kunstner"
 								/>
 							</label>
+							<div class="info-tools">
+								<label class="print-toggle">
+									<input
+										type="checkbox"
+										bind:checked={showBassTabs}
+										onchange={() => scheduleSave()}
+									/>
+									Bass
+								</label>
+								<label class="print-toggle">
+									<input
+										type="checkbox"
+										bind:checked={fitSinglePage}
+										onchange={() => scheduleSave()}
+									/>
+									Én side
+								</label>
+								<span class="key-cluster" aria-label="Toneart, transponér">
+									<button type="button" class="key-btn" title="Transponér ned" onclick={() => transpose(-1)}>−</button>
+									<input
+										class="key-input"
+										type="text"
+										bind:value={key}
+										oninput={() => scheduleSave()}
+										placeholder="—"
+										spellcheck="false"
+									/>
+									<button type="button" class="key-btn" title="Transponér op" onclick={() => transpose(1)}>+</button>
+								</span>
+								<CategoryPicker
+									options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
+									selected={categories}
+									triggerLabel="Kategori"
+									ariaLabel="Tilføj eller fjern kategori"
+									allowCreate
+									colorFor={colorForCategory}
+									onToggle={toggleCategory}
+								/>
+								<button type="button" class="song-tool song-tool-danger" onclick={handleDelete}>Slet</button>
+							</div>
+							{#if categories.length > 0}
+								<div class="function-cats">
+									{#each categories as cat (cat)}
+										{@const c = colorForCategory(cat)}
+										<button
+											type="button"
+											class="artist-cat"
+											style:--cat-color={c.text}
+											onclick={() => goToSongbookCategory(cat)}
+										>
+											<span class="cat-mark" aria-hidden="true"></span>
+											{cat}
+										</button>
+									{/each}
+								</div>
+							{/if}
+						{:else if key.trim() || categories.length > 0}
+							<div class="info-tools">
+								{#if key.trim()}
+									<span class="key-cluster" aria-label="Toneart">
+										<span class="key-input">{key}</span>
+									</span>
+								{/if}
+								{#each categories as cat (cat)}
+									{@const c = colorForCategory(cat)}
+									<button
+										type="button"
+										class="artist-cat"
+										style:--cat-color={c.text}
+										onclick={() => goToSongbookCategory(cat)}
+									>
+										<span class="cat-mark" aria-hidden="true"></span>
+										{cat}
+									</button>
+								{/each}
+							</div>
 						{/if}
 						<SongYoutubeLinks
 							links={youtubeLinks}
@@ -748,195 +720,158 @@
 					readOnly={!canEdit}
 				/>
 			</div>
-
-			<div
-				class="play-controls no-print"
-				class:is-playing={playing}
-				title="Løbende scroll gennem sangen"
-			>
-				<button
-					type="button"
-					class="play-side"
-					onclick={slowerPlay}
-					title={`Langsommere (÷${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
-					aria-label="Langsommere"
-					>−</button
-				>
-				<button
-					type="button"
-					class="play-main"
-					onclick={startPlay}
-					title={playing
-						? `Stop (Esc) · tempo ×${formatPlaySpeed(playSpeed)}`
-						: `Løbende scroll · tempo ×${formatPlaySpeed(playSpeed)}`}
-				>
-					{#if playing}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="currentColor"
-							aria-hidden="true"
-							><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg
-						>
-						Stop
-					{:else}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="18"
-							height="18"
-							viewBox="0 0 24 24"
-							fill="currentColor"
-							aria-hidden="true"
-							><path d="M8 5v14l11-7z"></path></svg
-						>
-						Spil
-					{/if}
-				</button>
-				<button
-					type="button"
-					class="play-side"
-					onclick={fasterPlay}
-					title={`Hurtigere (×${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
-					aria-label="Hurtigere"
-					>+</button
-				>
-			</div>
 		</article>
+
+		<div
+			class="play-controls no-print"
+			class:is-playing={playing}
+			title="Løbende scroll gennem sangen"
+		>
+			<button
+				type="button"
+				class="play-side"
+				onclick={slowerPlay}
+				title={`Langsommere (÷${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
+				aria-label="Langsommere"
+				>−</button
+			>
+			<button
+				type="button"
+				class="play-main"
+				onclick={startPlay}
+				title={playing
+					? `Stop (Esc) · tempo ×${formatPlaySpeed(playSpeed)}`
+					: `Løbende scroll · tempo ×${formatPlaySpeed(playSpeed)}`}
+			>
+				{#if playing}
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
+					Stop
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+					Spil
+				{/if}
+			</button>
+			<button
+				type="button"
+				class="play-side"
+				onclick={fasterPlay}
+				title={`Hurtigere (×${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
+				aria-label="Hurtigere"
+				>+</button
+			>
+		</div>
 	{/if}
 </main>
 
 <style>
-	.song-card {
-		container-type: inline-size;
-		padding: 0.85rem 1.25rem 1.15rem;
+	.song-page {
+		--pad: clamp(12px, 4vw, 24px);
+		--gap: clamp(6px, 2vw, 12px);
+		--type: clamp(16px, 4.2vw, 18px);
+		--type-sm: clamp(13px, 3.4vw, 15px);
+		--type-xs: clamp(12px, 3vw, 13px);
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		align-content: start;
+		min-height: 100dvh;
+		width: 100%;
+		margin-inline: 0;
+		padding: var(--pad);
+		padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+		background: #ffffff;
+		color: var(--color-ink);
+	}
+	.song-sheet {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: var(--gap);
+		min-width: 0;
+	}
+	.song-status {
+		margin: 2rem 0;
+		text-align: center;
+		color: var(--color-ink-muted);
+	}
+	.song-status.is-error {
+		color: var(--color-error);
 	}
 	.song-chrome {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		margin-bottom: 0.6rem;
-		padding-bottom: 0.4rem;
-		border-bottom: 1px solid var(--color-border-subtle);
+		gap: var(--gap);
 	}
 	.back-link {
-		display: inline-flex;
+		display: inline-grid;
+		grid-auto-flow: column;
 		align-items: center;
 		gap: 0.28rem;
-		font-size: 0.68rem;
+		font-size: var(--type-xs);
 		font-weight: 500;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
 		color: var(--color-ink-faint);
+		text-decoration: none;
 	}
 	.back-link:hover {
 		color: var(--color-ink);
 	}
 	.song-chrome-status {
-		display: flex;
+		display: grid;
+		grid-auto-flow: column;
 		align-items: center;
-		gap: 0.75rem;
-		font-size: 0.68rem;
-		letter-spacing: 0.04em;
+		gap: 0.65rem;
+		font-size: var(--type-xs);
 		color: var(--color-ink-faint);
+	}
+	.song-chrome-status a {
+		color: inherit;
 	}
 	.song-head {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.2rem;
+		min-width: 0;
+	}
+	.song-prints {
+		display: grid;
+		grid-auto-flow: column;
+		justify-content: start;
+		gap: 0.75rem;
+		min-width: 0;
+	}
+	.song-meta {
+		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
-		grid-template-rows: auto auto auto;
 		align-items: baseline;
-		column-gap: 1.25rem;
-		row-gap: 0.2rem;
-		margin-bottom: 0.55rem;
+		gap: var(--gap);
+		min-width: 0;
 	}
-	.title-line {
-		grid-column: 1;
-		grid-row: 1;
-	}
-	.song-actions {
-		grid-column: 2;
-		grid-row: 1;
-		align-self: baseline;
-	}
-	.song-sub {
-		grid-column: 1;
-		grid-row: 2;
-		align-self: baseline;
-	}
-	.song-functions {
-		grid-column: 1;
-		grid-row: 3;
-		justify-self: start;
-		align-self: center;
-		margin-top: 0.15rem;
-	}
-	@container (max-width: 42rem) {
-		.song-head {
-			grid-template-columns: minmax(0, 1fr);
-			grid-template-rows: auto;
-		}
-		.title-line,
-		.song-actions,
-		.song-sub,
-		.song-functions,
-		.info-toggle {
-			grid-column: 1;
-			grid-row: auto;
-		}
-		.song-actions,
-		.info-toggle {
-			justify-self: start;
-		}
-	}
-	.song-actions {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		justify-content: flex-end;
-		justify-self: end;
-		gap: 0.1rem 0.15rem;
-	}
-	.print-toggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.28rem;
-		font-size: 0.68rem;
-		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--color-ink-muted);
-		cursor: pointer;
-		user-select: none;
-		padding: 0.2rem 0.35rem;
+	.artist-line {
+		margin: 0;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	.print-toggle input {
-		accent-color: var(--color-ink);
-		width: 0.8rem;
-		height: 0.8rem;
+		font-size: var(--type-sm);
+		color: var(--color-ink-faint);
 	}
 	.song-tool {
 		appearance: none;
-		display: inline-flex;
+		display: inline-grid;
+		grid-auto-flow: column;
 		align-items: center;
 		gap: 0.32rem;
 		border: none;
 		background: transparent;
-		padding: 0.2rem 0.4rem;
-		font-size: 0.68rem;
+		padding: 0.15rem 0;
+		font-size: var(--type-xs);
 		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
 		color: var(--color-ink-muted);
 		cursor: pointer;
+		white-space: nowrap;
 	}
 	.print-icon {
 		width: 0.82rem;
 		height: 0.82rem;
-		flex-shrink: 0;
-		color: currentColor;
 	}
 	.song-tool:hover:not(:disabled) {
 		color: var(--color-ink);
@@ -948,34 +883,31 @@
 	.song-tool-danger {
 		color: var(--color-error);
 	}
-	.song-tool-danger:hover:not(:disabled) {
-		color: #991b1b;
-	}
 	.play-controls {
 		position: fixed;
-		bottom: 1.25rem;
+		bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
 		left: 50%;
 		transform: translateX(-50%);
-		z-index: 60;
-		display: inline-flex;
+		z-index: 80;
+		display: grid;
+		grid-template-columns: auto minmax(5.2rem, auto) auto;
 		align-items: stretch;
 		border: 1px solid var(--color-border-subtle);
 		border-radius: var(--radius-button);
 		overflow: hidden;
 		background: #ffffff;
 		box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14);
-		transition: box-shadow 160ms ease, border-color 160ms ease;
 	}
 	.play-controls.is-playing {
 		border-color: var(--color-accent);
-		box-shadow: 0 10px 28px rgba(15, 23, 42, 0.2);
 	}
 	.play-controls .play-side,
 	.play-controls .play-main {
-		display: inline-flex;
+		display: inline-grid;
+		grid-auto-flow: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.45rem;
+		gap: 0.4rem;
 		margin: 0;
 		border: none;
 		border-radius: 0;
@@ -984,11 +916,10 @@
 		font-weight: 600;
 		font-size: 0.9rem;
 		cursor: pointer;
-		transition: background 120ms ease, color 120ms ease;
 	}
 	.play-controls .play-side {
-		min-width: 2.4rem;
-		padding: 0.55rem 0.65rem;
+		min-width: 2.6rem;
+		padding: 0.65rem 0.7rem;
 		font-size: 1.15rem;
 		line-height: 1;
 		color: var(--color-ink-muted);
@@ -1000,8 +931,7 @@
 		border-left: 1px solid var(--color-border-subtle);
 	}
 	.play-controls .play-main {
-		padding: 0.55rem 1rem;
-		min-width: 5.5rem;
+		padding: 0.65rem 1rem;
 	}
 	.play-controls .play-side:hover,
 	.play-controls .play-main:hover {
@@ -1011,55 +941,27 @@
 		background: var(--color-accent);
 		color: #ffffff;
 	}
-	.play-controls.is-playing .play-main:hover {
-		background: var(--color-accent-hover);
-	}
-	.play-controls.is-playing .play-side {
-		color: var(--color-ink);
-	}
-	.play-controls.is-playing .play-side:hover {
-		background: rgba(245, 158, 11, 0.12);
-	}
-	.title-line {
-		display: flex;
-		align-items: baseline;
-		gap: 0.7rem 0.9rem;
-		min-width: 0;
-		flex-wrap: wrap;
-	}
 	.title-input {
-		min-width: 6ch;
-		max-width: 100%;
-		flex: 0 1 auto;
+		width: 100%;
+		min-width: 0;
 		background: transparent;
 		border: none;
 		font-family: var(--font-title);
-		font-size: 1.55rem;
+		font-size: clamp(1.35rem, 6vw, 1.7rem);
 		line-height: 1.12;
 		font-weight: 400;
-		letter-spacing: -0.03em;
 		color: var(--color-ink);
 		padding: 0;
-		border-radius: 0;
+		margin: 0;
 	}
 	.title-input:focus {
 		outline: none;
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
-	.song-sub {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.45rem;
-		min-width: 0;
-	}
 	.function-cats {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
 		gap: 0.45rem;
-		min-width: 0;
-		align-self: stretch;
 	}
 	.cat-mark {
 		width: 0.2rem;
@@ -1070,55 +972,51 @@
 	}
 	.artist-cat {
 		appearance: none;
-		display: inline-flex;
+		display: inline-grid;
+		grid-auto-flow: column;
 		align-items: center;
 		gap: 0.28rem;
 		border: none;
 		background: transparent;
 		padding: 0;
-		font-family: var(--font-sans);
-		font-size: 0.72rem;
-		font-weight: 400;
-		letter-spacing: 0.01em;
+		font-size: var(--type-xs);
 		color: var(--cat-color, var(--color-ink-muted));
 		cursor: pointer;
 	}
-	.artist-cat:hover {
-		text-decoration: underline;
-		text-underline-offset: 0.16em;
+	.info-tools {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(7rem, max-content));
+		align-items: center;
+		gap: 0.55rem 0.75rem;
 	}
-	.song-functions {
-		display: inline-flex;
-		align-items: stretch;
-		gap: 0.5rem;
-		max-width: 100%;
-		min-width: 0;
-		position: relative;
-		z-index: 2;
+	.print-toggle {
+		display: inline-grid;
+		grid-auto-flow: column;
+		align-items: center;
+		gap: 0.28rem;
+		font-size: var(--type-xs);
+		font-weight: 500;
+		color: var(--color-ink-muted);
+		cursor: pointer;
 	}
 	.key-cluster {
-		display: inline-flex;
+		display: inline-grid;
+		grid-auto-flow: column;
 		align-items: center;
-		flex: 0 0 auto;
 		gap: 0.05rem;
 		padding: 0 0.35rem 0 0.2rem;
 		color: var(--color-ink-muted);
 		border: 1px solid var(--color-border-subtle);
 		border-radius: var(--radius-button);
-		min-height: 2.35rem;
+		min-height: 2.2rem;
 	}
 	.key-btn {
 		padding: 0 0.2rem;
-		font-weight: 400;
 		font-size: 0.85rem;
-		line-height: 1;
 		color: var(--color-ink-faint);
 		background: transparent;
 		border: none;
 		cursor: pointer;
-	}
-	.key-btn:hover {
-		color: var(--color-ink);
 	}
 	.key-input {
 		width: 2.4rem;
@@ -1126,7 +1024,6 @@
 		font-weight: 500;
 		font-family: var(--font-mono);
 		font-size: 0.78rem;
-		letter-spacing: 0.02em;
 		color: var(--color-ink-muted);
 		background: transparent;
 		border: none;
@@ -1138,24 +1035,19 @@
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
 	.info-toggle {
-		grid-column: 2;
-		grid-row: 3;
-		justify-self: end;
-		align-self: center;
 		appearance: none;
-		display: inline-flex;
+		display: inline-grid;
+		grid-auto-flow: column;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.35rem;
 		border: none;
 		background: transparent;
-		padding: 0.2rem 0;
-		margin-top: 0.15rem;
-		font-size: 0.68rem;
+		padding: 0;
+		font-size: var(--type-xs);
 		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
 		color: var(--color-ink-faint);
 		cursor: pointer;
+		white-space: nowrap;
 	}
 	.info-toggle:hover,
 	.info-toggle.is-open {
@@ -1182,23 +1074,20 @@
 		min-height: 0;
 	}
 	.info-panel {
-		display: flex;
-		flex-direction: column;
-		gap: 0.55rem;
-		padding: 0.75rem 0 0.9rem;
+		display: grid;
+		gap: 0.65rem;
+		padding: 0.55rem 0 0.35rem;
 		border-top: 1px solid var(--color-border-subtle);
 	}
 	.info-field {
 		display: grid;
-		grid-template-columns: 8.75rem minmax(0, 1fr);
+		grid-template-columns: 6rem minmax(0, 1fr);
 		align-items: baseline;
 		gap: 0.75rem;
 	}
 	.info-field > span {
-		font-size: 0.68rem;
+		font-size: var(--type-xs);
 		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
 		color: var(--color-ink-faint);
 	}
 	.info-input {
@@ -1209,48 +1098,18 @@
 		padding: 0.1rem 0;
 		font-family: var(--font-title);
 		font-size: 0.95rem;
-		font-weight: 400;
-		letter-spacing: -0.015em;
 		color: var(--color-ink);
 	}
 	.info-input:focus {
 		outline: none;
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
-	.info-input::placeholder {
-		color: var(--color-ink-faint);
-		opacity: 0.55;
-	}
-	.artist-input {
-		width: auto;
-		min-width: 8ch;
-		max-width: 100%;
-		flex: 0 1 auto;
-		background: transparent;
-		border: none;
-		font-family: var(--font-title);
-		font-size: 0.78rem;
-		font-weight: 400;
-		color: var(--color-ink-faint);
-		padding: 0;
-		letter-spacing: 0.02em;
-	}
-	.artist-input:focus {
-		outline: none;
-		color: var(--color-ink);
-		box-shadow: inset 0 -1px 0 var(--color-ink);
-	}
-	.artist-input::placeholder {
-		color: var(--color-ink-faint);
-		opacity: 0.55;
-	}
 	.print-header {
 		display: none;
 	}
 	.song-area {
-		background: #ffffff;
-		border-radius: 0.35rem;
-		padding: 0.9rem 1rem 1rem;
-		border: 1px solid var(--color-border-subtle);
+		min-width: 0;
+		margin-inline: calc(var(--pad) * -1);
+		padding-inline: var(--pad);
 	}
 </style>

@@ -1436,8 +1436,8 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 1em;
-		padding: 0.2em 0 0.4em;
+		gap: 0;
+		padding: 0;
 	}
 	.editable-song.read-only,
 	.editable-song.read-only :global(*) {
@@ -1461,10 +1461,11 @@
 		--section-accent: #6b7280;
 		position: relative;
 		container-type: inline-size;
-		border: 1px solid var(--section-accent);
-		border-radius: 7px;
-		background: #fff;
-		padding: 0.6em 0.95em 0.7em;
+		border: none;
+		border-top: 1px solid color-mix(in srgb, var(--section-accent) 38%, #e5e7eb);
+		border-radius: 0;
+		background: transparent;
+		padding: 0.45em 0 0.55em;
 		overflow: visible;
 	}
 	.editable-song .section-insert {
@@ -1522,7 +1523,11 @@
 		}
 	}
 	.editable-song .song-section--unlabeled {
-		border-color: #cfd8dc;
+		border-top-color: #e5e7eb;
+	}
+	.editable-song > .song-section:first-child {
+		border-top: none;
+		padding-top: 0;
 	}
 	.editable-song .song-section-label {
 		grid-column: 1;
