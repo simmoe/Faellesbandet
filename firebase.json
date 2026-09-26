@@ -8,6 +8,9 @@
 	},
 	"hosting": {
 		"site": "faellesbandet",
+		"predeploy": [
+			"node $HOME/Documents/Git/cursor-global-setup/scripts/require-published-deploy.mjs --repo faellesbandet --live https://faellesbandet.web.app/deployed.json --out build/deployed.json"
+		],
 		"public": "build",
 		"ignore": ["firebase.json", "**/.*", "**/node_modules/**", "legacy/**", "functions/**"],
 		"rewrites": [
