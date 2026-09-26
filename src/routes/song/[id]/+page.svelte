@@ -815,7 +815,10 @@
 		display: inline-grid;
 		grid-auto-flow: column;
 		align-items: center;
-		gap: 0.28rem;
+		justify-content: start;
+		justify-self: start;
+		width: max-content;
+		gap: 0.22rem;
 		font-size: var(--type-xs);
 		font-weight: 500;
 		color: var(--color-ink-faint);
