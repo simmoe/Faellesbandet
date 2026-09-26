@@ -365,6 +365,17 @@
 	/** Hver − / + dividerer eller ganger tempoet med denne faktor. */
 	const PLAY_SPEED_FACTOR = 1.25;
 
+	const PLAY_OFFENDERS = [
+		'.song-chrome',
+		'.song-prints',
+		'.song-meta',
+		'.info-fold',
+		'.section-insert',
+		'.line-actions',
+		'.section-drag-handle',
+		'.section-header-actions'
+	] as const;
+
 	let playing = $state(false);
 	let playSpeed = $state(1);
 	let playRaf: number | null = null;
@@ -429,11 +440,25 @@
 			await tick();
 			await new Promise<void>((r) => requestAnimationFrame(() => r()));
 		}
+		infoOpen = false;
 		playing = true;
 		playLastTs = 0;
 		playPos = window.scrollY;
 		playRaf = requestAnimationFrame(playFrame);
 	}
+
+	$effect(() => {
+		if (!browser) return;
+		void rows.length;
+		void infoOpen;
+		document.body.classList.toggle('song-is-playing', playing);
+		const nodes = PLAY_OFFENDERS.flatMap((sel) => [...document.querySelectorAll(sel)]);
+		for (const el of nodes) el.classList.toggle('play-hidden', playing);
+		return () => {
+			document.body.classList.remove('song-is-playing');
+			for (const el of nodes) el.classList.remove('play-hidden');
+		};
+	});
 
 	$effect(() => {
 		if (!playing) return;
@@ -464,7 +489,7 @@
 	<title>{title || song?.title || 'Sang'} · {BAND.name}</title>
 </svelte:head>
 
-<main class="song-page">
+<div class="song-page">
 	{#if loading}
 		<p class="song-status">Henter sang…</p>
 	{:else if loadError}
@@ -511,6 +536,7 @@
 					<h1 class="title-input">{title || 'Uden titel'}</h1>
 				{/if}
 
+				<div class="song-toolbar">
 				<div class="song-prints">
 					<button
 						type="button"
@@ -560,6 +586,46 @@
 						</svg>
 						<span>{audiencePdfBusy ? '…' : 'Tekst'}</span>
 					</button>
+				</div>
+				<div
+					class="play-controls no-print"
+					class:is-docked={playing}
+					class:is-playing={playing}
+					title="Løbende scroll gennem sangen"
+				>
+					<button
+						type="button"
+						class="play-side"
+						onclick={slowerPlay}
+						title={`Langsommere (÷${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
+						aria-label="Langsommere"
+						>−</button
+					>
+					<button
+						type="button"
+						class="play-main"
+						onclick={startPlay}
+						title={playing
+							? `Stop (Esc) · tempo ×${formatPlaySpeed(playSpeed)}`
+							: `Løbende scroll · tempo ×${formatPlaySpeed(playSpeed)}`}
+					>
+						{#if playing}
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
+							Stop
+						{:else}
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+							Spil
+						{/if}
+					</button>
+					<button
+						type="button"
+						class="play-side"
+						onclick={fasterPlay}
+						title={`Hurtigere (×${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
+						aria-label="Hurtigere"
+						>+</button
+					>
+				</div>
 				</div>
 
 				<div class="song-meta">
@@ -721,47 +787,8 @@
 				/>
 			</div>
 		</article>
-
-		<div
-			class="play-controls no-print"
-			class:is-playing={playing}
-			title="Løbende scroll gennem sangen"
-		>
-			<button
-				type="button"
-				class="play-side"
-				onclick={slowerPlay}
-				title={`Langsommere (÷${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
-				aria-label="Langsommere"
-				>−</button
-			>
-			<button
-				type="button"
-				class="play-main"
-				onclick={startPlay}
-				title={playing
-					? `Stop (Esc) · tempo ×${formatPlaySpeed(playSpeed)}`
-					: `Løbende scroll · tempo ×${formatPlaySpeed(playSpeed)}`}
-			>
-				{#if playing}
-					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>
-					Stop
-				{:else}
-					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
-					Spil
-				{/if}
-			</button>
-			<button
-				type="button"
-				class="play-side"
-				onclick={fasterPlay}
-				title={`Hurtigere (×${PLAY_SPEED_FACTOR}) · nu ×${formatPlaySpeed(playSpeed)}`}
-				aria-label="Hurtigere"
-				>+</button
-			>
-		</div>
 	{/if}
-</main>
+</div>
 
 <style>
 	.song-page {
@@ -777,7 +804,7 @@
 		width: 100%;
 		margin-inline: 0;
 		padding: var(--pad);
-		padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+		padding-bottom: calc(var(--pad) + 2.5rem);
 		background: #ffffff;
 		color: var(--color-ink);
 	}
@@ -829,6 +856,13 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: 0.2rem;
+		min-width: 0;
+	}
+	.song-toolbar {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: var(--gap);
 		min-width: 0;
 	}
 	.song-prints {
@@ -884,18 +918,24 @@
 		color: var(--color-error);
 	}
 	.play-controls {
-		position: fixed;
-		bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 80;
 		display: grid;
 		grid-template-columns: auto minmax(5.2rem, auto) auto;
 		align-items: stretch;
+		justify-self: end;
 		border: 1px solid var(--color-border-subtle);
 		border-radius: var(--radius-button);
 		overflow: hidden;
 		background: #ffffff;
+	}
+	.play-controls.is-docked {
+		position: fixed;
+		bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+		left: 0;
+		right: 0;
+		z-index: 80;
+		justify-self: stretch;
+		width: max-content;
+		margin-inline: auto;
 		box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14);
 	}
 	.play-controls.is-playing {
@@ -1111,5 +1151,11 @@
 		min-width: 0;
 		margin-inline: calc(var(--pad) * -1);
 		padding-inline: var(--pad);
+	}
+	:global(.play-hidden) {
+		display: none !important;
+	}
+	:global(body.song-is-playing footer) {
+		display: none !important;
 	}
 </style>
