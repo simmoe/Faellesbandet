@@ -11,12 +11,33 @@
 
 <svelte:head><title>{BAND.name}</title></svelte:head>
 
-<main class="flex min-h-dvh items-center justify-center px-6">
-	<div class="text-center">
-		<p class="font-display text-3xl font-bold tracking-tight text-[var(--color-accent)]">
-			{BAND.name}
-		</p>
-		<p class="mt-2 text-sm text-[var(--color-ink-faint)]">{BAND.tagline}</p>
-		<p class="mt-8 text-xs text-[var(--color-ink-faint)]">Indlæser…</p>
-	</div>
+<main class="splash">
+	<p class="splash-title">{BAND.name}</p>
+	<p class="splash-tag">{BAND.tagline}</p>
+	<p class="splash-status">Indlæser…</p>
 </main>
+
+<style>
+	.splash {
+		display: grid;
+		place-content: center;
+		justify-items: center;
+		min-height: 100dvh;
+		padding: clamp(16px, 5vw, 40px);
+		text-align: center;
+		gap: clamp(8px, 2vw, 12px);
+	}
+	.splash-title {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(1.6rem, 7vw, 2rem);
+		font-weight: 700;
+		color: var(--color-accent);
+	}
+	.splash-tag,
+	.splash-status {
+		margin: 0;
+		font-size: clamp(13px, 3.4vw, 15px);
+		color: var(--color-ink-faint);
+	}
+</style>

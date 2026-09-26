@@ -203,9 +203,10 @@
 <style>
 	.category-picker {
 		position: relative;
-		display: flex;
-		flex: 0 0 auto;
-		height: 2.35rem;
+		display: grid;
+		min-width: 0;
+		min-height: 2.35rem;
+		height: 100%;
 	}
 	.category-picker-trigger {
 		appearance: none;
@@ -220,8 +221,8 @@
 		color: var(--color-ink);
 		font-weight: 500;
 		font-size: 0.82rem;
-		min-width: 12.5rem;
-		max-width: 18rem;
+		min-width: 0;
+		max-width: none;
 		cursor: pointer;
 	}
 	.joined .category-picker-trigger {

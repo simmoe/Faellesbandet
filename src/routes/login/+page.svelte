@@ -60,16 +60,15 @@
 
 <svelte:head><title>Log ind · {BAND.name}</title></svelte:head>
 
-<main class="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
-	<div class="mb-10 text-center">
-		<img class="mx-auto mb-5 h-28 w-28" src="/logo-mark.png?v=10" alt="" />
-		<h1 class="font-display text-4xl font-bold tracking-tight text-[var(--color-accent)]">
-			{BAND.name}
-		</h1>
-		<p class="mt-2 text-sm text-[var(--color-ink-faint)]">{BAND.tagline}</p>
+<main class="login">
+	<div class="login-brand">
+		<img class="login-mark" src="/logo-mark.png?v=10" alt="" />
+		<h1>{BAND.name}</h1>
+		<p>{BAND.tagline}</p>
 	</div>
 
-	<form class="card p-6 space-y-4" onsubmit={loginEmail}>
+	<div class="login-panel">
+	<form class="card login-form" onsubmit={loginEmail}>
 		<div>
 			<label
 				for="email"
@@ -112,17 +111,90 @@
 		</button>
 	</form>
 
-	<div class="my-6 flex items-center gap-3 text-xs text-[var(--color-ink-faint)]">
-		<div class="h-px flex-1 bg-[var(--color-border)]"></div>
+	<div class="login-or">
 		<span>eller</span>
-		<div class="h-px flex-1 bg-[var(--color-border)]"></div>
 	</div>
 
 	<button class="btn-secondary w-full" onclick={loginGoogle} disabled={busy}>
 		Log ind med Google
 	</button>
 
-	<p class="mt-6 text-center text-xs text-[var(--color-ink-faint)]">
-		Kun bandets medlemmer kan logge ind.
-	</p>
+	<p class="login-note">Kun bandets medlemmer kan logge ind.</p>
+	</div>
 </main>
+
+<style>
+	.login {
+		--pad: clamp(16px, 5vw, 40px);
+		--gap: clamp(12px, 3vw, 24px);
+		display: grid;
+		align-content: center;
+		justify-items: center;
+		min-height: 100dvh;
+		padding: var(--pad);
+	}
+	.login-brand,
+	.login-panel {
+		display: grid;
+		width: min(100%, 24rem);
+		gap: var(--gap);
+	}
+	.login-brand {
+		justify-items: center;
+		text-align: center;
+	}
+	.login-mark {
+		width: clamp(72px, 22vw, 112px);
+		height: clamp(72px, 22vw, 112px);
+		object-fit: contain;
+	}
+	.login-brand h1 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(1.6rem, 7vw, 2.25rem);
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--color-accent);
+	}
+	.login-brand p {
+		margin: 0;
+		font-size: clamp(13px, 3.4vw, 15px);
+		color: var(--color-ink-faint);
+	}
+	.login-form {
+		display: grid;
+		gap: 1rem;
+		padding: clamp(16px, 4vw, 24px);
+	}
+	.login-or {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		align-items: center;
+		gap: 0.75rem;
+		font-size: 0.75rem;
+		color: var(--color-ink-faint);
+	}
+	.login-or::before,
+	.login-or::after {
+		content: '';
+		height: 1px;
+		background: var(--color-border);
+	}
+	.login-note {
+		margin: 0;
+		text-align: center;
+		font-size: clamp(12px, 3vw, 13px);
+		color: var(--color-ink-faint);
+	}
+
+	@media (orientation: landscape) and (max-height: 34rem) {
+		.login {
+			align-content: start;
+			--pad: clamp(8px, 2vw, 16px);
+		}
+		.login-mark {
+			width: 56px;
+			height: 56px;
+		}
+	}
+</style>
