@@ -131,6 +131,7 @@
 				class:pdf-song-section--compact={section.compact}
 				class:pdf-song-section--framed={section.framed}
 				class:pdf-song-section--chorus-cue={Boolean(section.chorusCue)}
+				class:pdf-song-section--repeat={Boolean(section.chorusCue) || (section.compact && !!section.label)}
 			>
 				{#if section.chorusCue}
 					<div class="pdf-chorus-cue">

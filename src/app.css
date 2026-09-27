@@ -521,6 +521,12 @@ select {
 .pdf-song-section--chorus-cue {
 	padding: calc(0.1cm * var(--pdf-layout-scale, 1)) 0 0;
 }
+.pdf-song-section--repeat {
+	border: 0.4pt solid #111827;
+	border-radius: 3px;
+	padding: calc(1.4mm * var(--pdf-layout-scale, 1)) calc(2mm * var(--pdf-layout-scale, 1));
+	margin-top: calc(2mm * var(--pdf-layout-scale, 1));
+}
 .pdf-chorus-cue {
 	display: flex;
 	align-items: baseline;
@@ -528,9 +534,9 @@ select {
 	min-width: 0;
 }
 .pdf-chorus-cue-lyric {
-	font-size: calc(9.2pt * var(--pdf-layout-scale));
-	line-height: 1.05;
-	font-weight: 700;
+	font-size: calc(10pt * var(--pdf-layout-scale));
+	line-height: 1.2;
+	font-weight: 400;
 	min-width: 0;
 }
 .pdf-song-section--compact .pdf-section-label,
@@ -605,8 +611,8 @@ select {
 .pdf-chord,
 .pdf-bass {
 	font-family: var(--font-mono);
-	font-size: calc(8.5pt * var(--pdf-layout-scale));
-	line-height: 1;
+	font-size: calc(9pt * var(--pdf-layout-scale));
+	line-height: 1.15;
 }
 .pdf-chord .bass-chord {
 	color: var(--color-chord);
@@ -621,9 +627,9 @@ select {
 	user-select: none;
 }
 .pdf-lyric {
-	font-size: calc(9.2pt * var(--pdf-layout-scale));
-	line-height: 1.05;
-	font-weight: 700;
+	font-size: calc(10pt * var(--pdf-layout-scale));
+	line-height: 1.22;
+	font-weight: 400;
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
 }
@@ -726,8 +732,9 @@ select {
 		font-size: 9.5pt !important;
 		color: #000 !important;
 	}
-	.chord-grid .lyrics-cell {
-		font-weight: 700 !important;
+	.chord-grid .lyrics-cell,
+	.editable-song .lyric-cell {
+		font-weight: 400 !important;
 	}
 	.chord-grid .bass-chord,
 	.chord-grid .bar-sep {

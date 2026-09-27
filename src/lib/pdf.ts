@@ -50,7 +50,7 @@ interface AudienceExportOptions extends ExportOptions {
 }
 
 const MIN_LAYOUT_SCALE = 0.55;
-const MAX_LAYOUT_SCALE = 1.45;
+const MAX_LAYOUT_SCALE = 2.8;
 const FIT_HEIGHT_SAFETY = 0.995;
 const PDF_MARGIN_MM = 5;
 const OFFSCREEN_PAGE_PADDING = '2mm 3mm';
@@ -158,18 +158,18 @@ async function applyLayoutScale(
 
 	if (!fitSinglePage) return saved;
 
-	const naturalHeight = el.scrollHeight;
-	if (naturalHeight <= 0) return saved;
+	const contentHeight = () => Math.max(scaleEl.scrollHeight, el.scrollHeight);
+	if (contentHeight() <= 0) return saved;
 
 	let low = MIN_LAYOUT_SCALE;
 	let high = MAX_LAYOUT_SCALE;
 	let best = MIN_LAYOUT_SCALE;
 
-	for (let i = 0; i < 8; i++) {
+	for (let i = 0; i < 12; i++) {
 		const mid = (low + high) / 2;
 		scaleEl.style.setProperty('--pdf-layout-scale', String(mid));
 		await waitForLayout();
-		if (el.scrollHeight <= targetHeightPx) {
+		if (contentHeight() <= targetHeightPx) {
 			best = mid;
 			low = mid;
 		} else {
