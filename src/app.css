@@ -494,35 +494,32 @@ select {
 }
 .pdf-song-sections {
 	display: grid;
-	gap: calc(0.7mm * var(--pdf-layout-scale, 1));
+	gap: 0;
 }
 .pdf-song-section {
 	--section-accent: #6b7280;
 	position: relative;
 	border: 0;
 	border-radius: 0;
-	border-left: 2.25pt solid var(--section-accent);
-	margin-top: 0;
-	padding: 0 0 0 1.6mm;
+	margin: 0;
+	padding: calc(0.18cm * var(--pdf-layout-scale, 1)) 0 0;
 	break-inside: avoid;
 	background: transparent;
 }
 .pdf-song-section--compact {
 	margin-top: 0;
 	min-height: 0;
-	padding: 0 0 0 1.6mm;
+	padding: calc(0.1cm * var(--pdf-layout-scale, 1)) 0 0;
 }
 .pdf-song-section--unlabeled {
 	padding-top: 0;
 }
 .pdf-song-section--framed {
-	border: 0.9pt solid var(--section-accent);
-	border-left-width: 2.25pt;
-	border-radius: 3px;
-	padding: calc(0.07cm * var(--pdf-layout-scale, 1)) calc(0.14cm * var(--pdf-layout-scale, 1));
+	border: 0;
+	padding: calc(0.18cm * var(--pdf-layout-scale, 1)) 0 0;
 }
 .pdf-song-section--chorus-cue {
-	padding: 0 0 0 1.6mm;
+	padding: calc(0.1cm * var(--pdf-layout-scale, 1)) 0 0;
 }
 .pdf-chorus-cue {
 	display: flex;
@@ -741,12 +738,13 @@ select {
 		page-break-after: avoid;
 	}
 	.chord-grid .section-header {
-		background: #e5e7eb !important;
-		color: #000 !important;
+		background: transparent !important;
+		color: inherit !important;
 		font-size: 9.5pt !important;
-		padding: 0.02cm 0.22cm !important;
-		print-color-adjust: exact;
-		-webkit-print-color-adjust: exact;
+		padding: 0 !important;
+	}
+	.editable-song .song-section {
+		border: none !important;
 	}
 
 	/* Sang-area: ingen ramme, ingen padding */

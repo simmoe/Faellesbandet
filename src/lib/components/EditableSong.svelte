@@ -1492,10 +1492,9 @@
 		position: relative;
 		container-type: inline-size;
 		border: none;
-		border-top: 1px solid color-mix(in srgb, var(--section-accent) 38%, #e5e7eb);
 		border-radius: 0;
 		background: transparent;
-		padding: 0.45em 0 0.55em;
+		padding: 0.55em 0 0.45em;
 		overflow: visible;
 	}
 	.editable-song .section-insert {
@@ -1552,11 +1551,7 @@
 			pointer-events: auto;
 		}
 	}
-	.editable-song .song-section--unlabeled {
-		border-top-color: #e5e7eb;
-	}
 	.editable-song > .song-section:first-child {
-		border-top: none;
 		padding-top: 0;
 	}
 	.editable-song .song-section-label {
