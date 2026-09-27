@@ -55,34 +55,25 @@ function normalizeChordLineMarkers(line: string): string {
  */
 const chordTokenRegex = new RegExp(`^${CHORD_PATTERN}$`);
 
-/** Print: et mellemrum mellem to akkorder tæller som `-`, så de ikke klistrer. */
-export function spacesAsChordSpacers(line: string): string {
-	const parts = line.split(/(\s+)/);
+export function renderBarLine(line: string, transpose: number = 0): string {
+	if (!line || line.trim() === '') return '';
+	const parts = normalizeChordLineMarkers(line)
+		.trim()
+		.split(/(\s+|\|)/)
+		.filter((part) => part.length > 0);
 	const out: string[] = [];
 	for (let i = 0; i < parts.length; i++) {
-		const part = parts[i];
-		if (/^\s+$/.test(part)) {
+		const tok = parts[i];
+		if (tok === '|') {
+			out.push(`<span class="bar-sep">|</span>`);
+			continue;
+		}
+		if (/^\s+$/.test(tok)) {
 			const prev = parts[i - 1] ?? '';
 			const next = parts[i + 1] ?? '';
 			if (chordTokenRegex.test(prev) && chordTokenRegex.test(next)) {
-				out.push(` ${'-'.repeat(Math.max(1, part.length))} `);
-				continue;
+				out.push(`<span class="chord-spacer">${'\u00a0'.repeat(tok.length)}</span>`);
 			}
-		}
-		out.push(part);
-	}
-	return out.join('');
-}
-
-export function renderBarLine(line: string, transpose: number = 0): string {
-	if (!line || line.trim() === '') return '';
-	const tokens = normalizeChordLineMarkers(line).trim().split(/\s+/);
-	const out: string[] = [];
-	let prevWasBar = false;
-	for (const tok of tokens) {
-		if (tok === '|') {
-			out.push(`<span class="bar-sep">|</span>`);
-			prevWasBar = true;
 			continue;
 		}
 		if (out.length > 0) out.push(' ');
@@ -92,7 +83,6 @@ export function renderBarLine(line: string, transpose: number = 0): string {
 			const name = transpose === 0 ? normalizeAccidentals(tok) : transposeChord(tok, transpose);
 			out.push(`<b class="bass-chord">${escapeHtml(name)}</b>`);
 		}
-		prevWasBar = false;
 	}
 	return out.join('');
 }
