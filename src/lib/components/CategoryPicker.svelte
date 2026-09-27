@@ -205,22 +205,22 @@
 		position: relative;
 		display: grid;
 		min-width: 0;
-		min-height: 2.35rem;
+		min-height: var(--control-h, 2.5rem);
 		height: 100%;
 	}
 	.category-picker-trigger {
 		appearance: none;
 		display: inline-flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: var(--space-1, 0.4rem);
 		height: 100%;
 		background: #ffffff;
 		border: 1px solid var(--color-border-subtle);
-		border-radius: var(--radius-button);
-		padding: 0 0.7rem 0 0.8rem;
+		border-radius: var(--radius-pill, var(--radius-button));
+		padding: 0 var(--control-px, 1.15rem);
 		color: var(--color-ink);
 		font-weight: 500;
-		font-size: 0.82rem;
+		font-size: var(--type-sm, 0.94rem);
 		min-width: 0;
 		max-width: none;
 		cursor: pointer;
@@ -309,10 +309,10 @@
 		width: 100%;
 		border: none;
 		background: transparent;
-		padding: 0.4rem 0.5rem;
+		padding: var(--space-1, 0.4rem) var(--space-2, 0.75rem);
 		border-radius: calc(var(--radius-card) * 0.7);
 		color: var(--cat-color, var(--color-ink));
-		font-size: 0.82rem;
+		font-size: var(--type-sm, 0.94rem);
 		font-weight: 500;
 		text-align: left;
 		cursor: pointer;

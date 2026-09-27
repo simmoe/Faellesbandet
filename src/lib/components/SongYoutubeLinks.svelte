@@ -143,49 +143,16 @@
 </div>
 
 <style>
-	.info-field {
-		display: grid;
-		grid-template-columns: 8.75rem minmax(0, 1fr);
-		align-items: baseline;
-		gap: 0.75rem;
-	}
-	.info-field > span {
-		font-size: 0.68rem;
-		font-weight: 500;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--color-ink-faint);
-	}
-	.info-input {
-		width: 100%;
-		min-width: 0;
-		background: transparent;
-		border: none;
-		padding: 0.1rem 0;
-		font-family: var(--font-title);
-		font-size: 0.95rem;
-		font-weight: 400;
-		letter-spacing: -0.015em;
-		color: var(--color-ink);
-	}
-	.info-input:focus {
-		outline: none;
-		box-shadow: inset 0 -1px 0 var(--color-ink);
-	}
-	.info-input::placeholder {
-		color: var(--color-ink-faint);
-		opacity: 0.55;
-	}
 	.yt-block {
 		display: flex;
 		flex-direction: column;
-		gap: 0.55rem;
+		gap: var(--space-2, 0.75rem);
 		min-width: 0;
 	}
 	.yt-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.15rem;
+		gap: var(--space-1, 0.4rem);
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -193,18 +160,17 @@
 	.yt-row {
 		display: flex;
 		align-items: baseline;
-		gap: 0.45rem;
+		gap: var(--space-2, 0.75rem);
 		min-width: 0;
 	}
 	.yt-title {
 		appearance: none;
 		border: none;
 		background: transparent;
-		padding: 0.1rem 0;
+		padding: 0;
 		font-family: var(--font-title);
-		font-size: 0.95rem;
+		font-size: var(--type-sm, 0.94rem);
 		font-weight: 400;
-		letter-spacing: -0.015em;
 		color: var(--color-ink);
 		text-align: left;
 		cursor: pointer;
@@ -229,14 +195,14 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
 		align-items: end;
-		gap: 0.65rem;
+		gap: var(--space-2, 0.75rem);
 	}
 	.yt-add-btn {
 		appearance: none;
 		border: none;
 		background: transparent;
-		padding: 0.1rem 0;
-		font-size: 0.68rem;
+		padding: 0;
+		font-size: var(--type-label, 0.72rem);
 		font-weight: 500;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;

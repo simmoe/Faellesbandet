@@ -206,6 +206,168 @@ select {
 	box-shadow: var(--shadow-soft);
 }
 
+/* Song page chrome — one scale, used by the page and its child fields. */
+.song-page {
+	--space-1: 0.4rem;
+	--space-2: 0.75rem;
+	--space-3: 1.25rem;
+	--space-4: 1.85rem;
+	--space-5: 2.5rem;
+	--pad: clamp(18px, 5vw, 32px);
+	--type: 1.05rem;
+	--type-sm: 0.94rem;
+	--type-xs: 0.8rem;
+	--type-label: 0.72rem;
+	--control-h: 2.5rem;
+	--control-px: 1.15rem;
+	--label-w: 7.5rem;
+	--radius-pill: 999px;
+	--radius-panel: 1rem;
+}
+.song-page .info-panel {
+	display: grid;
+	gap: var(--space-3);
+	margin: 0;
+	padding: var(--space-4);
+	background: var(--color-bg-card-muted);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-panel);
+}
+.song-page .info-field {
+	display: grid;
+	grid-template-columns: var(--label-w) minmax(0, 1fr);
+	align-items: center;
+	gap: var(--space-2) var(--space-3);
+	min-width: 0;
+}
+.song-page .info-field > span {
+	font-size: var(--type-label);
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--color-ink-faint);
+}
+.song-page .info-field > span:empty {
+	display: none;
+}
+@media (max-width: 40rem) {
+	.song-page .info-field {
+		grid-template-columns: minmax(0, 1fr);
+		justify-items: start;
+		gap: var(--space-1);
+	}
+}
+.song-page .info-input {
+	width: 100%;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	border: none;
+	font-family: var(--font-title);
+	font-size: var(--type-sm);
+	font-weight: 400;
+	color: var(--color-ink);
+}
+.song-page .info-input:focus {
+	outline: none;
+	box-shadow: inset 0 -1px 0 var(--color-ink);
+}
+.song-page .info-input::placeholder {
+	color: var(--color-ink-faint);
+}
+.song-page .info-cats,
+.song-page .info-flags {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+	min-width: 0;
+}
+.song-page .info-cat {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--control-h);
+	padding: 0 var(--control-px);
+	border: 1px solid color-mix(in srgb, var(--cat-color, #64748b) 28%, var(--color-border-subtle));
+	border-radius: var(--radius-pill);
+	background: #ffffff;
+	color: var(--cat-color, var(--color-ink-muted));
+	font-size: var(--type-sm);
+	font-weight: 500;
+	cursor: pointer;
+}
+.song-page .info-cats .category-picker {
+	min-width: min(14rem, 100%);
+	min-height: var(--control-h);
+}
+.song-page .print-toggle {
+	display: inline-grid;
+	grid-auto-flow: column;
+	align-items: center;
+	gap: var(--space-1);
+	min-height: var(--control-h);
+	font-size: var(--type-sm);
+	font-weight: 500;
+	color: var(--color-ink-muted);
+	cursor: pointer;
+}
+.song-page .key-cluster {
+	display: inline-grid;
+	grid-template-columns: var(--control-h) auto var(--control-h);
+	align-items: stretch;
+	width: max-content;
+	max-width: 100%;
+	min-height: var(--control-h);
+	overflow: hidden;
+	color: var(--color-ink);
+	background: #ffffff;
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-pill);
+}
+.song-page .key-cluster.is-static {
+	grid-template-columns: auto;
+	padding: 0 var(--control-px);
+	align-items: center;
+}
+.song-page .key-btn {
+	min-width: var(--control-h);
+	min-height: var(--control-h);
+	padding: 0;
+	border: none;
+	background: #ffffff;
+	color: var(--color-ink);
+	font-size: var(--type);
+	font-weight: 500;
+	line-height: 1;
+	cursor: pointer;
+}
+.song-page .key-btn:first-child {
+	border-right: 1px solid var(--color-border-subtle);
+}
+.song-page .key-btn:last-child {
+	border-left: 1px solid var(--color-border-subtle);
+}
+.song-page .key-input {
+	width: auto;
+	min-width: 2.4rem;
+	margin: 0;
+	padding: 0 var(--space-2);
+	border: none;
+	background: #ffffff;
+	color: var(--color-ink);
+	font-family: var(--font-mono);
+	font-size: var(--type-sm);
+	font-weight: 500;
+	text-align: center;
+}
+.song-page .key-input:focus {
+	outline: none;
+	box-shadow: inset 0 -2px 0 var(--color-ink);
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Button system
  * Tre varianter — alle læsbare på BÅDE den mørke base og hvide kort/dialoger:

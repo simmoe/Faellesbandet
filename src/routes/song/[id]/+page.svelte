@@ -637,116 +637,128 @@
 						{/if}
 					</div>
 				{/if}
-			</div>
 
-			{#if canEdit || youtubeLinks.length > 0}
-			<section class="info-block no-print" class:is-open={infoOpen}>
-				<div class="info-fold" class:is-open={infoOpen}>
-					<div class="info-inner">
-						<div class="info-panel">
-							{#if canEdit}
-								<label class="info-field">
-									<span>Kunstner</span>
-									<input
-										class="info-input"
-										type="text"
-										bind:value={artist}
-										oninput={() => scheduleSave()}
-										placeholder="Kunstner"
-									/>
-								</label>
-								<div class="info-field info-key">
-									<span>Toneart</span>
-									<div class="key-cluster" aria-label="Toneart, transponér">
-										<button type="button" class="key-btn" title="Transponér ned" onclick={() => transpose(-1)}>−</button>
+				{#if canEdit || youtubeLinks.length > 0}
+				<section class="info-block no-print" class:is-open={infoOpen}>
+					<div class="info-fold" class:is-open={infoOpen}>
+						<div class="info-inner">
+							<div class="info-panel">
+								{#if canEdit}
+									<label class="info-field">
+										<span>Kunstner</span>
 										<input
-											class="key-input"
+											class="info-input"
 											type="text"
-											bind:value={key}
+											bind:value={artist}
 											oninput={() => scheduleSave()}
-											placeholder="—"
-											spellcheck="false"
+											placeholder="Kunstner"
 										/>
-										<button type="button" class="key-btn" title="Transponér op" onclick={() => transpose(1)}>+</button>
-									</div>
-								</div>
-								<div class="info-flags">
-									<label class="print-toggle bass-toggle">
-										<input
-											type="checkbox"
-											bind:checked={showBassTabs}
-											onchange={() => scheduleSave()}
-										/>
-										Bass
 									</label>
-									<label class="print-toggle">
-										<input
-											type="checkbox"
-											bind:checked={fitSinglePage}
-											onchange={() => scheduleSave()}
-										/>
-										Én side
-									</label>
-								</div>
-								<div class="info-cats">
-									{#each categories as cat (cat)}
-										{@const c = colorForCategory(cat)}
-										<button
-											type="button"
-											class="info-cat"
-											style:--cat-color={c.text}
-											onclick={() => goToSongbookCategory(cat)}
-										>
-											{cat}
-										</button>
-									{/each}
-									<CategoryPicker
-										options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
-										selected={categories}
-										triggerLabel="Tilføj kategori"
-										ariaLabel="Tilføj eller fjern kategori"
-										allowCreate
-										colorFor={colorForCategory}
-										onToggle={toggleCategory}
-									/>
-								</div>
-								<button type="button" class="song-tool song-tool-danger" onclick={handleDelete}>Slet</button>
-							{:else if key.trim() || categories.length > 0}
-								{#if key.trim()}
-									<div class="info-field info-key">
+									<div class="info-field">
 										<span>Toneart</span>
-										<div class="key-cluster is-static" aria-label="Toneart">
-											<span class="key-input">{key}</span>
+										<div class="key-cluster" aria-label="Toneart, transponér">
+											<button type="button" class="key-btn" title="Transponér ned" onclick={() => transpose(-1)}>−</button>
+											<input
+												class="key-input"
+												type="text"
+												bind:value={key}
+												oninput={() => scheduleSave()}
+												placeholder="—"
+												spellcheck="false"
+											/>
+											<button type="button" class="key-btn" title="Transponér op" onclick={() => transpose(1)}>+</button>
 										</div>
 									</div>
-								{/if}
-								{#if categories.length > 0}
-									<div class="info-cats">
-										{#each categories as cat (cat)}
-											{@const c = colorForCategory(cat)}
-											<button
-												type="button"
-												class="info-cat"
-												style:--cat-color={c.text}
-												onclick={() => goToSongbookCategory(cat)}
-											>
-												{cat}
-											</button>
-										{/each}
+									<div class="info-field">
+										<span>Visning</span>
+										<div class="info-flags">
+											<label class="print-toggle bass-toggle">
+												<input
+													type="checkbox"
+													bind:checked={showBassTabs}
+													onchange={() => scheduleSave()}
+												/>
+												Bass
+											</label>
+											<label class="print-toggle">
+												<input
+													type="checkbox"
+													bind:checked={fitSinglePage}
+													onchange={() => scheduleSave()}
+												/>
+												Én side
+											</label>
+										</div>
 									</div>
+									<div class="info-field">
+										<span>Kategorier</span>
+										<div class="info-cats">
+											{#each categories as cat (cat)}
+												{@const c = colorForCategory(cat)}
+												<button
+													type="button"
+													class="info-cat"
+													style:--cat-color={c.text}
+													onclick={() => goToSongbookCategory(cat)}
+												>
+													{cat}
+												</button>
+											{/each}
+											<CategoryPicker
+												options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
+												selected={categories}
+												triggerLabel="Tilføj kategori"
+												ariaLabel="Tilføj eller fjern kategori"
+												allowCreate
+												colorFor={colorForCategory}
+												onToggle={toggleCategory}
+											/>
+										</div>
+									</div>
+									<div class="info-field">
+										<span></span>
+										<button type="button" class="song-tool song-tool-danger" onclick={handleDelete}>Slet</button>
+									</div>
+								{:else if key.trim() || categories.length > 0}
+									{#if key.trim()}
+										<div class="info-field">
+											<span>Toneart</span>
+											<div class="key-cluster is-static" aria-label="Toneart">
+												<span class="key-input">{key}</span>
+											</div>
+										</div>
+									{/if}
+									{#if categories.length > 0}
+										<div class="info-field">
+											<span>Kategorier</span>
+											<div class="info-cats">
+												{#each categories as cat (cat)}
+													{@const c = colorForCategory(cat)}
+													<button
+														type="button"
+														class="info-cat"
+														style:--cat-color={c.text}
+														onclick={() => goToSongbookCategory(cat)}
+													>
+														{cat}
+													</button>
+												{/each}
+											</div>
+										</div>
+									{/if}
 								{/if}
-							{/if}
-							<SongYoutubeLinks
-								links={youtubeLinks}
-								onAdd={addYoutubeLink}
-								onRemove={removeYoutubeLink}
-								readOnly={!canEdit}
-							/>
+								<SongYoutubeLinks
+									links={youtubeLinks}
+									onAdd={addYoutubeLink}
+									onRemove={removeYoutubeLink}
+									readOnly={!canEdit}
+								/>
+							</div>
 						</div>
 					</div>
-				</div>
-			</section>
-			{/if}
+				</section>
+				{/if}
+			</div>
 
 			<div class="print-header" aria-hidden="true">
 				<div class="print-title">{title || 'Uden titel'}</div>
@@ -777,11 +789,6 @@
 
 <style>
 	.song-page {
-		--pad: clamp(14px, 5vw, 28px);
-		--gap: clamp(6px, 2vw, 12px);
-		--type: clamp(16px, 4.2vw, 18px);
-		--type-sm: clamp(13px, 3.4vw, 15px);
-		--type-xs: clamp(12px, 3vw, 13px);
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		align-content: start;
@@ -801,11 +808,11 @@
 	.song-sheet {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		gap: var(--gap);
+		gap: var(--space-4);
 		min-width: 0;
 	}
 	.song-status {
-		margin: 2rem 0;
+		margin: var(--space-5) 0;
 		text-align: center;
 		color: var(--color-ink-muted);
 	}
@@ -816,7 +823,7 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: center;
-		gap: var(--gap);
+		gap: var(--space-2);
 	}
 	.back-link {
 		display: inline-grid;
@@ -825,7 +832,7 @@
 		justify-content: start;
 		justify-self: start;
 		width: max-content;
-		gap: 0.22rem;
+		gap: var(--space-1);
 		font-size: var(--type-xs);
 		font-weight: 500;
 		color: var(--color-ink-faint);
@@ -838,7 +845,7 @@
 		display: grid;
 		grid-auto-flow: column;
 		align-items: center;
-		gap: 0.65rem;
+		gap: var(--space-2);
 		font-size: var(--type-xs);
 		color: var(--color-ink-faint);
 	}
@@ -848,23 +855,22 @@
 	.song-head {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		gap: 0.2rem;
+		gap: var(--space-2);
 		min-width: 0;
 	}
 	.song-prints {
 		display: grid;
 		grid-auto-flow: column;
 		justify-content: start;
-		gap: 0.75rem;
+		gap: var(--space-2);
 		min-width: 0;
 	}
 	.song-meta {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: baseline;
-		gap: var(--gap);
+		gap: var(--space-2);
 		min-width: 0;
-		margin-top: 0.15rem;
 	}
 	.artist-line {
 		margin: 0;
@@ -880,10 +886,10 @@
 		display: inline-grid;
 		grid-auto-flow: column;
 		align-items: center;
-		gap: 0.32rem;
+		gap: var(--space-1);
 		border: none;
 		background: transparent;
-		padding: 0.15rem 0;
+		padding: 0;
 		font-size: var(--type-xs);
 		font-weight: 500;
 		color: var(--color-ink-muted);
@@ -922,9 +928,12 @@
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
 	.info-block {
-		margin-top: 0;
-		padding-top: 0;
+		margin: 0;
+		padding: 0;
 		border: none;
+	}
+	.info-block.is-open {
+		margin-top: var(--space-2);
 	}
 	.info-toggle {
 		appearance: none;
@@ -932,7 +941,7 @@
 		grid-auto-flow: column;
 		align-items: center;
 		justify-content: end;
-		gap: 0.35rem;
+		gap: var(--space-1);
 		width: auto;
 		justify-self: end;
 		border: none;
@@ -968,137 +977,6 @@
 		overflow: hidden;
 		min-height: 0;
 	}
-	.info-panel {
-		display: grid;
-		gap: 0.95rem;
-		margin: 0 0 0.95rem;
-		padding: 0.95rem 1rem 1.05rem;
-		background: #f8fafc;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 12px;
-	}
-	.info-flags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.85rem 1.15rem;
-	}
-	.print-toggle {
-		display: inline-grid;
-		grid-auto-flow: column;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: var(--type-sm);
-		font-weight: 500;
-		color: var(--color-ink-muted);
-		cursor: pointer;
-	}
-	.info-key .key-cluster {
-		justify-self: start;
-	}
-	.key-cluster {
-		display: inline-grid;
-		grid-template-columns: 2.75rem minmax(2.8rem, auto) 2.75rem;
-		align-items: stretch;
-		width: max-content;
-		max-width: 100%;
-		min-height: 2.75rem;
-		color: var(--color-ink);
-		border: 1px solid #cbd5e1;
-		border-radius: var(--radius-button);
-		background: #ffffff;
-		overflow: hidden;
-	}
-	.key-cluster.is-static {
-		grid-template-columns: minmax(2.8rem, auto);
-		padding: 0 0.85rem;
-		align-items: center;
-	}
-	.key-btn {
-		min-width: 2.75rem;
-		min-height: 2.75rem;
-		padding: 0;
-		font-size: 1.25rem;
-		font-weight: 600;
-		line-height: 1;
-		color: var(--color-ink);
-		background: #ffffff;
-		border: none;
-		cursor: pointer;
-	}
-	.key-btn:first-child {
-		border-right: 1px solid #e2e8f0;
-	}
-	.key-btn:last-child {
-		border-left: 1px solid #e2e8f0;
-	}
-	.key-input {
-		width: 3rem;
-		min-width: 0;
-		text-align: center;
-		font-weight: 600;
-		font-family: var(--font-mono);
-		font-size: 0.95rem;
-		color: var(--color-ink);
-		background: #ffffff;
-		border: none;
-		padding: 0;
-	}
-	.key-input:focus {
-		outline: none;
-		box-shadow: inset 0 -2px 0 var(--color-ink);
-	}
-	.info-cats {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.55rem;
-		align-items: center;
-	}
-	.info-cat {
-		appearance: none;
-		display: inline-flex;
-		align-items: center;
-		min-height: 2.4rem;
-		padding: 0.4rem 0.9rem;
-		border: 1px solid color-mix(in srgb, var(--cat-color, #64748b) 28%, #e2e8f0);
-		border-radius: 999px;
-		background: #ffffff;
-		color: var(--cat-color, var(--color-ink-muted));
-		font-size: var(--type-sm);
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.info-cats :global(.category-picker) {
-		min-width: min(12rem, 100%);
-		min-height: 2.4rem;
-	}
-	.info-field {
-		display: grid;
-		grid-template-columns: 6rem minmax(0, 1fr);
-		align-items: baseline;
-		gap: 0.75rem;
-	}
-	.info-field.info-key {
-		align-items: center;
-	}
-	.info-field > span {
-		font-size: var(--type-sm);
-		font-weight: 500;
-		color: var(--color-ink-faint);
-	}
-	.info-input {
-		width: 100%;
-		min-width: 0;
-		background: transparent;
-		border: none;
-		padding: 0.1rem 0;
-		font-family: var(--font-title);
-		font-size: 0.95rem;
-		color: var(--color-ink);
-	}
-	.info-input:focus {
-		outline: none;
-		box-shadow: inset 0 -1px 0 var(--color-ink);
-	}
 	.print-header {
 		display: none;
 	}
@@ -1121,9 +999,12 @@
 
 	@media (orientation: landscape) and (max-height: 34rem) {
 		.song-page {
-			--pad: clamp(14px, 2.8vw, 22px);
-			--gap: clamp(4px, 1.2vw, 8px);
-			--type: clamp(15px, 2.2vw, 17px);
+			--space-1: 0.3rem;
+			--space-2: 0.55rem;
+			--space-3: 0.9rem;
+			--space-4: 1.25rem;
+			--pad: clamp(16px, 2.8vw, 24px);
+			--control-h: 2.15rem;
 			padding-top: calc(var(--pad) + env(safe-area-inset-top, 0px));
 			padding-right: max(3.5rem, calc(var(--pad) + env(safe-area-inset-right, 0px)));
 			padding-bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px));
@@ -1131,12 +1012,6 @@
 		}
 		.title-input {
 			font-size: clamp(1.15rem, 3.6vw, 1.45rem);
-		}
-		.song-prints {
-			gap: 0.5rem;
-		}
-		.song-chrome {
-			margin-bottom: 0;
 		}
 	}
 </style>
