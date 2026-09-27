@@ -108,7 +108,34 @@
 	function renderPrintableBarLine(line: string): string {
 		return renderBarLine(line.replace(/[\u2013\u2014]/g, '-').replace(/\u00a0/g, ' '));
 	}
+
+	function isRepeatSection(section: PrintableSection): boolean {
+		return Boolean(section.chorusCue) || (section.compact && !!section.label);
+	}
 </script>
+
+{#snippet sectionHeading(text: string, repeat: boolean)}
+	<div class="pdf-section-label">
+		<span>{text}</span>
+		{#if repeat}
+			<svg
+				class="pdf-repeat-icon"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.8"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M17 1.5 21 5.5 17 9.5"></path>
+				<path d="M3 11.5v-2a4 4 0 0 1 4-4h14"></path>
+				<path d="M7 22.5 3 18.5 7 14.5"></path>
+				<path d="M21 12.5v2a4 4 0 0 1-4 4H3"></path>
+			</svg>
+		{/if}
+	</div>
+{/snippet}
 
 <article class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]">
 	<header class="print-song-header">
@@ -129,18 +156,18 @@
 				class:pdf-song-section--compact={section.compact}
 				class:pdf-song-section--framed={section.framed}
 				class:pdf-song-section--chorus-cue={Boolean(section.chorusCue)}
-				class:pdf-song-section--repeat={Boolean(section.chorusCue) || (section.compact && !!section.label)}
+				class:pdf-song-section--repeat={isRepeatSection(section)}
 			>
 				{#if section.chorusCue}
 					<div class="pdf-chorus-cue">
 						{#if section.label}
-							<span class="pdf-section-label">{section.label}</span>
+							{@render sectionHeading(section.label, true)}
 						{/if}
 						<span class="pdf-chorus-cue-lyric">{section.chorusCue}</span>
 					</div>
 				{:else}
 					{#if section.label}
-						<div class="pdf-section-label">{section.label}</div>
+						{@render sectionHeading(section.label, isRepeatSection(section))}
 					{/if}
 					{#if !section.compact}
 						<div class="pdf-section-grid">
