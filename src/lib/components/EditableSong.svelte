@@ -1868,11 +1868,19 @@
 	.editable-song .song-line-wrap.is-chord .chord-cell-clickable {
 		display: flex;
 		flex-wrap: nowrap;
-		justify-content: space-between;
+		justify-content: flex-start;
 		align-items: baseline;
-		column-gap: 0.35em;
 		white-space: nowrap;
 		max-width: 100%;
+		overflow: hidden;
+	}
+	.editable-song .song-line-wrap.is-chord .chord-cell-clickable :global(.bass-chord),
+	.editable-song .song-line-wrap.is-chord .chord-cell-clickable :global(.bar-sep) {
+		flex: 0 0 auto;
+	}
+	.editable-song .song-line-wrap.is-chord .chord-cell-clickable :global(.chord-spacer) {
+		flex: 0 1 1.15ch;
+		min-width: 0.12em;
 		overflow: hidden;
 	}
 	.editable-song .rhythm-cell-clickable,
