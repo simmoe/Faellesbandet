@@ -7,7 +7,12 @@
 	 * Fra v4 er `song.rows` autoritativ; falder tilbage til `parseRows`
 	 * af `rawInput` hvis et legacy-dokument slipper igennem.
 	 */
-	import { renderBarLine, sectionHeaderType, transposeBassLine } from '$lib/chordFormatter';
+	import {
+		renderBarLine,
+		sectionHeaderType,
+		spacesAsChordSpacers,
+		transposeBassLine
+	} from '$lib/chordFormatter';
 	import { buildSections, parseRows, transposeRows, type Row } from '$lib/songParse';
 	import type { BassLines, SongDoc } from '$lib/types';
 
@@ -106,7 +111,9 @@
 	}
 
 	function renderPrintableBarLine(line: string): string {
-		return renderBarLine(line.replace(/[\u2013\u2014]/g, '-').replace(/\u00a0/g, ' '));
+		return renderBarLine(
+			spacesAsChordSpacers(line.replace(/[\u2013\u2014]/g, '-').replace(/\u00a0/g, ' '))
+		);
 	}
 
 	function isRepeatSection(section: PrintableSection): boolean {

@@ -53,6 +53,27 @@ function normalizeChordLineMarkers(line: string): string {
  * `transpose` flytter alle akkorder med n halvtoner. Returnerer en
  * tom streng hvis linjen ikke indeholder akkorder.
  */
+const chordTokenRegex = new RegExp(`^${CHORD_PATTERN}$`);
+
+/** Print: et mellemrum mellem to akkorder tæller som `-`, så de ikke klistrer. */
+export function spacesAsChordSpacers(line: string): string {
+	const parts = line.split(/(\s+)/);
+	const out: string[] = [];
+	for (let i = 0; i < parts.length; i++) {
+		const part = parts[i];
+		if (/^\s+$/.test(part)) {
+			const prev = parts[i - 1] ?? '';
+			const next = parts[i + 1] ?? '';
+			if (chordTokenRegex.test(prev) && chordTokenRegex.test(next)) {
+				out.push(` ${'-'.repeat(Math.max(1, part.length))} `);
+				continue;
+			}
+		}
+		out.push(part);
+	}
+	return out.join('');
+}
+
 export function renderBarLine(line: string, transpose: number = 0): string {
 	if (!line || line.trim() === '') return '';
 	const tokens = normalizeChordLineMarkers(line).trim().split(/\s+/);
