@@ -828,8 +828,8 @@ select {
 }
 .pdf-chord .chord-spacer,
 .pdf-spacer {
-	flex: 0 1 auto;
-	min-width: 0.12em;
+	flex: 0 0 var(--chord-slot, calc(100% / var(--chord-slots, 16)));
+	min-width: 0;
 	overflow: hidden;
 	color: transparent;
 	letter-spacing: 0;

@@ -44,6 +44,7 @@
 
 	let {
 		rows: rowsProp,
+		barsPerLine = 4,
 		bassLines = {},
 		collapsedSections = [],
 		readOnly = false,
@@ -51,6 +52,8 @@
 		onBassLinesChange,
 		onCollapsedSectionsChange
 	}: Props = $props();
+
+	const chordSlots = $derived(barsPerLine * 4);
 
 	let rows = $state<Row[]>([]);
 	let lastEmitted = $state<Row[] | null>(null);
@@ -1225,6 +1228,7 @@
 	class:is-pristine={isPristineSong}
 	class:is-section-dragging={sectionDragCompact}
 	class:is-section-copying={sectionDragCopy}
+	style="--chord-slots: {chordSlots}; --chord-slot: calc(100% / {chordSlots});"
 	role={readOnly ? 'presentation' : 'textbox'}
 	aria-multiline={readOnly ? undefined : 'true'}
 	tabindex={readOnly ? undefined : -1}
@@ -1874,9 +1878,10 @@
 		flex: 0 0 auto;
 	}
 	.editable-song .song-line-wrap.is-chord .chord-cell-clickable :global(.chord-spacer) {
-		flex: 0 1 auto;
-		min-width: 0.12em;
+		flex: 0 0 var(--chord-slot);
+		min-width: 0;
 		overflow: hidden;
+		color: transparent;
 	}
 	.editable-song .rhythm-cell-clickable,
 	.editable-song .rhythm-cell-clickable :global(*),

@@ -24,6 +24,7 @@
 	const bassLines = $derived(transposeBassLines(song.bassLines, semitones));
 	const collapsedSet = $derived(new Set(song.collapsedSections ?? []));
 	const sections = $derived(buildPrintableSections(rows, collapsedSet));
+	const chordSlots = $derived((song.barsPerLine ?? 4) * 4);
 
 	function transposeBassLines(bl: BassLines | undefined, n: number): BassLines {
 		if (!bl) return {};
@@ -137,7 +138,10 @@
 	</div>
 {/snippet}
 
-<article class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]">
+<article
+	class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]"
+	style="--chord-slots: {chordSlots}; --chord-slot: calc(100% / {chordSlots});"
+>
 	<header class="print-song-header">
 		<h2 class="song-title">{song.title}</h2>
 		{#if song.artist || song.key}
