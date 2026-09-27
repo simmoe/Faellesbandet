@@ -604,35 +604,43 @@
 					</button>
 				</div>
 
-				{#if artist}
-					<p class="artist-line">{artist}</p>
+				{#if artist || canEdit || youtubeLinks.length > 0}
+					<div class="song-meta">
+						{#if artist}
+							<p class="artist-line">{artist}</p>
+						{:else}
+							<span></span>
+						{/if}
+						{#if canEdit || youtubeLinks.length > 0}
+							<button
+								type="button"
+								class="info-toggle"
+								class:is-open={infoOpen}
+								aria-expanded={infoOpen}
+								onclick={() => (infoOpen = !infoOpen)}
+							>
+								Oplysninger
+								<svg
+									class="info-chevron"
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 12 12"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.4"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M2.25 4.25 6 8l3.75-3.75"></path>
+								</svg>
+							</button>
+						{/if}
+					</div>
 				{/if}
 			</div>
 
 			{#if canEdit || youtubeLinks.length > 0}
 			<section class="info-block no-print" class:is-open={infoOpen}>
-				<button
-					type="button"
-					class="info-toggle"
-					class:is-open={infoOpen}
-					aria-expanded={infoOpen}
-					onclick={() => (infoOpen = !infoOpen)}
-				>
-					Oplysninger
-					<svg
-						class="info-chevron"
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 12 12"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.4"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M2.25 4.25 6 8l3.75-3.75"></path>
-					</svg>
-				</button>
 				<div class="info-fold" class:is-open={infoOpen}>
 					<div class="info-inner">
 						<div class="info-panel">
@@ -851,8 +859,16 @@
 		gap: 0.75rem;
 		min-width: 0;
 	}
+	.song-meta {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: baseline;
+		gap: var(--gap);
+		min-width: 0;
+		margin-top: 0.15rem;
+	}
 	.artist-line {
-		margin: 0.15rem 0 0;
+		margin: 0;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -907,24 +923,25 @@
 		box-shadow: inset 0 -1px 0 var(--color-ink);
 	}
 	.info-block {
-		margin-top: 0.45rem;
-		padding-top: 0.15rem;
-		border-top: 1px solid var(--color-border-subtle);
+		margin-top: 0;
+		padding-top: 0;
+		border: none;
 	}
 	.info-toggle {
 		appearance: none;
 		display: inline-grid;
 		grid-auto-flow: column;
 		align-items: center;
-		justify-content: start;
-		gap: 0.4rem;
-		width: 100%;
+		justify-content: end;
+		gap: 0.35rem;
+		width: auto;
+		justify-self: end;
 		border: none;
 		background: transparent;
-		padding: 0.7rem 0;
+		padding: 0;
 		font-size: var(--type-sm);
-		font-weight: 600;
-		color: var(--color-ink-muted);
+		font-weight: 500;
+		color: var(--color-ink-faint);
 		cursor: pointer;
 		white-space: nowrap;
 	}
