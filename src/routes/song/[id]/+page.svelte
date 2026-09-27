@@ -749,14 +749,13 @@
 			{/if}
 
 			<div class="print-header" aria-hidden="true">
-				<div>
-					<span class="print-title">{title || 'Uden titel'}</span>
-					{#if key.trim()}
-						<span class="print-key">· {key.trim()}</span>
-					{/if}
-				</div>
-				{#if artist.trim()}
-					<div class="print-artist">{artist.trim()}</div>
+				<div class="print-title">{title || 'Uden titel'}</div>
+				{#if artist.trim() || key.trim()}
+					<div class="print-artist">
+						{#if artist.trim()}{artist.trim()}{/if}
+						{#if artist.trim() && key.trim()} · {/if}
+						{#if key.trim()}<span class="print-key">{key.trim()}</span>{/if}
+					</div>
 				{/if}
 			</div>
 
