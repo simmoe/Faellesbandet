@@ -147,16 +147,12 @@ export function renderBarLine(line: string, transpose: number = 0): string {
 		.split(/(\s+|:?\|:?)/)
 		.filter((part) => part.length > 0);
 	const out: string[] = [];
-	let dashRun = 0;
 	const pushSpacer = () => {
-		if (dashRun >= MAX_DASH_SLOTS) return;
-		dashRun += 1;
 		out.push('<span class="chord-spacer">-</span>');
 	};
 	for (let i = 0; i < parts.length; i++) {
 		const tok = parts[i];
 		if (BAR_TOKEN.test(tok)) {
-			dashRun = 0;
 			out.push(`<span class="bar-sep">${escapeHtml(tok)}</span>`);
 			continue;
 		}
@@ -170,7 +166,6 @@ export function renderBarLine(line: string, transpose: number = 0): string {
 			for (let n = 0; n < tok.length; n++) pushSpacer();
 			continue;
 		}
-		dashRun = 0;
 		const name = transpose === 0 ? normalizeAccidentals(tok) : transposeChord(tok, transpose);
 		out.push(`<b class="bass-chord">${escapeHtml(name)}</b>`);
 	}
