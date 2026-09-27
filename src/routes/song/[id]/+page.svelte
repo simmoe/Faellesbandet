@@ -543,14 +543,14 @@
 			<div class="song-head no-print-toolbar">
 				{#if canEdit}
 					<input
-						class="title-input"
+						class="song-title title-input"
 						type="text"
 						bind:value={title}
 						oninput={() => scheduleSave()}
 						placeholder="Titel"
 					/>
 				{:else}
-					<h1 class="title-input">{title || 'Uden titel'}</h1>
+					<h1 class="song-title title-input">{title || 'Uden titel'}</h1>
 				{/if}
 
 				<div class="song-prints">
@@ -761,7 +761,7 @@
 			</div>
 
 			<div class="print-header" aria-hidden="true">
-				<div class="print-title">{title || 'Uden titel'}</div>
+				<div class="song-title print-title">{title || 'Uden titel'}</div>
 				{#if artist.trim() || key.trim()}
 					<div class="print-artist">
 						{#if artist.trim()}{artist.trim()}{/if}
@@ -915,11 +915,7 @@
 		min-width: 0;
 		background: transparent;
 		border: none;
-		font-family: var(--font-title);
 		font-size: clamp(1.35rem, 6vw, 1.7rem);
-		line-height: 1.12;
-		font-weight: 400;
-		color: var(--color-ink);
 		padding: 0;
 		margin: 0;
 	}

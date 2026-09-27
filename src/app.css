@@ -499,8 +499,8 @@ select {
 	border: 1px solid rgba(0, 0, 0, 0.06);
 }
 .chord-grid .section-header--intro {
-	background: #e3f2fd;
-	color: #0d47a1;
+	background: #fce7f3;
+	color: #9d174d;
 }
 .chord-grid .section-header--verse {
 	background: #e8f5e9;
@@ -527,8 +527,8 @@ select {
 	color: #0d6e63;
 }
 .chord-grid .section-header--outro {
-	background: #ede7f6;
-	color: #4527a0;
+	background: #ffedd5;
+	color: #9a3412;
 }
 .chord-grid .section-header--coda {
 	background: #efebe9;
@@ -648,6 +648,13 @@ select {
 	padding: 0;
 	border: 0;
 }
+.song-title {
+	font-family: var(--font-title);
+	font-weight: 400;
+	line-height: 1.12;
+	letter-spacing: -0.02em;
+	color: var(--color-ink);
+}
 .print-song-header h2 {
 	margin: 0;
 	min-width: 0;
@@ -655,6 +662,7 @@ select {
 	font-size: calc(1.55rem * var(--pdf-layout-scale));
 	font-weight: 400;
 	line-height: 1.12;
+	letter-spacing: -0.02em;
 	color: var(--color-ink);
 }
 .print-song-meta {
@@ -838,14 +846,14 @@ select {
 .pdf-line--blank {
 	min-height: calc(0.14cm * var(--pdf-layout-scale));
 }
-.song-section--intro, .pdf-song-section--intro { --section-accent: #0d47a1; }
+.song-section--intro, .pdf-song-section--intro { --section-accent: #9d174d; }
 .song-section--verse, .pdf-song-section--verse { --section-accent: #1b5e20; }
 .song-section--pre-chorus, .pdf-song-section--pre-chorus { --section-accent: #8d6e00; }
 .song-section--chorus, .pdf-song-section--chorus { --section-accent: #b71c1c; }
 .song-section--bridge, .pdf-song-section--bridge { --section-accent: #b3501a; }
 .song-section--solo, .pdf-song-section--solo { --section-accent: #6c5b00; }
 .song-section--interlude, .pdf-song-section--interlude { --section-accent: #0d6e63; }
-.song-section--outro, .pdf-song-section--outro { --section-accent: #4527a0; }
+.song-section--outro, .pdf-song-section--outro { --section-accent: #9a3412; }
 .song-section--coda, .pdf-song-section--coda { --section-accent: #4e342e; }
 .song-section--other, .pdf-song-section--other, .song-section--unlabeled {
 	--section-accent: #6b7280;
@@ -904,11 +912,7 @@ select {
 		page-break-after: avoid;
 	}
 	.print-header .print-title {
-		font-family: var(--font-title);
 		font-size: 16pt;
-		font-weight: 400;
-		line-height: 1.12;
-		color: var(--color-ink);
 	}
 	.print-header .print-key {
 		font-family: var(--font-sans);

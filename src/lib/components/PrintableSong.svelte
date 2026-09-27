@@ -139,7 +139,7 @@
 
 <article class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]">
 	<header class="print-song-header">
-		<h2>{song.title}</h2>
+		<h2 class="song-title">{song.title}</h2>
 		{#if song.artist || song.key}
 			<p class="print-song-meta">
 				{#if song.artist}<span>{song.artist}</span>{/if}
