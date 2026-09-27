@@ -474,23 +474,29 @@ select {
 	grid-column: 2 !important;
 }
 .print-song-header {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 1rem;
-	margin-bottom: calc(0.28rem * var(--pdf-layout-scale)) !important;
-	padding-bottom: calc(0.16rem * var(--pdf-layout-scale)) !important;
+	display: grid;
+	justify-items: start;
+	gap: calc(0.12em * var(--pdf-layout-scale, 1));
+	margin: 0 0 calc(0.7em * var(--pdf-layout-scale, 1));
+	padding: 0;
+	border: 0;
 }
 .print-song-header h2 {
+	margin: 0;
 	min-width: 0;
-	flex: 1 1 auto;
-	line-height: 1.05;
-	font-size: calc(1.5rem * var(--pdf-layout-scale));
+	font-family: var(--font-title);
+	font-size: calc(1.55rem * var(--pdf-layout-scale));
+	font-weight: 400;
+	line-height: 1.12;
+	color: var(--color-ink);
 }
 .print-song-meta {
-	flex: 0 0 auto;
-	white-space: nowrap;
-	font-size: calc(0.875rem * var(--pdf-layout-scale));
+	margin: 0;
+	font-family: var(--font-sans);
+	font-size: calc(0.82rem * var(--pdf-layout-scale));
+	font-weight: 400;
+	line-height: 1.2;
+	color: var(--color-ink-faint);
 }
 .pdf-song-sections {
 	display: grid;
@@ -502,24 +508,27 @@ select {
 	border: 0;
 	border-radius: 0;
 	margin: 0;
-	padding: calc(0.18cm * var(--pdf-layout-scale, 1)) 0 0;
+	padding: calc(0.42em * var(--pdf-layout-scale, 1)) 0 calc(0.18em * var(--pdf-layout-scale, 1));
 	break-inside: avoid;
 	background: transparent;
+}
+.pdf-song-sections > .pdf-song-section:first-child {
+	padding-top: 0;
 }
 .pdf-song-section--compact {
 	margin-top: 0;
 	min-height: 0;
-	padding: calc(0.1cm * var(--pdf-layout-scale, 1)) 0 0;
+	padding: calc(0.22em * var(--pdf-layout-scale, 1)) 0 0;
 }
 .pdf-song-section--unlabeled {
 	padding-top: 0;
 }
 .pdf-song-section--framed {
 	border: 0;
-	padding: calc(0.18cm * var(--pdf-layout-scale, 1)) 0 0;
+	padding: calc(0.42em * var(--pdf-layout-scale, 1)) 0 calc(0.18em * var(--pdf-layout-scale, 1));
 }
 .pdf-song-section--chorus-cue {
-	padding: calc(0.1cm * var(--pdf-layout-scale, 1)) 0 0;
+	padding: calc(0.22em * var(--pdf-layout-scale, 1)) 0 0;
 }
 .pdf-song-section--repeat {
 	border: 0.4pt solid #111827;
@@ -534,8 +543,9 @@ select {
 	min-width: 0;
 }
 .pdf-chorus-cue-lyric {
-	font-size: calc(10pt * var(--pdf-layout-scale));
-	line-height: 1.2;
+	font-family: var(--font-sans);
+	font-size: calc(11pt * var(--pdf-layout-scale));
+	line-height: 1.28;
 	font-weight: 400;
 	min-width: 0;
 }
@@ -556,12 +566,12 @@ select {
 	display: block;
 	background: transparent;
 	color: var(--section-accent);
-	padding: 0;
-	margin: 0 0 calc(0.04cm * var(--pdf-layout-scale, 1));
-	font-size: calc(8pt * var(--pdf-layout-scale));
-	line-height: 1.05;
+	padding: 0 0 calc(0.22em * var(--pdf-layout-scale, 1));
+	margin: 0;
+	font-size: calc(8.5pt * var(--pdf-layout-scale));
+	line-height: 1.15;
 	font-weight: 800;
-	letter-spacing: 0.05em;
+	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	text-align: left;
 	white-space: nowrap;
@@ -597,7 +607,7 @@ select {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) max-content;
 	column-gap: calc(3mm * var(--pdf-layout-scale));
-	row-gap: 0;
+	row-gap: calc(0.08em * var(--pdf-layout-scale, 1));
 	align-items: baseline;
 }
 .pdf-line,
@@ -606,29 +616,48 @@ select {
 }
 .pdf-chord,
 .pdf-bass {
+	font-family: var(--font-mono);
+	font-size: calc(9.5pt * var(--pdf-layout-scale));
+	line-height: 1.2;
+}
+.pdf-chord {
+	display: flex;
+	flex-wrap: nowrap;
+	justify-content: flex-start;
+	align-items: baseline;
+	white-space: nowrap;
+	color: var(--color-chord);
+	font-weight: 600;
+}
+.pdf-bass {
 	white-space: pre;
 }
-.pdf-chord,
-.pdf-bass {
-	font-family: var(--font-mono);
-	font-size: calc(9pt * var(--pdf-layout-scale));
-	line-height: 1.15;
-}
-.pdf-chord .bass-chord {
+.pdf-chord .bass-chord,
+.pdf-chord .bar-sep {
 	color: var(--color-chord);
-	font-weight: 400;
+	font-weight: 600;
 }
 .pdf-bass .bass-chord {
 	display: inline-block;
 	min-width: 2.2ch;
 }
+.pdf-chord .chord-spacer,
 .pdf-spacer {
+	flex: 0 1 1.15ch;
+	min-width: 0.12em;
+	overflow: hidden;
+	color: transparent;
 	letter-spacing: 0;
 	user-select: none;
 }
+.pdf-lyric,
+.pdf-lyric + .pdf-bass {
+	padding-bottom: calc(0.38em * var(--pdf-layout-scale, 1));
+}
 .pdf-lyric {
-	font-size: calc(10pt * var(--pdf-layout-scale));
-	line-height: 1.22;
+	font-family: var(--font-sans);
+	font-size: calc(11pt * var(--pdf-layout-scale));
+	line-height: 1.28;
 	font-weight: 400;
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
@@ -694,43 +723,43 @@ select {
 		page-break-inside: auto;
 	}
 
-	/* Print-header: titel + toneart + kunstner kompakt */
 	.print-header {
-		display: block !important;
-		margin: 0 0 0.35cm;
+		display: grid !important;
+		justify-items: start;
+		gap: 0.12em;
+		margin: 0 0 0.55cm;
 		page-break-after: avoid;
 	}
 	.print-header .print-title {
-		font-family: var(--font-display);
+		font-family: var(--font-title);
 		font-size: 16pt;
-		font-weight: 700;
-		line-height: 1.1;
-		color: #000;
+		font-weight: 400;
+		line-height: 1.12;
+		color: var(--color-ink);
 	}
 	.print-header .print-key {
-		font-family: var(--font-mono);
-		font-size: 11pt;
-		font-weight: 700;
-		color: #000;
-		margin-left: 0.4em;
+		font-family: var(--font-sans);
+		font-size: 10pt;
+		font-weight: 400;
+		color: var(--color-ink-faint);
+		margin-left: 0.35em;
 	}
 	.print-header .print-artist {
-		font-size: 9pt;
-		font-style: italic;
-		color: #444;
-		margin-top: 0.05cm;
+		font-size: 10pt;
+		font-style: normal;
+		font-weight: 400;
+		color: var(--color-ink-faint);
+		margin-top: 0;
 	}
 
-	/* Chord-grid: kompakt layout, ingen interaktive states */
 	.chord-grid {
-		font-size: 10pt !important;
-		line-height: 1.18 !important;
-		color: #000 !important;
+		font-size: 11pt !important;
+		line-height: 1.28 !important;
 	}
 	.chord-grid .chord-cell,
 	.chord-grid .rhythm-cell {
 		font-size: 9.5pt !important;
-		color: #000 !important;
+		color: var(--color-chord) !important;
 	}
 	.chord-grid .lyrics-cell,
 	.editable-song .lyric-cell {
@@ -738,7 +767,11 @@ select {
 	}
 	.chord-grid .bass-chord,
 	.chord-grid .bar-sep {
-		color: #000 !important;
+		color: var(--color-chord) !important;
+	}
+	.editable-song .song-section {
+		border: none !important;
+		padding: 0.38em 0 0.2em !important;
 	}
 	.chord-grid .section-header-cell {
 		margin: 0 !important;
@@ -749,9 +782,6 @@ select {
 		color: inherit !important;
 		font-size: 9.5pt !important;
 		padding: 0 !important;
-	}
-	.editable-song .song-section {
-		border: none !important;
 	}
 
 	/* Sang-area: ingen ramme, ingen padding */

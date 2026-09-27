@@ -106,22 +106,20 @@
 	}
 
 	function renderPrintableBarLine(line: string): string {
-		const normalized = line.replace(/[\u2013\u2014]/g, '-').replace(/\u00a0/g, ' ');
-		return renderBarLine(normalized).replace(
-			new RegExp('<span class="chord-spacer">-+</span>', 'g'),
-			'<span class="chord-spacer pdf-spacer">&nbsp;</span>'
-		);
+		return renderBarLine(line.replace(/[\u2013\u2014]/g, '-').replace(/\u00a0/g, ' '));
 	}
 </script>
 
 <article class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]">
-	<header class="print-song-header mb-4 border-b border-[var(--color-border-subtle)] pb-3">
-		<h2 class="font-display text-2xl font-bold">{song.title}</h2>
-		<div class="print-song-meta text-right text-sm text-[var(--color-ink-muted)]">
-			{#if song.artist}<span>{song.artist}</span>{/if}
-			{#if song.artist && song.key}<span> · </span>{/if}
-			{#if song.key}<span>Toneart: <b>{song.key}</b></span>{/if}
-		</div>
+	<header class="print-song-header">
+		<h2>{song.title}</h2>
+		{#if song.artist || song.key}
+			<p class="print-song-meta">
+				{#if song.artist}<span>{song.artist}</span>{/if}
+				{#if song.artist && song.key}<span> · </span>{/if}
+				{#if song.key}<span>{song.key}</span>{/if}
+			</p>
+		{/if}
 	</header>
 	<div class="pdf-song-sections">
 		{#each sections as section}
