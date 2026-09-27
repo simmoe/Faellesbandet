@@ -751,11 +751,11 @@ select {
 	white-space: nowrap;
 }
 .pdf-repeat-icon {
-	width: 1.15em;
-	height: 1.15em;
+	width: 0.92em;
+	height: 0.92em;
 	flex: 0 0 auto;
-	color: inherit;
-	opacity: 0.88;
+	color: #111827;
+	opacity: 0.55;
 }
 .set-break-page {
 	box-sizing: border-box;
