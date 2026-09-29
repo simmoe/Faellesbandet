@@ -305,8 +305,7 @@ select {
 .song-page .info-input::placeholder {
 	color: var(--color-ink-faint);
 }
-.song-page .info-cats,
-.song-page .info-flags {
+.song-page .info-cats {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;

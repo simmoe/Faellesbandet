@@ -47,6 +47,7 @@ interface ExportOptions {
 interface AudienceExportOptions extends ExportOptions {
 	title: string;
 	categoryMeta?: CategoryMeta;
+	includeFrontMatter?: boolean;
 }
 
 const MIN_LAYOUT_SCALE = 0.55;
@@ -91,6 +92,15 @@ function restoreStyles(el: HTMLElement, saved: SavedStyles): void {
 
 async function waitForLayout(): Promise<void> {
 	await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+}
+
+async function waitForAudienceLayout(root: HTMLElement): Promise<void> {
+	for (let i = 0; i < 24; i++) {
+		await tick();
+		await waitForLayout();
+		const book = root.querySelector<HTMLElement>('.audience-book');
+		if (book?.dataset.ready === 'true') return;
+	}
 }
 
 async function waitForImages(root: HTMLElement): Promise<void> {
@@ -539,13 +549,16 @@ export async function exportAudienceSongbookAsPdf(
 
 	const component = mount(AudienceSongbook, {
 		target: pageDiv,
-		props: { title: opts.title, songs, categoryMeta }
+		props: {
+			title: opts.title,
+			songs,
+			categoryMeta,
+			includeFrontMatter: opts.includeFrontMatter ?? true
+		}
 	});
 
-	await tick();
-	await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+	await waitForAudienceLayout(pageDiv);
 	await waitForImages(wrapper);
-	await waitForLayout();
 
 	try {
 		const pages = [...pageDiv.querySelectorAll<HTMLElement>('.audience-page')];

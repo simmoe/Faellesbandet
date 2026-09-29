@@ -354,7 +354,8 @@
 			const exportTitle = title.trim() || song.title || 'Sang';
 			await exportAudienceSongbookAsPdf([liveSongForExport], {
 				title: exportTitle,
-				filename: `${exportTitle} - tekst`
+				filename: `${exportTitle} - tekst`,
+				includeFrontMatter: false
 			});
 		} catch (err) {
 			console.error('Publikums-PDF fejlede:', err);
@@ -662,6 +663,36 @@
 						</svg>
 						<span>{audiencePdfBusy ? '…' : 'Tekst'}</span>
 					</button>
+					<div class="song-print-flags">
+						<label class="print-toggle">
+							<input
+								type="checkbox"
+								bind:checked={fitSinglePage}
+								onchange={() => scheduleSave()}
+							/>
+							Enkeltside
+						</label>
+						<label class="print-toggle">
+							<input
+								type="checkbox"
+								bind:checked={columnLayout}
+								onchange={() => {
+									if (columnLayout) showBassTabs = false;
+									scheduleSave();
+								}}
+							/>
+							Kolonne
+						</label>
+						<label class="print-toggle" class:is-disabled={columnLayout}>
+							<input
+								type="checkbox"
+								bind:checked={showBassTabs}
+								disabled={columnLayout}
+								onchange={() => scheduleSave()}
+							/>
+							Bas
+						</label>
+					</div>
 				</div>
 
 				{#if artist || canEdit || youtubeLinks.length > 0}
@@ -727,39 +758,6 @@
 												spellcheck="false"
 											/>
 											<button type="button" class="key-btn" title="Transponér op" onclick={() => transpose(1)}>+</button>
-										</div>
-									</div>
-									<div class="info-field">
-										<span>Visning</span>
-										<div class="info-flags">
-											<label class="print-toggle bass-toggle" class:is-disabled={columnLayout}>
-												<input
-													type="checkbox"
-													bind:checked={showBassTabs}
-													disabled={columnLayout}
-													onchange={() => scheduleSave()}
-												/>
-												Bass
-											</label>
-											<label class="print-toggle">
-												<input
-													type="checkbox"
-													bind:checked={fitSinglePage}
-													onchange={() => scheduleSave()}
-												/>
-												Én side
-											</label>
-											<label class="print-toggle">
-												<input
-													type="checkbox"
-													bind:checked={columnLayout}
-													onchange={() => {
-														if (columnLayout) showBassTabs = false;
-														scheduleSave();
-													}}
-												/>
-												Kolonner
-											</label>
 										</div>
 									</div>
 									<div class="info-field">
@@ -969,11 +967,22 @@
 		min-width: 0;
 	}
 	.song-prints {
-		display: grid;
-		grid-auto-flow: column;
-		justify-content: start;
-		gap: var(--space-2);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2) var(--space-3);
 		min-width: 0;
+	}
+	.song-print-flags {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2) var(--space-3);
+	}
+	.song-prints :global(.print-toggle) {
+		min-height: 0;
+		font-size: var(--type-xs);
+		font-weight: 500;
 	}
 	.song-meta {
 		display: grid;
@@ -1092,13 +1101,6 @@
 	}
 	:global(.play-hidden) {
 		display: none !important;
-	}
-
-	@media (max-width: 40rem) and (orientation: portrait),
-		(orientation: landscape) and (max-height: 34rem) {
-		.bass-toggle {
-			display: none;
-		}
 	}
 
 	@media (orientation: landscape) and (max-height: 34rem) {
