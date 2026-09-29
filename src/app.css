@@ -156,6 +156,9 @@ body > * {
 		animation: none;
 	}
 }
+html.song-is-playing body::before {
+	display: none !important;
+}
 @keyframes liquid-wash {
 	from {
 		transform: translate3d(-4%, 2%, 0) scale(1);
