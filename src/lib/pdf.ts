@@ -377,7 +377,9 @@ export async function exportSongsAsPdf(
 			const song = entry.song;
 			pageDiv.style.padding = OFFSCREEN_PAGE_PADDING;
 			pageDiv.dataset.fitSinglePage = String(opts.fitSinglePage ?? song.fitSinglePage ?? true);
-			if ((entry.withBassTabs ?? song.showBassTabs ?? true) === false) {
+			if (song.columnLayout) {
+				pageDiv.classList.add('column-layout', 'no-bass-tabs');
+			} else if ((entry.withBassTabs ?? song.showBassTabs ?? true) === false) {
 				pageDiv.classList.add('no-bass-tabs');
 			}
 			const c = mount(PrintableSong, { target: pageDiv, props: { song } });
@@ -451,7 +453,9 @@ async function insertChordSongbookToc(args: {
 			});
 			item.component = c;
 			components.push(c);
-			if ((item.entry.withBassTabs ?? item.entry.song.showBassTabs ?? true) === false) {
+			if (item.entry.song.columnLayout) {
+				item.el.classList.add('column-layout', 'no-bass-tabs');
+			} else if ((item.entry.withBassTabs ?? item.entry.song.showBassTabs ?? true) === false) {
 				item.el.classList.add('no-bass-tabs');
 			}
 		}

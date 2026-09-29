@@ -137,7 +137,11 @@
 	</div>
 {/snippet}
 
-<article class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]">
+<article
+	class="print-page mb-8 rounded-md bg-white p-6 text-[var(--color-ink)]"
+	class:column-layout={Boolean(song.columnLayout)}
+	class:no-bass-tabs={Boolean(song.columnLayout) || song.showBassTabs === false}
+>
 	<header class="print-song-header">
 		<h2 class="song-title">{song.title}</h2>
 		{#if song.artist || song.key}

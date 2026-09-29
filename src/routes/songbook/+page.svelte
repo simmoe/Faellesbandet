@@ -682,7 +682,7 @@
 			return songs.map((song) => ({
 				type: 'song',
 				song,
-				withBassTabs: song.showBassTabs ?? true
+				withBassTabs: song.columnLayout ? false : (song.showBassTabs ?? true)
 			}));
 		}
 		const byId = new Map(songs.map((song) => [song.id, song]));
@@ -692,7 +692,7 @@
 				if (entry.type === 'set') return { ...entry, label: setLabelForOrderIndex(order, index) };
 				const song = byId.get(entry.songId);
 				return song
-					? { type: 'song' as const, song, withBassTabs: song.showBassTabs ?? true }
+					? { type: 'song' as const, song, withBassTabs: song.columnLayout ? false : (song.showBassTabs ?? true) }
 					: null;
 			})
 			.filter((entry): entry is SongbookPrintEntry => !!entry);

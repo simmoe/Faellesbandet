@@ -84,6 +84,11 @@ export interface SongDoc {
 	collapsedSections?: CollapsedSections;
 	/** Om bass tabs skal vises på sangside og medtages i PDF'er. */
 	showBassTabs?: boolean;
+	/**
+	 * To-kolonne visning (udvalgte sange). Skjuler automatisk baslinjer
+	 * og sætter skærm + print/PDF op i to spalter.
+	 */
+	columnLayout?: boolean;
 	/** Om PDF-export som udgangspunkt skal skalere sangen til maks én A4-side. */
 	fitSinglePage?: boolean;
 	categories?: string[];

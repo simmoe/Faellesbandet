@@ -589,6 +589,34 @@ select {
 	column-gap: 0 !important;
 }
 
+.column-layout .editable-song {
+	display: block;
+	columns: 2;
+	column-gap: 1.6em;
+	column-fill: auto;
+}
+.column-layout .editable-song > .song-section {
+	break-inside: avoid;
+}
+.print-page.column-layout .pdf-song-sections,
+.column-layout .pdf-song-sections {
+	display: block;
+	columns: 2;
+	column-gap: 8mm;
+	column-fill: auto;
+}
+@media (max-width: 48rem) {
+	.column-layout .editable-song {
+		columns: 1;
+	}
+}
+@media print {
+	.column-layout .editable-song {
+		columns: 2 !important;
+		column-gap: 8mm;
+	}
+}
+
 /* Telefon: ingen bas-kolonne. iPad og opefter beholder den.
  * iPhone landscape er ofte bredere end iPad-portræt, så vi bruger højde. */
 @media screen and (max-width: 40rem) and (orientation: portrait),

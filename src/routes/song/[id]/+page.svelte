@@ -58,6 +58,7 @@
 	let categoryColorMap = $state<CategoryColorMap>({});
 	let categoryMetaMap = $state<CategoryMetaMap>({});
 	let showBassTabs = $state(true);
+	let columnLayout = $state(false);
 	let fitSinglePage = $state(true);
 	let infoOpen = $state(false);
 	let youtubeLinks = $state<YoutubeLink[]>([]);
@@ -125,6 +126,7 @@
 				bassLines = { ...(s.bassLines ?? {}) };
 				collapsedSections = [...(s.collapsedSections ?? [])];
 				showBassTabs = s.showBassTabs ?? true;
+				columnLayout = s.columnLayout ?? false;
 				fitSinglePage = s.fitSinglePage ?? true;
 				youtubeLinks = [...(s.youtubeLinks ?? [])];
 			})
@@ -171,6 +173,7 @@
 				bassLines,
 				collapsedSections,
 				showBassTabs,
+				columnLayout,
 				fitSinglePage,
 				youtubeLinks,
 				schemaVersion: 4
@@ -314,6 +317,7 @@
 					bassLines,
 					collapsedSections,
 					showBassTabs,
+					columnLayout,
 					fitSinglePage
 				} as SongDoc)
 			: null
@@ -330,7 +334,7 @@
 			if (!liveSongForExport) return;
 			await exportSongsAsPdf([liveSongForExport], {
 				filename: title.trim() || song.title || 'Sang',
-				withBassTabs: showBassTabs,
+				withBassTabs: columnLayout ? false : showBassTabs,
 				fitSinglePage
 			});
 		} catch (err) {
@@ -744,6 +748,14 @@
 												/>
 												Én side
 											</label>
+											<label class="print-toggle">
+												<input
+													type="checkbox"
+													bind:checked={columnLayout}
+													onchange={() => scheduleSave()}
+												/>
+												Kolonner
+											</label>
 										</div>
 									</div>
 									<div class="info-field">
@@ -827,7 +839,11 @@
 				{/if}
 			</div>
 
-			<div class="song-area" class:no-bass-tabs={!showBassTabs}>
+			<div
+				class="song-area"
+				class:no-bass-tabs={!showBassTabs || columnLayout}
+				class:column-layout={columnLayout}
+			>
 				<EditableSong
 					{rows}
 					{barsPerLine}
