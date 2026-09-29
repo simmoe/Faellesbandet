@@ -1,11 +1,5 @@
 <script lang="ts">
-	import {
-		buildSections,
-		findPreviousSameType,
-		parseRows,
-		sectionHasBodyContent,
-		type Row
-	} from '$lib/songParse';
+	import { buildSections, parseRows, type Row } from '$lib/songParse';
 	import type { CategoryMeta, SongDoc } from '$lib/types';
 	import SongbookToc from './SongbookToc.svelte';
 	import { buildSongbookTocPages, tocPageCountForSongs } from '$lib/songbookToc';
@@ -31,10 +25,12 @@
 		artist?: string;
 		lines: AudienceLine[];
 		columns: 1 | 2;
+		fitSinglePage: boolean;
 	}
 
 	interface AudiencePage extends AudienceSong {
 		page: number;
+		scale: number;
 	}
 
 	const sourceSongs = $derived(songs.map(toAudienceSong).filter((song) => song.lines.length > 0));
@@ -84,7 +80,6 @@
 	function toAudienceSong(song: SongDoc): AudienceSong {
 		const rows = rowsFor(song);
 		const sections = buildSections(rows);
-		const collapsed = new Set(song.collapsedSections ?? []);
 		const lines: AudienceLine[] = [];
 		let hasRenderedChorus = false;
 
@@ -93,24 +88,15 @@
 		} else {
 			for (const section of sections) {
 				const isChorus = section.type === 'chorus';
-				const hasLyrics = sectionHasBodyContent(rows, section);
-				const collapsedHere = collapsed.has(section.headerIdx);
-				const previousSame = findPreviousSameType(sections, section.headerIdx, rows);
-				const repeatWithoutText =
-					(isChorus && hasRenderedChorus) ||
-					collapsedHere ||
-					(!hasLyrics && previousSame !== null);
-
-				if (repeatWithoutText) {
+				if (isChorus && hasRenderedChorus) {
 					appendBlank(lines);
-					appendRepeat(lines, sectionLabel(section.headerText, isChorus));
-					if (isChorus) hasRenderedChorus = true;
+					appendRepeat(lines, chorusLabel(section.headerText));
 					continue;
 				}
 
 				appendBlank(lines);
 				if (isChorus) {
-					appendLabel(lines, sectionLabel(section.headerText, true));
+					appendLabel(lines, chorusLabel(section.headerText));
 					hasRenderedChorus = true;
 				}
 				for (let i = section.bodyStart; i < section.bodyEnd; i++) {
@@ -124,7 +110,8 @@
 			title: song.title,
 			artist: song.artist,
 			lines: trimAudienceLines(lines),
-			columns: song.columnLayout ? 2 : 1
+			columns: song.columnLayout ? 2 : 1,
+			fitSinglePage: song.fitSinglePage !== false
 		};
 	}
 
@@ -158,10 +145,8 @@
 		lines.push({ kind: 'repeat', text });
 	}
 
-	function sectionLabel(headerText: string, chorus: boolean): string {
-		const trimmed = headerText.trim();
-		if (trimmed) return trimmed;
-		return chorus ? 'Omkvæd' : 'Sektion';
+	function chorusLabel(headerText: string): string {
+		return headerText.trim() || 'Omkvæd';
 	}
 
 	function trimAudienceLines(lines: AudienceLine[]): AudienceLine[] {
@@ -208,6 +193,35 @@
 		return chunks;
 	}
 
+	function contentOverflows(section: HTMLElement): boolean {
+		const linesBox = section.querySelector<HTMLElement>('.audience-lines');
+		if (!linesBox) return false;
+		const box = linesBox.getBoundingClientRect();
+		const last = [...linesBox.querySelectorAll('[data-audience-line]')].at(-1);
+		if (!last) return false;
+		const rect = last.getBoundingClientRect();
+		return rect.bottom > box.bottom + 1.5 || rect.right > box.right + 1.5;
+	}
+
+	function fitScaleForSection(section: HTMLElement): number {
+		let low = 0.55;
+		let high = 1;
+		let best = 0.55;
+		for (let i = 0; i < 12; i++) {
+			const mid = (low + high) / 2;
+			section.style.setProperty('--pdf-layout-scale', String(mid));
+			void section.offsetHeight;
+			if (!contentOverflows(section)) {
+				best = mid;
+				low = mid;
+			} else {
+				high = mid;
+			}
+		}
+		section.style.removeProperty('--pdf-layout-scale');
+		return best;
+	}
+
 	function paginateSongs(
 		root: HTMLElement,
 		input: AudienceSong[],
@@ -218,9 +232,19 @@
 		const pages: AudiencePage[] = [];
 		for (const song of input) {
 			const section = root.querySelector<HTMLElement>(`[data-song-id="${CSS.escape(song.id)}"]`);
+			if (song.fitSinglePage) {
+				pages.push({
+					...song,
+					lines: song.lines,
+					page,
+					scale: section ? fitScaleForSection(section) : 1
+				});
+				page += 1;
+				continue;
+			}
 			const chunks = section ? paginateSong(section, song) : [song.lines];
 			for (const lines of chunks) {
-				pages.push({ ...song, lines, page });
+				pages.push({ ...song, lines, page, scale: 1 });
 				page += 1;
 			}
 		}
@@ -232,7 +256,7 @@
 	{#if planned === null}
 		<div class="audience-measure" bind:this={measureRoot}>
 			{#each sourceSongs as song (song.id)}
-				{@render songPage(song, song.lines, 0, false)}
+				{@render songPage(song, song.lines, 0, false, 1)}
 			{/each}
 		</div>
 	{:else}
@@ -254,16 +278,23 @@
 		{/if}
 
 		{#each planned as page (page.id + '-' + page.page)}
-			{@render songPage(page, page.lines, page.page, showPageNumbers)}
+			{@render songPage(page, page.lines, page.page, showPageNumbers, page.scale)}
 		{/each}
 	{/if}
 </article>
 
-{#snippet songPage(song: AudienceSong, lines: AudienceLine[], page: number, numbered: boolean)}
+{#snippet songPage(
+	song: AudienceSong,
+	lines: AudienceLine[],
+	page: number,
+	numbered: boolean,
+	scale: number
+)}
 	<section
 		class="audience-page audience-song-page"
 		data-fit-single-page="false"
 		data-song-id={song.id}
+		style:--pdf-layout-scale={scale}
 	>
 		<section class="audience-song">
 			<header>
@@ -329,6 +360,7 @@
 		break-after: page;
 		position: relative;
 		overflow: hidden;
+		--pdf-layout-scale: 1;
 	}
 	.audience-cover {
 		display: grid;
@@ -387,21 +419,21 @@
 	}
 	.audience-song header {
 		flex: 0 0 auto;
-		margin-bottom: 5mm;
-		padding-bottom: 3mm;
+		margin-bottom: calc(5mm * var(--pdf-layout-scale, 1));
+		padding-bottom: calc(3mm * var(--pdf-layout-scale, 1));
 		border-bottom: 1px solid #dcc48d;
 	}
 	.audience-song h2 {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: 16pt;
+		font-size: calc(16pt * var(--pdf-layout-scale, 1));
 		line-height: 1.08;
 		color: #172033;
 	}
 	.audience-song header p {
-		margin: 1mm 0 0;
+		margin: calc(1mm * var(--pdf-layout-scale, 1)) 0 0;
 		color: #64748b;
-		font-size: 9.5pt;
+		font-size: calc(9.5pt * var(--pdf-layout-scale, 1));
 		font-style: italic;
 	}
 	.audience-lines {
@@ -410,7 +442,7 @@
 		min-height: 0;
 		columns: 1;
 		column-fill: auto;
-		column-gap: 11mm;
+		column-gap: calc(11mm * var(--pdf-layout-scale, 1));
 		font-family: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
 	}
 	.audience-lines--two {
@@ -422,18 +454,18 @@
 		overflow: visible;
 	}
 	.audience-lines p {
-		margin: 0 0 1.2mm;
-		font-size: 15.4pt;
+		margin: 0 0 calc(1.2mm * var(--pdf-layout-scale, 1));
+		font-size: calc(15.4pt * var(--pdf-layout-scale, 1));
 		line-height: 1.24;
 		color: #1f2937;
 		white-space: pre-wrap;
 		break-inside: avoid;
 	}
 	.audience-lines .audience-repeat-label {
-		margin: 2.4mm 0 1.7mm;
+		margin: calc(2.4mm * var(--pdf-layout-scale, 1)) 0 calc(1.7mm * var(--pdf-layout-scale, 1));
 		color: #9a6a12;
 		font-family: var(--font-display);
-		font-size: 13.2pt;
+		font-size: calc(13.2pt * var(--pdf-layout-scale, 1));
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
@@ -446,14 +478,14 @@
 		width: max-content;
 		min-width: 11em;
 		max-width: 100%;
-		margin: 2.4mm 0 1.7mm;
+		margin: calc(2.4mm * var(--pdf-layout-scale, 1)) 0 calc(1.7mm * var(--pdf-layout-scale, 1));
 		padding: 0.45em 0.7em;
 		border: 0.4pt solid #111827;
 		border-radius: 4px;
 		break-inside: avoid;
 		color: #172033;
 		font-family: var(--font-display);
-		font-size: 11pt;
+		font-size: calc(11pt * var(--pdf-layout-scale, 1));
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
@@ -465,7 +497,7 @@
 		opacity: 0.88;
 	}
 	.audience-blank {
-		height: 3.2mm;
+		height: calc(3.2mm * var(--pdf-layout-scale, 1));
 		break-inside: avoid;
 	}
 	.audience-page-number {
