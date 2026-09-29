@@ -125,7 +125,7 @@
 				rows = [...(s.rows ?? parseRows(s.rawInput ?? ''))];
 				bassLines = { ...(s.bassLines ?? {}) };
 				collapsedSections = [...(s.collapsedSections ?? [])];
-				showBassTabs = s.showBassTabs ?? true;
+				showBassTabs = s.columnLayout ? false : (s.showBassTabs ?? true);
 				columnLayout = s.columnLayout ?? false;
 				fitSinglePage = s.fitSinglePage ?? true;
 				youtubeLinks = [...(s.youtubeLinks ?? [])];
@@ -732,10 +732,11 @@
 									<div class="info-field">
 										<span>Visning</span>
 										<div class="info-flags">
-											<label class="print-toggle bass-toggle">
+											<label class="print-toggle bass-toggle" class:is-disabled={columnLayout}>
 												<input
 													type="checkbox"
 													bind:checked={showBassTabs}
+													disabled={columnLayout}
 													onchange={() => scheduleSave()}
 												/>
 												Bass
@@ -752,7 +753,10 @@
 												<input
 													type="checkbox"
 													bind:checked={columnLayout}
-													onchange={() => scheduleSave()}
+													onchange={() => {
+														if (columnLayout) showBassTabs = false;
+														scheduleSave();
+													}}
 												/>
 												Kolonner
 											</label>

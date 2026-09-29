@@ -317,6 +317,11 @@ select {
 	color: var(--color-ink-muted);
 	cursor: pointer;
 }
+.song-page .print-toggle.is-disabled {
+	opacity: 0.42;
+	cursor: not-allowed;
+	color: var(--color-ink-faint);
+}
 .song-page .key-cluster {
 	display: inline-grid;
 	grid-template-columns: var(--control-h) auto var(--control-h);
