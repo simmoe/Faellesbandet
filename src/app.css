@@ -228,7 +228,6 @@ select {
 	--radius-panel: 1rem;
 }
 .song-page .info-panel {
-	position: relative;
 	display: grid;
 	gap: var(--space-3);
 	margin: 0;
@@ -236,27 +235,25 @@ select {
 	background: var(--color-bg-card-muted);
 	border: 1px solid var(--color-border-subtle);
 	border-radius: var(--radius-panel);
-}
-.song-page .info-panel:has(.info-delete) {
-	padding-right: calc(var(--space-4) + 7.25rem);
+	font-size: var(--type-sm);
+	font-weight: 400;
 }
 .song-page .info-delete {
 	appearance: none;
-	position: absolute;
-	top: var(--space-3);
-	right: var(--space-3);
-	min-height: var(--control-h);
-	padding: 0 var(--control-px);
-	border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border-subtle));
-	border-radius: var(--radius-pill);
-	background: #ffffff;
+	justify-self: end;
+	margin: var(--space-2) 0 0;
+	padding: 0;
+	border: none;
+	background: transparent;
 	color: var(--color-error);
-	font-size: var(--type-sm);
+	font-size: var(--type-label);
 	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
 	cursor: pointer;
 }
 .song-page .info-delete:hover {
-	background: color-mix(in srgb, var(--color-error) 8%, #ffffff);
+	color: color-mix(in srgb, var(--color-error) 72%, var(--color-ink));
 }
 .song-page .info-field {
 	display: grid;
@@ -281,6 +278,13 @@ select {
 		justify-items: start;
 		gap: var(--space-1);
 	}
+	.song-page .yt-add {
+		width: 100%;
+	}
+	.song-page .yt-add .info-input,
+	.song-page .yt-add .info-input[type='url'] {
+		width: 100%;
+	}
 }
 .song-page .info-input {
 	width: 100%;
@@ -289,9 +293,9 @@ select {
 	padding: 0;
 	background: transparent;
 	border: none;
-	font-family: var(--font-title);
-	font-size: var(--type-sm);
-	font-weight: 400;
+	font-family: inherit;
+	font-size: inherit;
+	font-weight: inherit;
 	color: var(--color-ink);
 }
 .song-page .info-input:focus {
@@ -309,6 +313,10 @@ select {
 	gap: var(--space-2);
 	min-width: 0;
 }
+.song-page .info-cat-wrap {
+	position: relative;
+	display: inline-flex;
+}
 .song-page .info-cat {
 	appearance: none;
 	display: inline-flex;
@@ -320,13 +328,49 @@ select {
 	border-radius: var(--radius-pill);
 	background: #ffffff;
 	color: var(--cat-color, var(--color-ink-muted));
-	font-size: var(--type-sm);
-	font-weight: 500;
+	font: inherit;
 	cursor: pointer;
 }
+.song-page .info-cat-remove {
+	appearance: none;
+	position: absolute;
+	top: -0.35rem;
+	right: -0.35rem;
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	width: 1.05rem;
+	height: 1.05rem;
+	padding: 0;
+	border: none;
+	border-radius: 999px;
+	background: #ffffff;
+	color: var(--color-error);
+	font-size: 0.85rem;
+	font-weight: 400;
+	line-height: 1;
+	opacity: 0;
+	pointer-events: none;
+	cursor: pointer;
+}
+.song-page .info-cat-wrap:hover .info-cat-remove,
+.song-page .info-cat-wrap:focus-within .info-cat-remove {
+	opacity: 1;
+	pointer-events: auto;
+}
+@media (hover: none) {
+	.song-page .info-cat-remove {
+		opacity: 1;
+		pointer-events: auto;
+	}
+}
 .song-page .info-cats .category-picker {
-	min-width: min(14rem, 100%);
+	min-width: 0;
 	min-height: var(--control-h);
+}
+.song-page .info-cats .category-picker-trigger,
+.song-page .info-cats .category-picker-input {
+	font: inherit;
 }
 .song-page .print-toggle {
 	display: inline-grid;
@@ -334,8 +378,7 @@ select {
 	align-items: center;
 	gap: var(--space-1);
 	min-height: var(--control-h);
-	font-size: var(--type-sm);
-	font-weight: 500;
+	font: inherit;
 	color: var(--color-ink-muted);
 	cursor: pointer;
 }
@@ -369,8 +412,7 @@ select {
 	border: none;
 	background: #ffffff;
 	color: var(--color-ink);
-	font-size: var(--type);
-	font-weight: 500;
+	font: inherit;
 	line-height: 1;
 	cursor: pointer;
 }
@@ -389,9 +431,25 @@ select {
 	background: #ffffff;
 	color: var(--color-ink);
 	font-family: var(--font-mono);
-	font-size: var(--type-sm);
-	font-weight: 500;
+	font-size: inherit;
+	font-weight: inherit;
 	text-align: center;
+}
+.song-page .yt-add {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--space-2) var(--space-3);
+	width: max-content;
+	max-width: 100%;
+}
+.song-page .yt-add .info-input {
+	width: 9.5rem;
+	flex: 0 1 auto;
+}
+.song-page .yt-add .info-input[type='url'] {
+	width: 16rem;
+	max-width: 100%;
 }
 .song-page .key-input:focus {
 	outline: none;

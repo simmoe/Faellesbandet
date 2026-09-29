@@ -168,9 +168,7 @@
 		border: none;
 		background: transparent;
 		padding: 0;
-		font-family: var(--font-title);
-		font-size: var(--type-sm, 0.94rem);
-		font-weight: 400;
+		font: inherit;
 		color: var(--color-ink);
 		text-align: left;
 		cursor: pointer;
@@ -183,7 +181,7 @@
 		border: none;
 		background: transparent;
 		padding: 0;
-		font-size: 1rem;
+		font: inherit;
 		line-height: 1;
 		color: var(--color-ink-faint);
 		cursor: pointer;
@@ -191,18 +189,12 @@
 	.yt-remove:hover {
 		color: var(--color-ink);
 	}
-	.yt-add {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
-		align-items: end;
-		gap: var(--space-2, 0.75rem);
-	}
 	.yt-add-btn {
 		appearance: none;
 		border: none;
 		background: transparent;
 		padding: 0;
-		font-size: var(--type-label, 0.72rem);
+		font-size: var(--type-label);
 		font-weight: 500;
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
@@ -214,8 +206,8 @@
 	}
 	.yt-error {
 		margin: 0;
-		font-size: 0.78rem;
-		color: #b42318;
+		font: inherit;
+		color: var(--color-error);
 	}
 	.yt-modal-host {
 		display: none;
@@ -272,13 +264,5 @@
 		border: 0;
 		border-radius: var(--radius-button);
 		background: #000;
-	}
-	@media (max-width: 40rem) {
-		.yt-add {
-			grid-template-columns: minmax(0, 1fr);
-		}
-		.yt-add-btn {
-			justify-self: start;
-		}
 	}
 </style>

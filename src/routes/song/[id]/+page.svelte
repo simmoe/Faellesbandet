@@ -704,7 +704,6 @@
 						<div class="info-inner">
 							<div class="info-panel">
 								{#if canEdit}
-									<button type="button" class="info-delete" onclick={handleDelete}>Slet sang</button>
 									<label class="info-field">
 										<span>Kunstner</span>
 										<input
@@ -768,14 +767,25 @@
 										<div class="info-cats">
 											{#each categories as cat (cat)}
 												{@const c = colorForCategory(cat)}
-												<button
-													type="button"
-													class="info-cat"
-													style:--cat-color={c.text}
-													onclick={() => goToSongbookCategory(cat)}
-												>
-													{cat}
-												</button>
+												<span class="info-cat-wrap">
+													<button
+														type="button"
+														class="info-cat"
+														style:--cat-color={c.text}
+														onclick={() => goToSongbookCategory(cat)}
+													>
+														{cat}
+													</button>
+													<button
+														type="button"
+														class="info-cat-remove"
+														title="Fjern kategori"
+														aria-label="Fjern {cat}"
+														onclick={() => removeCategory(cat)}
+													>
+														×
+													</button>
+												</span>
 											{/each}
 											<CategoryPicker
 												options={pickerCategories.map((cat) => ({ value: cat, label: cat }))}
@@ -823,6 +833,9 @@
 									readOnly={!canEdit}
 								/>
 							</div>
+							{#if canEdit}
+								<button type="button" class="info-delete" onclick={handleDelete}>Slet sang</button>
+							{/if}
 						</div>
 					</div>
 				</section>
@@ -1064,6 +1077,7 @@
 		grid-template-rows: 1fr;
 	}
 	.info-inner {
+		display: grid;
 		overflow: hidden;
 		min-height: 0;
 	}
