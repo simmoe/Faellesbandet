@@ -48,72 +48,13 @@ function normalizeChordLineMarkers(line: string): string {
  *  - `"C | F | G | Am"` → fire takter
  *  - `"Bb C | Dm"` → to akkorder i første takt, én i anden
  *  - `"C - - F"` → akkord, to tomme slag, akkord (dashes vises muted)
- *  - `"C    F    G    Am"` (uden pipes) → fire akkorder uden takter
+ *  - `"C    F    G    Am"` (uden pipes) → fire akkorder, ét spacer pr. `-` i data
  *
  * `transpose` flytter alle akkorder med n halvtoner. Returnerer en
- * tom streng hvis linjen ikke indeholder akkorder.
+ * tom streng hvis linjen ikke indeholder akkorder. Whitespace mellem
+ * akkorder bliver ikke til bindestreger.
  */
-const chordTokenRegex = new RegExp(`^${CHORD_PATTERN}$`);
 const BAR_TOKEN = /^(?:\|:|:\||\|)$/;
-const MAX_DASH_SLOTS = 3;
-
-/**
- * `-` is the only chord separator. Cleanup for stored chord lines:
- * expand packed `---`, turn a gap between two chords into one `-`,
- * cap a run at three, and drop leading/trailing dashes so the last
- * chord stays left. `|` / `|: ` / `:|` are kept.
- */
-export function normalizeChordSeparators(line: string): string {
-	type Slot = { kind: 'bar'; text: string } | { kind: 'chord'; text: string } | { kind: 'dash' };
-	const tokens = tokenizeChordLine(line);
-	const slots: Slot[] = [];
-	for (const tok of tokens) {
-		if (tok.kind === 'space') continue;
-		if (tok.kind === 'chord' && slots.length > 0 && slots[slots.length - 1].kind === 'chord') {
-			slots.push({ kind: 'dash' });
-		}
-		if (tok.kind === 'dash-run') {
-			const n = Math.min(tok.count, MAX_DASH_SLOTS);
-			for (let d = 0; d < n; d++) slots.push({ kind: 'dash' });
-			continue;
-		}
-		if (tok.kind === 'bar' || tok.kind === 'chord') slots.push(tok);
-	}
-
-	while (slots.length > 0 && slots[0].kind === 'dash') slots.shift();
-	let lead = 0;
-	while (lead < slots.length && slots[lead].kind === 'bar') lead++;
-	while (lead < slots.length && slots[lead].kind === 'dash') slots.splice(lead, 1);
-	while (slots.length > 0 && slots[slots.length - 1].kind === 'dash') slots.pop();
-	let trail = slots.length - 1;
-	while (trail >= 0 && slots[trail].kind === 'bar') trail--;
-	while (trail >= 0 && slots[trail].kind === 'dash') {
-		slots.splice(trail, 1);
-		trail--;
-	}
-
-	let run = 0;
-	const capped: Slot[] = [];
-	for (const tok of slots) {
-		if (tok.kind === 'dash') {
-			run += 1;
-			if (run <= MAX_DASH_SLOTS) capped.push(tok);
-			continue;
-		}
-		run = 0;
-		capped.push(tok);
-	}
-
-	return capped
-		.map((tok) => (tok.kind === 'dash' ? '-' : tok.text))
-		.join(' ');
-}
-
-type ChordLineToken =
-	| { kind: 'bar'; text: string }
-	| { kind: 'chord'; text: string }
-	| { kind: 'dash-run'; count: number }
-	| { kind: 'space' };
 
 function prepareChordLine(line: string): string {
 	return expandPackedDashRuns(
@@ -123,21 +64,6 @@ function prepareChordLine(line: string): string {
 
 function expandPackedDashRuns(line: string): string {
 	return line.replace(/-{2,}/g, (dashes) => ` ${dashes.split('').join(' ')} `);
-}
-
-function tokenizeChordLine(line: string): ChordLineToken[] {
-	const parts = prepareChordLine(line)
-		.trim()
-		.split(/(\s+|:?\|:?)/)
-		.filter((part) => part.length > 0);
-	const tokens: ChordLineToken[] = [];
-	for (const part of parts) {
-		if (/^\s+$/.test(part)) tokens.push({ kind: 'space' });
-		else if (BAR_TOKEN.test(part)) tokens.push({ kind: 'bar', text: part });
-		else if (/^-+$/.test(part)) tokens.push({ kind: 'dash-run', count: part.length });
-		else tokens.push({ kind: 'chord', text: part });
-	}
-	return tokens;
 }
 
 export function renderBarLine(line: string, transpose: number = 0): string {
@@ -156,12 +82,7 @@ export function renderBarLine(line: string, transpose: number = 0): string {
 			out.push(`<span class="bar-sep">${escapeHtml(tok)}</span>`);
 			continue;
 		}
-		if (/^\s+$/.test(tok)) {
-			const prev = parts[i - 1] ?? '';
-			const next = parts[i + 1] ?? '';
-			if (chordTokenRegex.test(prev) && chordTokenRegex.test(next)) pushSpacer();
-			continue;
-		}
+		if (/^\s+$/.test(tok)) continue;
 		if (/^-+$/.test(tok)) {
 			for (let n = 0; n < tok.length; n++) pushSpacer();
 			continue;

@@ -553,6 +553,9 @@ select {
 	color: var(--color-chord);
 	font-weight: 600;
 }
+.chord-grid .bass-chord + .bass-chord {
+	margin-left: 0.4em;
+}
 .chord-grid .rhythm-cell .bass-chord {
 	display: inline;
 }
@@ -938,6 +941,9 @@ select {
 .pdf-chord .bar-sep {
 	color: var(--color-chord);
 	font-weight: 600;
+}
+.pdf-chord .bass-chord + .bass-chord {
+	margin-left: 0.4em;
 }
 .pdf-bass .bass-chord {
 	display: inline-block;
