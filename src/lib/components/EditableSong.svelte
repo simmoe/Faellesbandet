@@ -1469,6 +1469,28 @@
 		gap: 0;
 		padding: 0;
 	}
+	:global(.column-layout) .editable-song {
+		display: block;
+		columns: 2;
+		column-gap: 1.6em;
+		column-fill: balance;
+	}
+	:global(.column-layout) .editable-song .song-section {
+		break-inside: avoid;
+		-webkit-column-break-inside: avoid;
+	}
+	@media (max-width: 48rem) {
+		:global(.column-layout) .editable-song {
+			columns: 1;
+		}
+	}
+	@media print {
+		:global(.column-layout) .editable-song {
+			columns: 2;
+			column-gap: 8mm;
+			column-fill: balance;
+		}
+	}
 	.editable-song.read-only,
 	.editable-song.read-only :global(*) {
 		cursor: default !important;

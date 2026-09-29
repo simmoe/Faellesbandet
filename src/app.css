@@ -593,17 +593,18 @@ select {
 	display: block;
 	columns: 2;
 	column-gap: 1.6em;
-	column-fill: auto;
+	column-fill: balance;
 }
 .column-layout .editable-song > .song-section {
 	break-inside: avoid;
+	-webkit-column-break-inside: avoid;
 }
 .print-page.column-layout .pdf-song-sections,
 .column-layout .pdf-song-sections {
 	display: block;
 	columns: 2;
 	column-gap: 8mm;
-	column-fill: auto;
+	column-fill: balance;
 }
 @media (max-width: 48rem) {
 	.column-layout .editable-song {
@@ -614,6 +615,7 @@ select {
 	.column-layout .editable-song {
 		columns: 2 !important;
 		column-gap: 8mm;
+		column-fill: balance;
 	}
 }
 
