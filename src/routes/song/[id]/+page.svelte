@@ -23,6 +23,7 @@
 	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
 	import SongYoutubeLinks from '$lib/components/SongYoutubeLinks.svelte';
 	import { persistSongbookCategory } from '$lib/songbookSelection';
+	import { readSongDisplayFlags, writeSongDisplayFlags } from '$lib/songDisplay';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
 	import {
 		assignMissingCategoryColors,
@@ -125,9 +126,7 @@
 				rows = [...(s.rows ?? parseRows(s.rawInput ?? ''))];
 				bassLines = { ...(s.bassLines ?? {}) };
 				collapsedSections = [...(s.collapsedSections ?? [])];
-				showBassTabs = s.columnLayout ? false : (s.showBassTabs ?? true);
-				columnLayout = s.columnLayout ?? false;
-				fitSinglePage = s.fitSinglePage ?? true;
+				applyDisplayFlags(s, !authState.user);
 				youtubeLinks = [...(s.youtubeLinks ?? [])];
 			})
 			.catch((err) => (loadError = err instanceof Error ? err.message : 'Ukendt fejl'))
@@ -139,6 +138,23 @@
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let saveError = $state<string | null>(null);
 	const DEBOUNCE_MS = 800;
+
+	function applyDisplayFlags(s: SongDoc, useLocal: boolean) {
+		const local = useLocal ? readSongDisplayFlags(s.id) : null;
+		columnLayout = local?.columnLayout ?? s.columnLayout ?? false;
+		fitSinglePage = local?.fitSinglePage ?? s.fitSinglePage ?? true;
+		showBassTabs = columnLayout ? false : (local?.showBassTabs ?? s.showBassTabs ?? true);
+	}
+
+	function persistDisplayFlags() {
+		if (!song || !browser) return;
+		writeSongDisplayFlags(song.id, { showBassTabs, columnLayout, fitSinglePage });
+	}
+
+	function onDisplayFlagsChange() {
+		persistDisplayFlags();
+		scheduleSave();
+	}
 
 	function scheduleSave() {
 		if (!song || !authState.user) return;
@@ -668,7 +684,7 @@
 							<input
 								type="checkbox"
 								bind:checked={fitSinglePage}
-								onchange={() => scheduleSave()}
+								onchange={onDisplayFlagsChange}
 							/>
 							Enkeltside
 						</label>
@@ -678,7 +694,7 @@
 								bind:checked={columnLayout}
 								onchange={() => {
 									if (columnLayout) showBassTabs = false;
-									scheduleSave();
+									onDisplayFlagsChange();
 								}}
 							/>
 							Kolonne
@@ -688,7 +704,7 @@
 								type="checkbox"
 								bind:checked={showBassTabs}
 								disabled={columnLayout}
-								onchange={() => scheduleSave()}
+								onchange={onDisplayFlagsChange}
 							/>
 							Bas
 						</label>
