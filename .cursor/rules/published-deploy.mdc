@@ -1,0 +1,17 @@
+---
+description: Refuse a hosting deploy that is dirty, unpublished, or missing live work
+alwaysApply: true
+---
+
+# Published hosting only
+
+Live is Firebase Hosting. Two checkouts must not overwrite each other with an unpublished build.
+
+## Before any `firebase deploy` / `npm run deploy`
+
+1. `git fetch` and stay on `master`.
+2. Working tree clean. HEAD equals `origin/master`.
+3. Deploy **hosting only** (`npm run deploy` / `deploy:web`). Functions: only the named function this repo owns. Never a broad functions deploy. Never `firestore:rules` without merging live rules first.
+4. Do not copy a local `build/` onto live. Hosting predeploy runs `require-published-deploy.mjs` and stamps `deployed.json`.
+
+If the command refuses, commit, push, and pull until this checkout contains the live commit. Then deploy again.
