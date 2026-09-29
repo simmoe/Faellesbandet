@@ -360,7 +360,7 @@
 		}
 	}
 
-	// ───── Spil: ultrasmooth løbende scroll (ingen highlight/BPM) ─────────
+	// ───── Spil: GPU-transform i stedet for scrollTo (subpixel, ingen hak) ─
 	/** Ved ×1 scroller hele siden igennem på ca. denne tid (en typisk sang). */
 	const PLAY_FULL_PAGE_SEC = 165;
 	/** Hver − / + dividerer eller ganger tempoet med denne faktor. */
@@ -378,55 +378,46 @@
 
 	let playing = $state(false);
 	let playSpeed = $state(1);
-	let playRaf: number | null = null;
-	let playLastTs = 0;
-	/** Fractional scroll-position — undgår at sub-pixel-deltaer forsvinder via scrollY. */
-	let playPos = 0;
+	let songPageEl = $state<HTMLElement | null>(null);
+	let playAnim: Animation | null = null;
+
+	function waitFrame(): Promise<void> {
+		return new Promise((r) => requestAnimationFrame(() => r()));
+	}
+
+	function playOffsetY(el: HTMLElement): number {
+		const t = getComputedStyle(el).transform;
+		if (!t || t === 'none') return 0;
+		return -new DOMMatrixReadOnly(t).m42;
+	}
 
 	function stopPlay(): void {
-		playing = false;
-		playLastTs = 0;
-		if (playRaf != null) {
-			cancelAnimationFrame(playRaf);
-			playRaf = null;
+		const el = songPageEl;
+		let y = window.scrollY;
+		if (playAnim && el) {
+			y = playOffsetY(el);
+			playAnim.onfinish = null;
+			playAnim.cancel();
+			playAnim = null;
 		}
+		document.documentElement.classList.remove('song-is-playing');
+		document.body.classList.remove('song-is-playing');
+		playing = false;
+		window.scrollTo(0, y);
 	}
 
 	function slowerPlay(): void {
 		playSpeed = playSpeed / PLAY_SPEED_FACTOR;
+		if (playAnim) playAnim.playbackRate = playSpeed;
 	}
 
 	function fasterPlay(): void {
 		playSpeed = playSpeed * PLAY_SPEED_FACTOR;
+		if (playAnim) playAnim.playbackRate = playSpeed;
 	}
 
 	function formatPlaySpeed(s: number): string {
 		return String(Number(s.toPrecision(3)));
-	}
-
-	function playFrame(ts: number): void {
-		if (!playing) return;
-		if (!playLastTs) playLastTs = ts;
-		const dt = Math.min(0.05, (ts - playLastTs) / 1000);
-		playLastTs = ts;
-
-		const maxScroll = Math.max(
-			0,
-			document.documentElement.scrollHeight - window.innerHeight
-		);
-		if (maxScroll <= 0) {
-			stopPlay();
-			return;
-		}
-		const pxPerSec = (maxScroll / PLAY_FULL_PAGE_SEC) * playSpeed;
-		playPos = Math.min(maxScroll, playPos + pxPerSec * dt);
-		window.scrollTo(0, playPos);
-
-		if (playPos >= maxScroll - 0.5) {
-			stopPlay();
-			return;
-		}
-		playRaf = requestAnimationFrame(playFrame);
 	}
 
 	async function startPlay(): Promise<void> {
@@ -438,24 +429,57 @@
 			collapsedSections = [];
 			scheduleSave();
 			await tick();
-			await new Promise<void>((r) => requestAnimationFrame(() => r()));
+			await waitFrame();
 		}
 		infoOpen = false;
 		playing = true;
-		playLastTs = 0;
-		playPos = window.scrollY;
-		playRaf = requestAnimationFrame(playFrame);
+		await tick();
+		await waitFrame();
+		await waitFrame();
+		if (!playing) return;
+
+		const el = songPageEl;
+		if (!el) {
+			stopPlay();
+			return;
+		}
+		const maxScroll = Math.max(0, el.offsetHeight - window.innerHeight);
+		if (maxScroll <= 0) {
+			stopPlay();
+			return;
+		}
+		const startY = Math.min(window.scrollY, maxScroll);
+
+		el.style.transform = `translate3d(0, ${-startY}px, 0)`;
+		document.documentElement.classList.add('song-is-playing');
+		document.body.classList.add('song-is-playing');
+		window.scrollTo(0, 0);
+		playAnim = el.animate(
+			[
+				{ transform: 'translate3d(0, 0, 0)' },
+				{ transform: `translate3d(0, ${-maxScroll}px, 0)` }
+			],
+			{
+				duration: PLAY_FULL_PAGE_SEC * 1000,
+				easing: 'linear',
+				fill: 'forwards'
+			}
+		);
+		playAnim.pause();
+		playAnim.currentTime = (startY / maxScroll) * PLAY_FULL_PAGE_SEC * 1000;
+		playAnim.playbackRate = playSpeed;
+		playAnim.onfinish = () => stopPlay();
+		playAnim.play();
+		el.style.removeProperty('transform');
 	}
 
 	$effect(() => {
 		if (!browser) return;
 		void rows.length;
 		void infoOpen;
-		document.body.classList.toggle('song-is-playing', playing);
 		const nodes = PLAY_OFFENDERS.flatMap((sel) => [...document.querySelectorAll(sel)]);
 		for (const el of nodes) el.classList.toggle('play-hidden', playing);
 		return () => {
-			document.body.classList.remove('song-is-playing');
 			for (const el of nodes) el.classList.remove('play-hidden');
 		};
 	});
@@ -482,8 +506,15 @@
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape') stopPlay();
 		};
+		const blockScroll = (e: Event) => e.preventDefault();
 		window.addEventListener('keydown', onKey);
-		return () => window.removeEventListener('keydown', onKey);
+		window.addEventListener('wheel', blockScroll, { passive: false });
+		window.addEventListener('touchmove', blockScroll, { passive: false });
+		return () => {
+			window.removeEventListener('keydown', onKey);
+			window.removeEventListener('wheel', blockScroll);
+			window.removeEventListener('touchmove', blockScroll);
+		};
 	});
 
 	$effect(() => {
@@ -506,7 +537,7 @@
 	<title>{title || song?.title || 'Sang'} · {BAND.name}</title>
 </svelte:head>
 
-<div class="song-page">
+<div class="song-page" bind:this={songPageEl}>
 	{#if loading}
 		<p class="song-status">Henter sang…</p>
 	{:else if loadError}
@@ -788,6 +819,13 @@
 </div>
 
 <style>
+	:global(html.song-is-playing),
+	:global(html.song-is-playing body) {
+		overflow: hidden;
+		height: 100%;
+		overscroll-behavior: none;
+		touch-action: none;
+	}
 	.song-page {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
@@ -804,6 +842,9 @@
 		color: var(--color-ink);
 		overflow-x: clip;
 		box-sizing: border-box;
+	}
+	:global(html.song-is-playing) .song-page {
+		will-change: transform;
 	}
 	.song-sheet {
 		display: grid;
