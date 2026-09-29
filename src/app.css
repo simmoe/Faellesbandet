@@ -548,7 +548,7 @@ select {
 	color: var(--color-ink-faint, #9ca3af);
 	font-weight: 400;
 	user-select: none;
-	letter-spacing: 0.1em;
+	letter-spacing: 0;
 }
 .chord-grid .chord-cell .chord-spacer {
 	color: transparent;
@@ -828,8 +828,9 @@ select {
 }
 .pdf-chord .chord-spacer,
 .pdf-spacer {
-	flex: 0 1 auto;
-	min-width: 0.12em;
+	flex: 0 0 3ch;
+	width: 3ch;
+	min-width: 3ch;
 	overflow: hidden;
 	color: transparent;
 	letter-spacing: 0;

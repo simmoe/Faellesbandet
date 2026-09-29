@@ -1874,8 +1874,9 @@
 		flex: 0 0 auto;
 	}
 	.editable-song .song-line-wrap.is-chord .chord-cell-clickable :global(.chord-spacer) {
-		flex: 0 1 auto;
-		min-width: 0.12em;
+		flex: 0 0 3ch;
+		width: 3ch;
+		min-width: 3ch;
 		overflow: hidden;
 	}
 	.editable-song .rhythm-cell-clickable,
