@@ -282,6 +282,12 @@
 		void goto('/songbook');
 	}
 
+	async function handleSignOut() {
+		await flushPendingSave();
+		await authState.signOut();
+		void goto('/songbook');
+	}
+
 	// ───── Transponering ────────────────────────────────────────────────
 
 	async function transpose(semitones: number) {
@@ -610,6 +616,7 @@
 						{/if}
 						{#if authState.profile}
 							<span>{authState.profile.displayName}</span>
+							<button type="button" class="chrome-signout" onclick={handleSignOut}>Log ud</button>
 						{/if}
 					{:else}
 						<a href={`/login?next=${encodeURIComponent(`/song/${song.id}`)}`}>Log ind</a>
@@ -973,8 +980,17 @@
 		font-size: var(--type-xs);
 		color: var(--color-ink-faint);
 	}
-	.song-chrome-status a {
+	.song-chrome-status a,
+	.chrome-signout {
 		color: inherit;
+		font: inherit;
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+	}
+	.chrome-signout:hover {
+		color: var(--color-ink);
 	}
 	.song-head {
 		display: grid;
