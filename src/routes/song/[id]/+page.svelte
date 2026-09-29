@@ -704,6 +704,7 @@
 						<div class="info-inner">
 							<div class="info-panel">
 								{#if canEdit}
+									<button type="button" class="info-delete" onclick={handleDelete}>Slet sang</button>
 									<label class="info-field">
 										<span>Kunstner</span>
 										<input
@@ -786,10 +787,6 @@
 												onToggle={toggleCategory}
 											/>
 										</div>
-									</div>
-									<div class="info-field">
-										<span></span>
-										<button type="button" class="song-tool song-tool-danger" onclick={handleDelete}>Slet</button>
 									</div>
 								{:else if key.trim() || categories.length > 0}
 									{#if key.trim()}
@@ -1006,9 +1003,6 @@
 	.song-tool:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
-	}
-	.song-tool-danger {
-		color: var(--color-error);
 	}
 	.title-input {
 		width: 100%;

@@ -228,6 +228,7 @@ select {
 	--radius-panel: 1rem;
 }
 .song-page .info-panel {
+	position: relative;
 	display: grid;
 	gap: var(--space-3);
 	margin: 0;
@@ -235,6 +236,27 @@ select {
 	background: var(--color-bg-card-muted);
 	border: 1px solid var(--color-border-subtle);
 	border-radius: var(--radius-panel);
+}
+.song-page .info-panel:has(.info-delete) {
+	padding-right: calc(var(--space-4) + 7.25rem);
+}
+.song-page .info-delete {
+	appearance: none;
+	position: absolute;
+	top: var(--space-3);
+	right: var(--space-3);
+	min-height: var(--control-h);
+	padding: 0 var(--control-px);
+	border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-border-subtle));
+	border-radius: var(--radius-pill);
+	background: #ffffff;
+	color: var(--color-error);
+	font-size: var(--type-sm);
+	font-weight: 500;
+	cursor: pointer;
+}
+.song-page .info-delete:hover {
+	background: color-mix(in srgb, var(--color-error) 8%, #ffffff);
 }
 .song-page .info-field {
 	display: grid;
