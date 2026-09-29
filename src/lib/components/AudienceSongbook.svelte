@@ -1,6 +1,11 @@
 <script lang="ts">
-	import { sectionHeaderType } from '$lib/chordFormatter';
-	import { buildSections, parseRows, type Row } from '$lib/songParse';
+	import {
+		buildSections,
+		findPreviousSameType,
+		parseRows,
+		sectionHasBodyContent,
+		type Row
+	} from '$lib/songParse';
 	import type { CategoryMeta, SongDoc } from '$lib/types';
 	import SongbookToc from './SongbookToc.svelte';
 	import { buildSongbookTocPages, tocPageCountForSongs } from '$lib/songbookToc';
@@ -17,6 +22,7 @@
 	type AudienceLine =
 		| { kind: 'lyric'; text: string }
 		| { kind: 'label'; text: string }
+		| { kind: 'repeat'; text: string }
 		| { kind: 'blank' };
 
 	interface AudienceSong {
@@ -78,6 +84,7 @@
 	function toAudienceSong(song: SongDoc): AudienceSong {
 		const rows = rowsFor(song);
 		const sections = buildSections(rows);
+		const collapsed = new Set(song.collapsedSections ?? []);
 		const lines: AudienceLine[] = [];
 		let hasRenderedChorus = false;
 
@@ -85,17 +92,26 @@
 			for (const row of rows) appendAudienceRow(lines, row);
 		} else {
 			for (const section of sections) {
-				if (sectionHeaderType(section.headerText) === 'chorus') {
-					if (hasRenderedChorus) {
-						appendBlank(lines);
-						appendLabel(lines, cleanChorusLabel(section.headerText));
-						continue;
-					}
+				const isChorus = section.type === 'chorus';
+				const hasLyrics = sectionHasBodyContent(rows, section);
+				const collapsedHere = collapsed.has(section.headerIdx);
+				const previousSame = findPreviousSameType(sections, section.headerIdx, rows);
+				const repeatWithoutText =
+					(isChorus && hasRenderedChorus) ||
+					collapsedHere ||
+					(!hasLyrics && previousSame !== null);
+
+				if (repeatWithoutText) {
 					appendBlank(lines);
-					appendLabel(lines, cleanChorusLabel(section.headerText));
+					appendRepeat(lines, sectionLabel(section.headerText, isChorus));
+					if (isChorus) hasRenderedChorus = true;
+					continue;
+				}
+
+				appendBlank(lines);
+				if (isChorus) {
+					appendLabel(lines, sectionLabel(section.headerText, true));
 					hasRenderedChorus = true;
-				} else {
-					appendBlank(lines);
 				}
 				for (let i = section.bodyStart; i < section.bodyEnd; i++) {
 					appendAudienceRow(lines, rows[i]);
@@ -136,9 +152,16 @@
 		lines.push({ kind: 'label', text });
 	}
 
-	function cleanChorusLabel(headerText: string): string {
+	function appendRepeat(lines: AudienceLine[], text: string): void {
+		const lastNonBlank = [...lines].reverse().find((line) => line.kind !== 'blank');
+		if (lastNonBlank?.kind === 'repeat' && lastNonBlank.text === text) return;
+		lines.push({ kind: 'repeat', text });
+	}
+
+	function sectionLabel(headerText: string, chorus: boolean): string {
 		const trimmed = headerText.trim();
-		return trimmed || 'Omkvæd';
+		if (trimmed) return trimmed;
+		return chorus ? 'Omkvæd' : 'Sektion';
 	}
 
 	function trimAudienceLines(lines: AudienceLine[]): AudienceLine[] {
@@ -253,6 +276,25 @@
 						<p data-audience-line={index}>{line.text}</p>
 					{:else if line.kind === 'label'}
 						<p class="audience-repeat-label" data-audience-line={index}>{line.text}</p>
+					{:else if line.kind === 'repeat'}
+						<div class="audience-repeat" data-audience-line={index}>
+							<span>{line.text}</span>
+							<svg
+								class="audience-repeat-icon"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.8"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M17 1.5 21 5.5 17 9.5"></path>
+								<path d="M3 11.5v-2a4 4 0 0 1 4-4h14"></path>
+								<path d="M7 22.5 3 18.5 7 14.5"></path>
+								<path d="M21 12.5v2a4 4 0 0 1-4 4H3"></path>
+							</svg>
+						</div>
 					{:else}
 						<div class="audience-blank" data-audience-line={index}></div>
 					{/if}
@@ -395,6 +437,32 @@
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
+	}
+	.audience-repeat {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75em;
+		width: max-content;
+		min-width: 11em;
+		max-width: 100%;
+		margin: 2.4mm 0 1.7mm;
+		padding: 0.45em 0.7em;
+		border: 0.4pt solid #111827;
+		border-radius: 4px;
+		break-inside: avoid;
+		color: #172033;
+		font-family: var(--font-display);
+		font-size: 11pt;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.audience-repeat-icon {
+		width: 1.15em;
+		height: 1.15em;
+		flex: 0 0 auto;
+		opacity: 0.88;
 	}
 	.audience-blank {
 		height: 3.2mm;
