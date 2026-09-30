@@ -263,7 +263,7 @@
 		{#if includeFrontMatter}
 			<section class="audience-page audience-cover" data-fit-single-page="false">
 				{#if categoryMeta?.imageUrl}
-					<img class="audience-cover-image" src={categoryMeta.imageUrl} alt="" crossorigin="anonymous" />
+					<img class="audience-cover-image" src={categoryMeta.imageUrl} alt="" decoding="sync" />
 				{/if}
 				<div class="audience-cover-copy">
 					<p class="audience-kicker">Publikums-sangbog</p>

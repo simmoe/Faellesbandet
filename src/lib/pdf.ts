@@ -104,12 +104,53 @@ async function waitForAudienceLayout(root: HTMLElement): Promise<void> {
 	}
 }
 
+function createSnapshotWrapper(): HTMLDivElement {
+	const wrapper = document.createElement('div');
+	wrapper.style.position = 'fixed';
+	wrapper.style.left = '0';
+	wrapper.style.top = '0';
+	wrapper.style.width = '210mm';
+	wrapper.style.background = '#ffffff';
+	wrapper.style.color = '#000000';
+	wrapper.style.zIndex = '-1';
+	wrapper.style.pointerEvents = 'none';
+	wrapper.classList.add('pdf-snapshot-page');
+	document.body.appendChild(wrapper);
+	return wrapper;
+}
+
+async function waitForCoverImage(root: HTMLElement, expected: boolean): Promise<void> {
+	if (!expected) return;
+	for (let i = 0; i < 40; i++) {
+		const img = root.querySelector<HTMLImageElement>(
+			'.audience-cover-image, .chord-cover-image'
+		);
+		if (img?.getAttribute('src')) {
+			img.loading = 'eager';
+			img.decoding = 'sync';
+			try {
+				await img.decode();
+			} catch {
+				/* decode kan kaste hvis src er i stykker */
+			}
+			if (img.naturalWidth > 0) return;
+		}
+		await tick();
+		await waitForLayout();
+	}
+}
+
 async function waitForImages(root: HTMLElement): Promise<void> {
 	const images = [...root.querySelectorAll<HTMLImageElement>('img')];
 	await Promise.all(
-		images.map(
-			(img) =>
-				new Promise<void>((resolve) => {
+		images.map(async (img) => {
+			if (!img.getAttribute('src')) return;
+			img.loading = 'eager';
+			img.decoding = 'sync';
+			try {
+				await img.decode();
+			} catch {
+				await new Promise<void>((resolve) => {
 					if (img.complete) {
 						resolve();
 						return;
@@ -117,8 +158,9 @@ async function waitForImages(root: HTMLElement): Promise<void> {
 					const done = () => resolve();
 					img.addEventListener('load', done, { once: true });
 					img.addEventListener('error', done, { once: true });
-				})
-		)
+				});
+			}
+		})
 	);
 }
 
@@ -292,6 +334,8 @@ async function pagesToPdf(pages: HTMLElement[], opts: ExportOptions): Promise<vo
 			scale: renderScale,
 			backgroundColor: '#ffffff',
 			useCORS: true,
+			allowTaint: true,
+			imageTimeout: 15000,
 			logging: false
 		});
 		restoreStyles(pageEl, saved);
@@ -344,17 +388,8 @@ export async function exportSongsAsPdf(
 	if (songs.length === 0) return;
 	const entries = normalizePrintEntries(songs);
 
-	const wrapper = document.createElement('div');
-	wrapper.style.position = 'fixed';
-	wrapper.style.left = '-10000px';
-	wrapper.style.top = '0';
-	wrapper.style.width = '210mm';
-	wrapper.style.background = '#ffffff';
-	wrapper.style.color = '#000000';
-	wrapper.style.zIndex = '-1';
-	wrapper.classList.add('pdf-snapshot-page');
+	const wrapper = createSnapshotWrapper();
 	if (opts.withBassTabs === false) wrapper.classList.add('no-bass-tabs');
-	document.body.appendChild(wrapper);
 
 	const components: ReturnType<typeof mount>[] = [];
 	const pageEls: HTMLElement[] = [];
@@ -410,6 +445,7 @@ export async function exportSongsAsPdf(
 	// Vent på at Svelte's tick + browser-layout (fonts, grid) er færdig.
 	await tick();
 	await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+	await waitForCoverImage(wrapper, Boolean(coverMeta?.imageUrl));
 	await waitForImages(wrapper);
 	await waitForLayout();
 
@@ -537,16 +573,7 @@ export async function exportAudienceSongbookAsPdf(
 ): Promise<void> {
 	if (songs.length === 0) return;
 
-	const wrapper = document.createElement('div');
-	wrapper.style.position = 'fixed';
-	wrapper.style.left = '-10000px';
-	wrapper.style.top = '0';
-	wrapper.style.width = '210mm';
-	wrapper.style.background = '#ffffff';
-	wrapper.style.color = '#000000';
-	wrapper.style.zIndex = '-1';
-	wrapper.classList.add('pdf-snapshot-page');
-	document.body.appendChild(wrapper);
+	const wrapper = createSnapshotWrapper();
 
 	const pageDiv = document.createElement('div');
 	pageDiv.style.background = '#ffffff';
@@ -567,6 +594,7 @@ export async function exportAudienceSongbookAsPdf(
 
 	await waitForAudienceLayout(pageDiv);
 	await tick();
+	await waitForCoverImage(pageDiv, Boolean(categoryMeta?.imageUrl));
 	await waitForImages(wrapper);
 
 	try {

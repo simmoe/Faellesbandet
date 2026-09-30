@@ -1,7 +1,7 @@
 /** Map a full rectangular photo into a circle with a mild wide-angle squeeze. */
 
 const DEFAULT_FILL = '#f7f3ea';
-const DEFAULT_SIZE = 1400;
+const DEFAULT_SIZE = 1000;
 const DEFAULT_STRENGTH = 0.78;
 
 export async function toCircularWideAngle(
