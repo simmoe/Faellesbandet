@@ -107,37 +107,54 @@ async function waitForAudienceLayout(root: HTMLElement): Promise<void> {
 function createSnapshotWrapper(): HTMLDivElement {
 	const wrapper = document.createElement('div');
 	wrapper.style.position = 'fixed';
-	wrapper.style.left = '0';
+	wrapper.style.left = '-10000px';
 	wrapper.style.top = '0';
 	wrapper.style.width = '210mm';
 	wrapper.style.background = '#ffffff';
 	wrapper.style.color = '#000000';
 	wrapper.style.zIndex = '-1';
-	wrapper.style.pointerEvents = 'none';
 	wrapper.classList.add('pdf-snapshot-page');
 	document.body.appendChild(wrapper);
 	return wrapper;
 }
 
-async function waitForCoverImage(root: HTMLElement, expected: boolean): Promise<void> {
-	if (!expected) return;
-	for (let i = 0; i < 40; i++) {
-		const img = root.querySelector<HTMLImageElement>(
-			'.audience-cover-image, .chord-cover-image'
-		);
-		if (img?.getAttribute('src')) {
-			img.loading = 'eager';
-			img.decoding = 'sync';
-			try {
-				await img.decode();
-			} catch {
-				/* decode kan kaste hvis src er i stykker */
-			}
-			if (img.naturalWidth > 0) return;
-		}
-		await tick();
-		await waitForLayout();
-	}
+async function loadCoverBitmap(src: string): Promise<HTMLImageElement> {
+	const img = new Image();
+	if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
+	await new Promise<void>((resolve, reject) => {
+		img.onload = () => resolve();
+		img.onerror = () => reject(new Error('Kunne ikke afkode kategori-billedet.'));
+		img.src = src;
+	});
+	return img;
+}
+
+async function stampCoverPhoto(pageEl: HTMLElement, canvas: HTMLCanvasElement): Promise<void> {
+	const slot = pageEl.querySelector<HTMLElement>('[data-cover-src]');
+	const src = slot?.dataset.coverSrc;
+	if (!slot || !src) return;
+	const pageRect = pageEl.getBoundingClientRect();
+	if (pageRect.width < 1 || pageRect.height < 1) return;
+	const rect = slot.getBoundingClientRect();
+	const img = await loadCoverBitmap(src).catch((err) => {
+		console.warn('Kunne ikke stemple kategori-billede på PDF:', err);
+		return null;
+	});
+	if (!img) return;
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return;
+	const sx = canvas.width / pageRect.width;
+	const sy = canvas.height / pageRect.height;
+	const x = (rect.left - pageRect.left) * sx;
+	const y = (rect.top - pageRect.top) * sy;
+	const w = rect.width * sx;
+	const h = rect.height * sy;
+	ctx.save();
+	ctx.beginPath();
+	ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+	ctx.clip();
+	ctx.drawImage(img, x, y, w, h);
+	ctx.restore();
 }
 
 async function waitForImages(root: HTMLElement): Promise<void> {
@@ -334,10 +351,9 @@ async function pagesToPdf(pages: HTMLElement[], opts: ExportOptions): Promise<vo
 			scale: renderScale,
 			backgroundColor: '#ffffff',
 			useCORS: true,
-			allowTaint: true,
-			imageTimeout: 15000,
 			logging: false
 		});
+		await stampCoverPhoto(pageEl, canvas);
 		restoreStyles(pageEl, saved);
 
 		const slicePxHeight = canvas.width * (usableH / usableW);
@@ -445,7 +461,6 @@ export async function exportSongsAsPdf(
 	// Vent på at Svelte's tick + browser-layout (fonts, grid) er færdig.
 	await tick();
 	await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-	await waitForCoverImage(wrapper, Boolean(coverMeta?.imageUrl));
 	await waitForImages(wrapper);
 	await waitForLayout();
 
@@ -594,7 +609,6 @@ export async function exportAudienceSongbookAsPdf(
 
 	await waitForAudienceLayout(pageDiv);
 	await tick();
-	await waitForCoverImage(pageDiv, Boolean(categoryMeta?.imageUrl));
 	await waitForImages(wrapper);
 
 	try {

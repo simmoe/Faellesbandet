@@ -293,7 +293,7 @@
 				withBassTabs: true,
 				includeCover: true,
 				coverTitle: title,
-				coverMeta: printCategory ? categoryMetaMap[printCategory] : undefined
+				coverMeta: printCategory ? categoryMetaFor(printCategory) : undefined
 			});
 		} catch (err) {
 			console.error('PDF-eksport fejlede:', err);
@@ -311,7 +311,7 @@
 			await exportAudienceSongbookAsPdf(printSongs, {
 				title,
 				filename: `${title} - tekst`,
-				categoryMeta: printCategory ? categoryMetaMap[printCategory] : undefined
+				categoryMeta: printCategory ? categoryMetaFor(printCategory) : undefined
 			});
 		} catch (err) {
 			console.error('Publikums-PDF fejlede:', err);
@@ -508,6 +508,13 @@
 			...(meta.createdAt ? { createdAt: meta.createdAt } : {}),
 			...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {})
 		};
+	}
+
+	function categoryMetaFor(name: string): CategoryMeta | undefined {
+		if (categoryMetaMap[name]) return categoryMetaMap[name];
+		const lower = name.toLowerCase();
+		const key = Object.keys(categoryMetaMap).find((k) => k.toLowerCase() === lower);
+		return key ? categoryMetaMap[key] : undefined;
 	}
 
 	function defaultPrintOrderForCategory(cat: string): PrintOrderEntry[] {
