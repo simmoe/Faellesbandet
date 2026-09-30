@@ -364,18 +364,23 @@
 	}
 	.audience-cover {
 		display: grid;
-		align-content: end;
+		grid-template-rows: minmax(0, 1fr) auto;
+		align-content: stretch;
+		justify-items: center;
 		gap: 10mm;
 		background: linear-gradient(180deg, #fffbf3 0%, #ffffff 55%);
 	}
 	.audience-cover-image {
-		width: 100%;
-		height: 120mm;
+		width: 132mm;
+		height: 132mm;
+		align-self: center;
 		object-fit: cover;
-		border-radius: 12px;
-		box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+		border-radius: 50%;
+		box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
 	}
 	.audience-cover-copy {
+		justify-self: start;
+		width: 100%;
 		max-width: 140mm;
 	}
 	.audience-kicker {

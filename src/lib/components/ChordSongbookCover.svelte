@@ -50,10 +50,14 @@
 	}
 
 	.chord-cover-image {
-		width: 100%;
-		height: 150mm;
+		width: min(100%, 148mm);
+		height: auto;
+		max-height: 148mm;
+		aspect-ratio: 1;
+		justify-self: center;
+		align-self: center;
 		object-fit: cover;
-		border-radius: 18px;
+		border-radius: 50%;
 		box-shadow: 0 24px 60px rgba(15, 23, 42, 0.13);
 	}
 

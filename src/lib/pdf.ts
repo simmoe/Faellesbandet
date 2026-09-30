@@ -21,6 +21,7 @@ import ChordSongbookCover from './components/ChordSongbookCover.svelte';
 import PrintableSong from './components/PrintableSong.svelte';
 import SongbookToc from './components/SongbookToc.svelte';
 import { categoryImageDataUrl } from './firebase/images';
+import { toCircularWideAngle } from './circleImage';
 import {
 	buildSongbookTocPages,
 	tocPageCountForSongs,
@@ -109,7 +110,7 @@ async function waitForImages(root: HTMLElement): Promise<void> {
 		images.map(
 			(img) =>
 				new Promise<void>((resolve) => {
-					if (img.complete && img.naturalWidth > 0) {
+					if (img.complete) {
 						resolve();
 						return;
 					}
@@ -142,13 +143,20 @@ async function urlToDataUrl(url: string | undefined): Promise<string | undefined
 
 async function inlineCategoryImage(meta: CategoryMeta | undefined): Promise<CategoryMeta | undefined> {
 	if (!meta?.imageUrl) return meta;
-	const imageUrl = meta.imagePath
+	let imageUrl = meta.imagePath
 		? await categoryImageDataUrl(meta.imagePath).catch((err) => {
 				console.warn('Kunne ikke hente kategori-billede via function:', err);
 				return undefined;
 			})
-		: await urlToDataUrl(meta.imageUrl);
-	return imageUrl ? { ...meta, imageUrl } : meta;
+		: undefined;
+	if (!imageUrl) imageUrl = await urlToDataUrl(meta.imageUrl);
+	if (!imageUrl) return meta;
+	try {
+		imageUrl = await toCircularWideAngle(imageUrl);
+	} catch (err) {
+		console.warn('Kunne ikke lave cirkulært kategori-billede:', err);
+	}
+	return { ...meta, imageUrl };
 }
 
 async function applyLayoutScale(
@@ -558,6 +566,7 @@ export async function exportAudienceSongbookAsPdf(
 	});
 
 	await waitForAudienceLayout(pageDiv);
+	await tick();
 	await waitForImages(wrapper);
 
 	try {

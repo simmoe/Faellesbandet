@@ -1213,13 +1213,15 @@
 		min-height: 100%;
 		aspect-ratio: 1 / 1;
 		overflow: hidden;
+		border-radius: 50%;
+		background: #efe7d6;
 	}
 	.print-order-image {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
+		object-fit: contain;
 	}
 	.print-order-edit-area {
 		padding: 0 0.85rem 0.85rem;
