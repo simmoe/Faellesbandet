@@ -39,6 +39,7 @@ html {
 	background: var(--color-bg);
 	-webkit-text-size-adjust: 100%;
 	text-size-adjust: 100%;
+	overflow-x: clip;
 }
 html,
 body {
@@ -57,7 +58,8 @@ body {
 body::before {
 	content: '';
 	position: fixed;
-	inset: -12%;
+	inset: -30%;
+	border-radius: 42%;
 	z-index: 0;
 	pointer-events: none;
 	background:
@@ -161,10 +163,10 @@ html.song-is-playing body::before {
 }
 @keyframes liquid-wash {
 	from {
-		transform: translate3d(-4%, 2%, 0) scale(1);
+		transform: translate3d(-3%, 2%, 0) scale(1);
 	}
 	to {
-		transform: translate3d(5%, -4%, 0) scale(1.12);
+		transform: translate3d(4%, -3%, 0) scale(1.08);
 	}
 }
 

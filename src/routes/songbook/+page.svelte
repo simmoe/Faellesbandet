@@ -1089,7 +1089,25 @@
 		z-index: 20;
 		margin-inline: calc(var(--pad) * -1);
 		padding: var(--pad) var(--pad) var(--gap);
-		background: var(--color-bg);
+		background: transparent;
+	}
+	.songbook-chrome::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: calc(50% - 50vw);
+		width: 100vw;
+		z-index: -1;
+		pointer-events: none;
+		background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--color-bg) 42%, transparent) 0%,
+			color-mix(in srgb, var(--color-bg) 16%, transparent) 72%,
+			transparent 100%
+		);
+		-webkit-backdrop-filter: blur(16px);
+		backdrop-filter: blur(16px);
 	}
 	.page-head {
 		display: grid;
@@ -1109,6 +1127,7 @@
 		width: clamp(40px, 10vw, 60px);
 		height: clamp(40px, 10vw, 60px);
 		object-fit: contain;
+		border-radius: 50%;
 	}
 	.page-tagline {
 		margin: 0.15rem 0 0;
