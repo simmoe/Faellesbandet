@@ -3,6 +3,7 @@ export interface SongbookTocSong {
 	title: string;
 	artist?: string;
 	page: number;
+	kind?: 'song' | 'set';
 }
 
 export interface SongbookTocPage {

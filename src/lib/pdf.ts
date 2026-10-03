@@ -43,12 +43,15 @@ interface ExportOptions {
 	coverTitle?: string;
 	coverMeta?: CategoryMeta;
 	includeCover?: boolean;
+	/** Stamp page numbers from this 1-based PDF page (cover is 1 and stays unnumbered). */
+	numberPagesFrom?: number;
 }
 
 interface AudienceExportOptions extends ExportOptions {
 	title: string;
 	categoryMeta?: CategoryMeta;
 	includeFrontMatter?: boolean;
+	order?: SongbookPrintEntry[];
 }
 
 const MIN_LAYOUT_SCALE = 0.55;
@@ -118,6 +121,23 @@ function createSnapshotWrapper(): HTMLDivElement {
 	return wrapper;
 }
 
+const coverPhotoBySlot = new WeakMap<HTMLElement, string>();
+
+function coverSlotSelector(): string {
+	return '.chord-cover-image, .audience-cover-image';
+}
+
+function paintCoverSlots(root: HTMLElement, dataUrl: string | undefined): void {
+	if (!dataUrl) return;
+	for (const slot of root.querySelectorAll<HTMLElement>(coverSlotSelector())) {
+		slot.style.backgroundImage = `url("${dataUrl}")`;
+		slot.style.backgroundSize = 'cover';
+		slot.style.backgroundPosition = 'center';
+		slot.style.backgroundRepeat = 'no-repeat';
+		coverPhotoBySlot.set(slot, dataUrl);
+	}
+}
+
 async function loadCoverBitmap(src: string): Promise<HTMLImageElement> {
 	const img = new Image();
 	if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
@@ -129,32 +149,67 @@ async function loadCoverBitmap(src: string): Promise<HTMLImageElement> {
 	return img;
 }
 
+function boxRelativeTo(
+	el: HTMLElement,
+	ancestor: HTMLElement
+): { x: number; y: number; w: number; h: number } | null {
+	const w = el.offsetWidth;
+	const h = el.offsetHeight;
+	if (w < 2 || h < 2) return null;
+	const page = ancestor.getBoundingClientRect();
+	const rect = el.getBoundingClientRect();
+	if (page.width >= 2 && rect.width >= 2) {
+		return { x: rect.left - page.left, y: rect.top - page.top, w: rect.width, h: rect.height };
+	}
+	let x = 0;
+	let y = 0;
+	let node: HTMLElement | null = el;
+	while (node && node !== ancestor) {
+		x += node.offsetLeft;
+		y += node.offsetTop;
+		const parent = node.offsetParent;
+		node = parent instanceof HTMLElement ? parent : null;
+	}
+	return { x, y, w, h };
+}
+
 async function stampCoverPhoto(pageEl: HTMLElement, canvas: HTMLCanvasElement): Promise<void> {
-	const slot = pageEl.querySelector<HTMLElement>('[data-cover-src]');
-	const src = slot?.dataset.coverSrc;
+	const slot = pageEl.querySelector<HTMLElement>(coverSlotSelector());
+	const src = (slot && coverPhotoBySlot.get(slot)) || undefined;
 	if (!slot || !src) return;
-	const pageRect = pageEl.getBoundingClientRect();
-	if (pageRect.width < 1 || pageRect.height < 1) return;
-	const rect = slot.getBoundingClientRect();
+	const pageW = pageEl.offsetWidth;
+	const pageH = pageEl.offsetHeight;
+	if (pageW < 2 || pageH < 2) return;
+	const box = boxRelativeTo(slot, pageEl);
+	if (!box) return;
 	const img = await loadCoverBitmap(src).catch((err) => {
 		console.warn('Kunne ikke stemple kategori-billede på PDF:', err);
 		return null;
 	});
-	if (!img) return;
+	if (!img || img.naturalWidth < 2) return;
 	const ctx = canvas.getContext('2d');
 	if (!ctx) return;
-	const sx = canvas.width / pageRect.width;
-	const sy = canvas.height / pageRect.height;
-	const x = (rect.left - pageRect.left) * sx;
-	const y = (rect.top - pageRect.top) * sy;
-	const w = rect.width * sx;
-	const h = rect.height * sy;
+	const sx = canvas.width / pageW;
+	const sy = canvas.height / pageH;
+	const x = box.x * sx;
+	const y = box.y * sy;
+	const w = box.w * sx;
+	const h = box.h * sy;
 	ctx.save();
 	ctx.beginPath();
 	ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
 	ctx.clip();
 	ctx.drawImage(img, x, y, w, h);
 	ctx.restore();
+}
+
+function drawPdfPageNumber(pdf: InstanceType<typeof jsPDF>, pageIndex: number): void {
+	const pageWidth = pdf.internal.pageSize.getWidth();
+	const pageHeight = pdf.internal.pageSize.getHeight();
+	pdf.setFont('helvetica', 'normal');
+	pdf.setFontSize(9);
+	pdf.setTextColor(156, 163, 175);
+	pdf.text(String(pageIndex + 1), pageWidth - 12, pageHeight - 10, { align: 'right' });
 }
 
 async function waitForImages(root: HTMLElement): Promise<void> {
@@ -204,7 +259,7 @@ async function inlineCategoryImage(meta: CategoryMeta | undefined): Promise<Cate
 	if (!meta?.imageUrl) return meta;
 	let imageUrl = meta.imagePath
 		? await categoryImageDataUrl(meta.imagePath).catch((err) => {
-				console.warn('Kunne ikke hente kategori-billede via function:', err);
+				console.warn('Kunne ikke hente kategori-billede fra Storage:', err);
 				return undefined;
 			})
 		: undefined;
@@ -383,6 +438,9 @@ async function pagesToPdf(pages: HTMLElement[], opts: ExportOptions): Promise<vo
 			const h = w * (slice.height / slice.width);
 			if (pdfPageIndex > 0) pdf.addPage();
 			pdf.addImage(imgData, imageFormat === 'jpeg' ? 'JPEG' : 'PNG', margin, margin, w, h);
+			if (opts.numberPagesFrom != null && pdfPageIndex + 1 >= opts.numberPagesFrom) {
+				drawPdfPageNumber(pdf, pdfPageIndex);
+			}
 			pdfPageIndex++;
 		}
 	}
@@ -431,6 +489,9 @@ export async function exportSongsAsPdf(
 		});
 		components.push(cover);
 		pageEls.push(coverDiv);
+		await tick();
+		paintCoverSlots(coverDiv, coverMeta?.imageUrl);
+		await waitForLayout();
 	}
 
 	for (const entry of entries) {
@@ -476,7 +537,10 @@ export async function exportSongsAsPdf(
 	}
 
 	try {
-		await pagesToPdf(pageEls, opts);
+		await pagesToPdf(pageEls, {
+			...opts,
+			numberPagesFrom: opts.includeCover ? (opts.numberPagesFrom ?? 2) : opts.numberPagesFrom
+		});
 	} finally {
 		for (const c of components) unmount(c);
 		document.body.removeChild(wrapper);
@@ -496,37 +560,40 @@ async function insertChordSongbookToc(args: {
 	const { wrapper, pageEls, contentMounts, components } = args;
 	const songCount = contentMounts.filter((item) => item.entry.type === 'song').length;
 	if (songCount === 0) return;
-	const tocCount = tocPageCountForSongs(songCount);
+	const setCount = contentMounts.filter((item) => item.entry.type === 'set').length;
+	const tocCount = tocPageCountForSongs(songCount + setCount + (setCount > 0 ? 1 : 0));
 
 	let cursor = 2 + tocCount;
 	const tocSongs: SongbookTocSong[] = [];
+	let addedOpeningSet = false;
+	let sawSet = false;
 
 	for (const item of contentMounts) {
 		const pageCount = await estimatePdfPageCount(item.el);
-		if (item.entry.type === 'song') {
+		if (item.entry.type === 'set') {
+			sawSet = true;
+			tocSongs.push({
+				id: item.entry.id,
+				title: item.entry.label,
+				page: cursor,
+				kind: 'set'
+			});
+		} else {
+			if (setCount > 0 && !addedOpeningSet && !sawSet) {
+				tocSongs.push({
+					id: '__set__1',
+					title: '1. sæt',
+					page: cursor,
+					kind: 'set'
+				});
+				addedOpeningSet = true;
+			}
 			tocSongs.push({
 				id: item.entry.song.id,
 				title: item.entry.song.title,
 				artist: item.entry.song.artist,
 				page: cursor
 			});
-			if (item.component) {
-				unmount(item.component);
-				const idx = components.indexOf(item.component);
-				if (idx >= 0) components.splice(idx, 1);
-			}
-			item.el.replaceChildren();
-			const c = mount(PrintableSong, {
-				target: item.el,
-				props: { song: item.entry.song, pageNumber: cursor }
-			});
-			item.component = c;
-			components.push(c);
-			if (item.entry.song.columnLayout) {
-				item.el.classList.add('column-layout', 'no-bass-tabs');
-			} else if ((item.entry.withBassTabs ?? item.entry.song.showBassTabs ?? true) === false) {
-				item.el.classList.add('no-bass-tabs');
-			}
 		}
 		cursor += pageCount;
 	}
@@ -549,15 +616,16 @@ async function insertChordSongbookToc(args: {
 async function estimatePdfPageCount(pageEl: HTMLElement): Promise<number> {
 	const usableW = 210 - PDF_MARGIN_MM * 2;
 	const usableH = 297 - PDF_MARGIN_MM * 2;
-	const widthPx = pageEl.getBoundingClientRect().width || pageEl.scrollWidth;
+	const widthPx = pageEl.getBoundingClientRect().width || pageEl.offsetWidth || pageEl.scrollWidth;
 	if (widthPx <= 0) return 1;
-	const targetHeightPx = widthPx * (usableH / usableW) * FIT_HEIGHT_SAFETY;
+	const layoutHeightPx = widthPx * (usableH / usableW) * FIT_HEIGHT_SAFETY;
+	const sliceHeightPx = widthPx * (usableH / usableW);
 	const pageFitSinglePage = pageEl.dataset.fitSinglePage !== 'false';
-	const saved = await applyLayoutScale(pageEl, targetHeightPx, pageFitSinglePage);
-	const height = Math.max(pageEl.scrollHeight, pageEl.getBoundingClientRect().height);
+	const saved = await applyLayoutScale(pageEl, layoutHeightPx, pageFitSinglePage);
+	const height = Math.max(pageEl.scrollHeight, pageEl.getBoundingClientRect().height, pageEl.offsetHeight);
 	restoreStyles(pageEl, saved);
-	if (height <= 0 || targetHeightPx <= 0) return 1;
-	return Math.max(1, Math.ceil(height / targetHeightPx - 1e-6));
+	if (height <= 0 || sliceHeightPx <= 0) return 1;
+	return Math.max(1, Math.ceil(height / sliceHeightPx - 1e-6));
 }
 
 function normalizePrintEntries(input: SongDoc[] | SongbookPrintEntry[]): SongbookPrintEntry[] {
@@ -603,13 +671,16 @@ export async function exportAudienceSongbookAsPdf(
 			title: opts.title,
 			songs,
 			categoryMeta,
-			includeFrontMatter: opts.includeFrontMatter ?? true
+			includeFrontMatter: opts.includeFrontMatter ?? true,
+			order: opts.order
 		}
 	});
 
 	await waitForAudienceLayout(pageDiv);
 	await tick();
+	paintCoverSlots(pageDiv, categoryMeta?.imageUrl);
 	await waitForImages(wrapper);
+	await waitForLayout();
 
 	try {
 		const pages = [...pageDiv.querySelectorAll<HTMLElement>('.audience-page')];
@@ -617,7 +688,8 @@ export async function exportAudienceSongbookAsPdf(
 			...opts,
 			fitSinglePage: false,
 			imageFormat: opts.imageFormat ?? 'jpeg',
-			jpegQuality: opts.jpegQuality ?? 0.86
+			jpegQuality: opts.jpegQuality ?? 0.86,
+			numberPagesFrom: (opts.includeFrontMatter ?? true) ? 2 : opts.numberPagesFrom
 		});
 	} finally {
 		unmount(component);

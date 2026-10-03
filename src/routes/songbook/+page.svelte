@@ -311,7 +311,8 @@
 			await exportAudienceSongbookAsPdf(printSongs, {
 				title,
 				filename: `${title} - tekst`,
-				categoryMeta: printCategory ? categoryMetaFor(printCategory) : undefined
+				categoryMeta: printCategory ? categoryMetaFor(printCategory) : undefined,
+				order: printEntries
 			});
 		} catch (err) {
 			console.error('Publikums-PDF fejlede:', err);

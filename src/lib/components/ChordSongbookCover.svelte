@@ -14,7 +14,7 @@
 <article class="chord-cover-page">
 	<div class="chord-cover-mark">{BAND.name}</div>
 	{#if categoryMeta?.imageUrl}
-		<div class="chord-cover-image" data-cover-src={categoryMeta.imageUrl}></div>
+		<div class="chord-cover-image"></div>
 	{/if}
 	<div class="chord-cover-copy">
 		<p class="chord-cover-kicker">Akkordbog</p>

@@ -4,14 +4,19 @@
 	import SongbookToc from './SongbookToc.svelte';
 	import { buildSongbookTocPages, tocPageCountForSongs } from '$lib/songbookToc';
 
+	export type AudienceOrderItem =
+		| { type: 'song'; song: SongDoc }
+		| { type: 'set'; id: string; label: string };
+
 	interface Props {
 		title: string;
 		songs: SongDoc[];
 		categoryMeta?: CategoryMeta;
 		includeFrontMatter?: boolean;
+		order?: AudienceOrderItem[];
 	}
 
-	const { title, songs, categoryMeta, includeFrontMatter = true }: Props = $props();
+	const { title, songs, categoryMeta, includeFrontMatter = true, order }: Props = $props();
 
 	type AudienceLine =
 		| { kind: 'lyric'; text: string }
@@ -29,19 +34,59 @@
 	}
 
 	interface AudiencePage extends AudienceSong {
+		kind: 'song';
 		page: number;
 		scale: number;
 	}
 
+	interface AudienceSetPage {
+		kind: 'set';
+		id: string;
+		title: string;
+		page: number;
+	}
+
+	type PlannedPage = AudiencePage | AudienceSetPage;
+
 	const sourceSongs = $derived(songs.map(toAudienceSong).filter((song) => song.lines.length > 0));
+	const orderItems = $derived<AudienceOrderItem[]>(
+		order?.length ? order : songs.map((song) => ({ type: 'song', song }))
+	);
+	const tocLineCount = $derived.by(() => {
+		const setCount = orderItems.filter((item) => item.type === 'set').length;
+		const songCount = orderItems.filter((item) => item.type === 'song').length;
+		return songCount + setCount + (setCount > 0 ? 1 : 0);
+	});
 	let measureRoot = $state<HTMLDivElement | undefined>();
-	let planned = $state<AudiencePage[] | null>(null);
+	let planned = $state<PlannedPage[] | null>(null);
 
 	const tocPages = $derived.by(() => {
 		if (!planned || !includeFrontMatter) return [];
 		const seen = new Set<string>();
 		const tocSongs = [];
+		const hasSets = planned.some((page) => page.kind === 'set');
+		let addedOpeningSet = false;
+		let sawSet = false;
 		for (const page of planned) {
+			if (page.kind === 'set') {
+				sawSet = true;
+				tocSongs.push({
+					id: page.id,
+					title: page.title,
+					page: page.page,
+					kind: 'set' as const
+				});
+				continue;
+			}
+			if (hasSets && !addedOpeningSet && !sawSet) {
+				tocSongs.push({
+					id: '__set__1',
+					title: '1. sæt',
+					page: page.page,
+					kind: 'set' as const
+				});
+				addedOpeningSet = true;
+			}
 			if (seen.has(page.id)) continue;
 			seen.add(page.id);
 			tocSongs.push({
@@ -54,18 +99,18 @@
 		return buildSongbookTocPages(tocSongs);
 	});
 
-	const showPageNumbers = $derived(includeFrontMatter || (planned?.length ?? 0) > 1);
-
 	$effect(() => {
 		const snapshot = sourceSongs;
+		const items = orderItems;
 		const front = includeFrontMatter;
+		const tocLines = tocLineCount;
 		const root = measureRoot;
 		if (!root) return;
 		let cancelled = false;
 		requestAnimationFrame(() => {
 			requestAnimationFrame(() => {
 				if (cancelled || !root.isConnected) return;
-				planned = paginateSongs(root, snapshot, front);
+				planned = paginateOrder(root, snapshot, items, front, tocLines);
 			});
 		});
 		return () => {
@@ -222,19 +267,30 @@
 		return best;
 	}
 
-	function paginateSongs(
+	function paginateOrder(
 		root: HTMLElement,
 		input: AudienceSong[],
-		front: boolean
-	): AudiencePage[] {
+		items: AudienceOrderItem[],
+		front: boolean,
+		tocLines: number
+	): PlannedPage[] {
 		void root.offsetHeight;
-		let page = front ? 2 + tocPageCountForSongs(input.length) : 1;
-		const pages: AudiencePage[] = [];
-		for (const song of input) {
+		const byId = new Map(input.map((song) => [song.id, song]));
+		let page = front ? 2 + tocPageCountForSongs(tocLines) : 1;
+		const pages: PlannedPage[] = [];
+		for (const item of items) {
+			if (item.type === 'set') {
+				pages.push({ kind: 'set', id: item.id, title: item.label, page });
+				page += 1;
+				continue;
+			}
+			const song = byId.get(item.song.id);
+			if (!song) continue;
 			const section = root.querySelector<HTMLElement>(`[data-song-id="${CSS.escape(song.id)}"]`);
 			if (song.fitSinglePage) {
 				pages.push({
 					...song,
+					kind: 'song',
 					lines: song.lines,
 					page,
 					scale: section ? fitScaleForSection(section) : 1
@@ -244,7 +300,7 @@
 			}
 			const chunks = section ? paginateSong(section, song) : [song.lines];
 			for (const lines of chunks) {
-				pages.push({ ...song, lines, page, scale: 1 });
+				pages.push({ ...song, kind: 'song', lines, page, scale: 1 });
 				page += 1;
 			}
 		}
@@ -256,14 +312,14 @@
 	{#if planned === null}
 		<div class="audience-measure" bind:this={measureRoot}>
 			{#each sourceSongs as song (song.id)}
-				{@render songPage(song, song.lines, 0, false, 1)}
+				{@render songPage(song, song.lines, 1)}
 			{/each}
 		</div>
 	{:else}
 		{#if includeFrontMatter}
 			<section class="audience-page audience-cover" data-fit-single-page="false">
 				{#if categoryMeta?.imageUrl}
-					<div class="audience-cover-image" data-cover-src={categoryMeta.imageUrl}></div>
+					<div class="audience-cover-image"></div>
 				{/if}
 				<div class="audience-cover-copy">
 					<p class="audience-kicker">Publikums-sangbog</p>
@@ -277,19 +333,20 @@
 			<SongbookToc pages={tocPages} />
 		{/if}
 
-		{#each planned as page (page.id + '-' + page.page)}
-			{@render songPage(page, page.lines, page.page, showPageNumbers, page.scale)}
+		{#each planned as page (page.kind === 'set' ? `set-${page.id}` : `${page.id}-${page.page}`)}
+			{#if page.kind === 'set'}
+				<section class="audience-page audience-set" data-fit-single-page="false">
+					<p>Sæt</p>
+					<h1>{page.title}</h1>
+				</section>
+			{:else}
+				{@render songPage(page, page.lines, page.scale)}
+			{/if}
 		{/each}
 	{/if}
 </article>
 
-{#snippet songPage(
-	song: AudienceSong,
-	lines: AudienceLine[],
-	page: number,
-	numbered: boolean,
-	scale: number
-)}
+{#snippet songPage(song: AudienceSong, lines: AudienceLine[], scale: number)}
 	<section
 		class="audience-page audience-song-page"
 		data-fit-single-page="false"
@@ -332,9 +389,6 @@
 				{/each}
 			</div>
 		</section>
-		{#if numbered}
-			<footer class="audience-page-number">{page}</footer>
-		{/if}
 	</section>
 {/snippet}
 
@@ -377,6 +431,28 @@
 		background: #efe7d6;
 		border-radius: 50%;
 		box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+	}
+	.audience-set {
+		display: grid;
+		place-items: center;
+		background: #ffffff;
+		color: #151a22;
+		text-align: center;
+	}
+	.audience-set p {
+		margin: 0 0 5mm;
+		color: #9a6a12;
+		font-size: 9pt;
+		font-weight: 800;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+	}
+	.audience-set h1 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: 36pt;
+		font-weight: 800;
+		letter-spacing: -0.04em;
 	}
 	.audience-cover-copy {
 		justify-self: start;
@@ -504,13 +580,5 @@
 	.audience-blank {
 		height: calc(3.2mm * var(--pdf-layout-scale, 1));
 		break-inside: avoid;
-	}
-	.audience-page-number {
-		position: absolute;
-		right: 20mm;
-		bottom: 8mm;
-		color: #9ca3af;
-		font-family: var(--font-display);
-		font-size: 9pt;
 	}
 </style>
