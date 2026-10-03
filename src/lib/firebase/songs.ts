@@ -9,6 +9,7 @@ import {
 	addDoc,
 	collection,
 	deleteDoc,
+	deleteField,
 	doc,
 	getDoc,
 	onSnapshot,
@@ -110,8 +111,44 @@ export async function updateSong(
 	});
 }
 
-export async function deleteSong(id: string): Promise<void> {
+export async function deleteSong(id: string, chordChartPath?: string): Promise<void> {
+	await deleteChordChart(chordChartPath).catch(() => undefined);
 	await deleteDoc(songRef(id));
+}
+
+export async function uploadChordChart(
+	songId: string,
+	file: File,
+	uid: string
+): Promise<{ imageUrl: string; imagePath: string }> {
+	const ext = extensionForFile(file);
+	const imagePath = `${COL.bands}/${BAND.id}/categoryImages/${uid}/chart-${slugForStorage(songId)}-${Date.now()}.${ext}`;
+	const storageRef = ref(getStorageBucket(), imagePath);
+	await uploadBytes(storageRef, file, {
+		contentType: file.type || `image/${ext}`,
+		customMetadata: { songId, kind: 'chordChart' }
+	});
+	const imageUrl = await getDownloadURL(storageRef);
+	return { imageUrl, imagePath };
+}
+
+export async function saveSongChordChart(
+	id: string,
+	chart: { url: string; path: string } | null,
+	uid: string
+): Promise<void> {
+	await updateDoc(songRef(id), {
+		...(chart
+			? { chordChartUrl: chart.url, chordChartPath: chart.path }
+			: { chordChartUrl: deleteField(), chordChartPath: deleteField() }),
+		updatedBy: uid,
+		updatedAt: serverTimestamp()
+	});
+}
+
+export async function deleteChordChart(imagePath: string | undefined): Promise<void> {
+	if (!imagePath) return;
+	await deleteObject(ref(getStorageBucket(), imagePath));
 }
 
 export function subscribeCategoryColors(
