@@ -63,8 +63,10 @@
 </script>
 
 {#if show}
-	<div class="info-field info-field--stack">
-		<span>Akkordskema</span>
+	<div class={url ? 'chart-side' : 'info-field'}>
+		{#if !url}
+			<span>Akkordskema</span>
+		{/if}
 		<div class="chart-block">
 			{#if url}
 				<button
@@ -123,6 +125,12 @@
 </div>
 
 <style>
+	.chart-side {
+		width: min(30vw, 100%);
+		min-width: 0;
+		margin-inline-start: auto;
+		justify-self: end;
+	}
 	.chart-block {
 		display: flex;
 		flex-direction: column;
@@ -134,21 +142,19 @@
 	.chart-preview {
 		appearance: none;
 		display: block;
-		width: fit-content;
-		max-width: min(30vw, 100%);
+		width: 100%;
 		margin: 0;
-		margin-inline-start: auto;
-		padding: 0.35rem;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: var(--radius-button, 0.6rem);
-		background: #fff;
+		padding: 0;
+		border: 0;
+		background: transparent;
 		cursor: zoom-in;
 	}
 	.chart-preview img {
 		display: block;
-		width: auto;
-		max-width: min(30vw, 100%);
+		width: 100%;
 		height: auto;
+		aspect-ratio: auto 640 / 370;
+		object-fit: contain;
 	}
 	.chart-actions {
 		display: flex;
@@ -239,6 +245,8 @@
 	.chart-modal-img {
 		display: block;
 		width: 100%;
+		height: auto;
+		aspect-ratio: auto 640 / 370;
 		max-height: calc(100vh - 7rem);
 		object-fit: contain;
 		background: #fff;

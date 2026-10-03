@@ -240,6 +240,20 @@ select {
 	font-size: var(--type-sm);
 	font-weight: 400;
 }
+.song-page .info-fields {
+	display: grid;
+	gap: var(--space-3);
+	min-width: 0;
+}
+.song-page .info-panel--with-chart {
+	grid-template-columns: minmax(0, 1fr) 30vw;
+	align-items: start;
+}
+@media (max-width: 40rem) {
+	.song-page .info-panel--with-chart {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
 .song-page .info-delete {
 	appearance: none;
 	justify-self: end;

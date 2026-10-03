@@ -835,7 +835,8 @@
 				<section class="info-block no-print" class:is-open={infoOpen}>
 					<div class="info-fold" class:is-open={infoOpen}>
 						<div class="info-inner">
-							<div class="info-panel">
+							<div class="info-panel" class:info-panel--with-chart={!!chordChartUrl}>
+								<div class="info-fields">
 								{#if canEdit}
 									<label class="info-field">
 										<span>Kunstner</span>
@@ -932,15 +933,29 @@
 									onRemove={removeYoutubeLink}
 									readOnly={!canEdit}
 								/>
-								<SongChordChart
-									url={chordChartUrl}
-									songTitle={title}
-									canEdit={canEdit}
-									uploading={chartUploading}
-									error={chartError}
-									onUpload={handleChartUpload}
-									onRemove={handleChartRemove}
-								/>
+								{#if !chordChartUrl}
+									<SongChordChart
+										url={chordChartUrl}
+										songTitle={title}
+										canEdit={canEdit}
+										uploading={chartUploading}
+										error={chartError}
+										onUpload={handleChartUpload}
+										onRemove={handleChartRemove}
+									/>
+								{/if}
+								</div>
+								{#if chordChartUrl}
+									<SongChordChart
+										url={chordChartUrl}
+										songTitle={title}
+										canEdit={canEdit}
+										uploading={chartUploading}
+										error={chartError}
+										onUpload={handleChartUpload}
+										onRemove={handleChartRemove}
+									/>
+								{/if}
 							</div>
 							{#if canEdit}
 								<button type="button" class="info-delete" onclick={handleDelete}>Slet sang</button>
