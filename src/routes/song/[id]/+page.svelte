@@ -265,7 +265,8 @@
 	}
 
 	const CHART_MAX_BYTES = 15 * 1024 * 1024;
-	const CHART_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+	const CHART_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/svg']);
+	const CHART_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg']);
 
 	function chartUploadError(err: unknown, fallback: string): string {
 		if (!(err instanceof Error)) return fallback;
@@ -276,11 +277,9 @@
 	async function handleChartUpload(file: File) {
 		if (!song || !authState.user) return;
 		const ext = file.name.split('.').pop()?.toLowerCase();
-		const typeOk =
-			CHART_TYPES.has(file.type) ||
-			(!file.type && ['png', 'jpg', 'jpeg', 'webp'].includes(ext ?? ''));
+		const typeOk = CHART_TYPES.has(file.type) || CHART_EXTS.has(ext ?? '');
 		if (!typeOk) {
-			chartError = 'Brug JPG, PNG eller WebP.';
+			chartError = 'Brug SVG, JPG, PNG eller WebP.';
 			return;
 		}
 		if (file.size > CHART_MAX_BYTES) {

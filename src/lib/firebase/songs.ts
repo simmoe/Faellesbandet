@@ -125,7 +125,7 @@ export async function uploadChordChart(
 	const imagePath = `${COL.bands}/${BAND.id}/categoryImages/${uid}/chart-${slugForStorage(songId)}-${Date.now()}.${ext}`;
 	const storageRef = ref(getStorageBucket(), imagePath);
 	await uploadBytes(storageRef, file, {
-		contentType: file.type || `image/${ext}`,
+		contentType: contentTypeForFile(file),
 		customMetadata: { songId, kind: 'chordChart' }
 	});
 	const imageUrl = await getDownloadURL(storageRef);
@@ -207,7 +207,16 @@ function extensionForFile(file: File): string {
 	if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName;
 	if (file.type === 'image/png') return 'png';
 	if (file.type === 'image/webp') return 'webp';
+	if (file.type === 'image/svg+xml' || file.type === 'image/svg') return 'svg';
 	return 'jpg';
+}
+
+function contentTypeForFile(file: File): string {
+	const ext = extensionForFile(file);
+	if (ext === 'svg') return 'image/svg+xml';
+	if (file.type && file.type.startsWith('image/')) return file.type;
+	if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+	return `image/${ext}`;
 }
 
 function slugForStorage(value: string): string {
