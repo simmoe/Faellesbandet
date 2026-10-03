@@ -126,6 +126,7 @@
 	.chart-block {
 		display: flex;
 		flex-direction: column;
+		align-items: flex-end;
 		gap: var(--space-2, 0.75rem);
 		min-width: 0;
 		width: 100%;
@@ -133,9 +134,11 @@
 	.chart-preview {
 		appearance: none;
 		display: block;
-		width: 100%;
+		width: fit-content;
+		max-width: min(30vw, 100%);
 		margin: 0;
-		padding: 0.4rem;
+		margin-inline-start: auto;
+		padding: 0.35rem;
 		border: 1px solid var(--color-border-subtle);
 		border-radius: var(--radius-button, 0.6rem);
 		background: #fff;
@@ -143,12 +146,14 @@
 	}
 	.chart-preview img {
 		display: block;
-		width: 100%;
+		width: auto;
+		max-width: min(30vw, 100%);
 		height: auto;
 	}
 	.chart-actions {
 		display: flex;
 		flex-wrap: wrap;
+		justify-content: flex-end;
 		gap: var(--space-3, 1rem);
 		align-items: center;
 	}
