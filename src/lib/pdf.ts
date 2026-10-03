@@ -174,7 +174,9 @@ function boxRelativeTo(
 
 async function stampCoverPhoto(pageEl: HTMLElement, canvas: HTMLCanvasElement): Promise<void> {
 	const slot = pageEl.querySelector<HTMLElement>(coverSlotSelector());
-	const src = (slot && coverPhotoBySlot.get(slot)) || undefined;
+	const src =
+		(slot instanceof HTMLImageElement && slot.src.startsWith('data:') ? slot.src : undefined) ||
+		(slot ? coverPhotoBySlot.get(slot) : undefined);
 	if (!slot || !src) return;
 	const pageW = pageEl.offsetWidth;
 	const pageH = pageEl.offsetHeight;

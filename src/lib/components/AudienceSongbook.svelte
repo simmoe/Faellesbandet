@@ -319,7 +319,7 @@
 		{#if includeFrontMatter}
 			<section class="audience-page audience-cover" data-fit-single-page="false">
 				{#if categoryMeta?.imageUrl}
-					<div class="audience-cover-image"></div>
+					<img class="audience-cover-image" src={categoryMeta.imageUrl} alt="" />
 				{/if}
 				<div class="audience-cover-copy">
 					<p class="audience-kicker">Publikums-sangbog</p>
@@ -428,6 +428,7 @@
 		width: 132mm;
 		height: 132mm;
 		align-self: center;
+		object-fit: cover;
 		background: #efe7d6;
 		border-radius: 50%;
 		box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
