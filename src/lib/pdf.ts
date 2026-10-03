@@ -128,7 +128,7 @@ function coverSlotSelector(): string {
 }
 
 function paintCoverSlots(root: HTMLElement, dataUrl: string | undefined): void {
-	if (!dataUrl) return;
+	if (!dataUrl?.startsWith('data:')) return;
 	for (const slot of root.querySelectorAll<HTMLElement>(coverSlotSelector())) {
 		slot.style.backgroundImage = `url("${dataUrl}")`;
 		slot.style.backgroundSize = 'cover';
@@ -140,7 +140,6 @@ function paintCoverSlots(root: HTMLElement, dataUrl: string | undefined): void {
 
 async function loadCoverBitmap(src: string): Promise<HTMLImageElement> {
 	const img = new Image();
-	if (!src.startsWith('data:')) img.crossOrigin = 'anonymous';
 	await new Promise<void>((resolve, reject) => {
 		img.onload = () => resolve();
 		img.onerror = () => reject(new Error('Kunne ikke afkode kategori-billedet.'));
@@ -239,6 +238,9 @@ async function waitForImages(root: HTMLElement): Promise<void> {
 async function urlToDataUrl(url: string | undefined): Promise<string | undefined> {
 	if (!url) return undefined;
 	if (url.startsWith('data:')) return url;
+	if (/firebasestorage\.googleapis\.com|storage\.googleapis\.com/i.test(url)) {
+		return undefined;
+	}
 	try {
 		const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
 		if (!response.ok) return undefined;
@@ -259,12 +261,12 @@ async function inlineCategoryImage(meta: CategoryMeta | undefined): Promise<Cate
 	if (!meta?.imageUrl) return meta;
 	let imageUrl = meta.imagePath
 		? await categoryImageDataUrl(meta.imagePath).catch((err) => {
-				console.warn('Kunne ikke hente kategori-billede fra Storage:', err);
+				console.warn('Kunne ikke hente kategori-billede via function:', err);
 				return undefined;
 			})
 		: undefined;
 	if (!imageUrl) imageUrl = await urlToDataUrl(meta.imageUrl);
-	if (!imageUrl) return meta;
+	if (!imageUrl?.startsWith('data:')) return meta;
 	try {
 		imageUrl = await toCircularWideAngle(imageUrl);
 	} catch (err) {

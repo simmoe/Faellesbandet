@@ -1,13 +1,15 @@
-import { getBytes, ref } from 'firebase/storage';
-import { getStorageBucket } from './client';
+import { httpsCallable } from 'firebase/functions';
+import { getFns } from './client';
 
 export async function categoryImageDataUrl(imagePath: string): Promise<string> {
-	const bytes = await getBytes(ref(getStorageBucket(), imagePath));
-	const blob = new Blob([bytes]);
-	return await new Promise<string>((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(reader.result?.toString() ?? '');
-		reader.onerror = () => reject(reader.error ?? new Error('Kunne ikke læse kategori-billede'));
-		reader.readAsDataURL(blob);
-	});
+	const callable = httpsCallable<{ imagePath: string }, { dataUrl: string }>(
+		getFns(),
+		'categoryImageDataUrl'
+	);
+	const result = await callable({ imagePath });
+	const dataUrl = result.data?.dataUrl;
+	if (!dataUrl?.startsWith('data:')) {
+		throw new Error('Funktionen returnerede ikke et billede.');
+	}
+	return dataUrl;
 }
