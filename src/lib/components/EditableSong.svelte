@@ -1481,7 +1481,7 @@
 	}
 	:global(.practice-view) .editable-song {
 		display: block;
-		columns: 2;
+		columns: var(--practice-columns, 2);
 		column-gap: 1.6em;
 		column-fill: balance;
 	}

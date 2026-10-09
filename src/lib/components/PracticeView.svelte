@@ -52,13 +52,32 @@
 		const stage = stageEl;
 		const sheet = sheetEl;
 		if (!stage || !sheet) return;
+		const width = stage.clientWidth;
+		const height = stage.clientHeight;
+		if (width < 8 || height < 8) return;
+
+		const gap = 26;
+		const minCol = 210;
+		const maxCols = Math.max(2, Math.floor((width + gap) / (minCol + gap)));
+
 		sheet.style.setProperty('--practice-scale', '1');
+		sheet.style.setProperty('--practice-columns', '1');
 		await tick();
 		void sheet.offsetHeight;
+		const oneHeight = Math.max(1, sheet.scrollHeight);
+		let cols = Math.min(maxCols, Math.max(2, Math.ceil(oneHeight / height)));
+		sheet.style.setProperty('--practice-columns', String(cols));
+		void sheet.offsetHeight;
+		while (cols < maxCols && sheet.scrollHeight > height + 1) {
+			cols += 1;
+			sheet.style.setProperty('--practice-columns', String(cols));
+			void sheet.offsetHeight;
+		}
+
 		const scale = Math.min(
 			1,
-			stage.clientWidth / Math.max(1, sheet.scrollWidth),
-			stage.clientHeight / Math.max(1, sheet.scrollHeight)
+			width / Math.max(1, sheet.scrollWidth),
+			height / Math.max(1, sheet.scrollHeight)
 		);
 		sheet.style.setProperty('--practice-scale', String(Math.max(0.22, scale)));
 	}
