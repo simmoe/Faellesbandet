@@ -20,6 +20,7 @@
 	} from '$lib/chordFormatter';
 	import { parseRows, serializeRows, transposeRows, type Row } from '$lib/songParse';
 	import EditableSong from '$lib/components/EditableSong.svelte';
+	import PracticeView from '$lib/components/PracticeView.svelte';
 	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
 	import SongYoutubeLinks from '$lib/components/SongYoutubeLinks.svelte';
 	import { persistSongbookCategory } from '$lib/songbookSelection';
@@ -62,6 +63,7 @@
 	let columnLayout = $state(false);
 	let fitSinglePage = $state(true);
 	let infoOpen = $state(false);
+	let practiceOpen = $state(false);
 	let youtubeLinks = $state<YoutubeLink[]>([]);
 
 	let allSongs = $state<SongDoc[]>([]);
@@ -365,6 +367,11 @@
 		} finally {
 			pdfBusy = false;
 		}
+	}
+
+	function openPractice() {
+		if (playing) stopPlay();
+		practiceOpen = true;
 	}
 
 	async function handleAudiencePdf() {
@@ -686,6 +693,30 @@
 						</svg>
 						<span>{audiencePdfBusy ? '…' : 'Tekst'}</span>
 					</button>
+					<button
+						type="button"
+						class="song-tool"
+						onclick={openPractice}
+						title="Fuldskærm"
+						aria-label="Fuldskærm"
+					>
+						<svg
+							class="print-icon"
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+							<path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+							<path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+							<path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+						</svg>
+					</button>
 					<div class="song-print-flags">
 						<label class="print-toggle">
 							<input
@@ -873,6 +904,17 @@
 					</div>
 				{/if}
 			</div>
+
+			{#if practiceOpen}
+				<PracticeView
+					title={title.trim() || 'Uden titel'}
+					artist={artist.trim()}
+					keyLabel={key.trim()}
+					{rows}
+					{barsPerLine}
+					onClose={() => (practiceOpen = false)}
+				/>
+			{/if}
 
 			<div
 				class="song-area"

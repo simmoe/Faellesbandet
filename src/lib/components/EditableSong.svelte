@@ -1479,6 +1479,16 @@
 		break-inside: avoid;
 		-webkit-column-break-inside: avoid;
 	}
+	:global(.practice-view) .editable-song {
+		display: block;
+		columns: 2;
+		column-gap: 1.6em;
+		column-fill: balance;
+	}
+	:global(.practice-view) .editable-song .song-section {
+		break-inside: avoid;
+		-webkit-column-break-inside: avoid;
+	}
 	@media (max-width: 48rem) {
 		:global(.column-layout) .editable-song {
 			columns: 1;
