@@ -4,13 +4,16 @@
 	import { authState } from '$lib/auth.svelte';
 	import { BAND } from '$lib/data/band';
 	import {
+		deleteChordChart,
 		deleteSong,
 		getSong,
 		saveCategoryColors,
+		saveSongChordChart,
 		subscribeCategoryColors,
 		subscribeCategoryMeta,
 		subscribeSongs,
-		updateSong
+		updateSong,
+		uploadChordChart
 	} from '$lib/firebase/songs';
 	import {
 		uniqueCategoriesFromSongs,
@@ -23,6 +26,7 @@
 	import PracticeView from '$lib/components/PracticeView.svelte';
 	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
 	import SongYoutubeLinks from '$lib/components/SongYoutubeLinks.svelte';
+	import SongChordChart from '$lib/components/SongChordChart.svelte';
 	import { persistSongbookCategory } from '$lib/songbookSelection';
 	import { readSongDisplayFlags, writeSongDisplayFlags } from '$lib/songDisplay';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf } from '$lib/pdf';
@@ -65,6 +69,11 @@
 	let infoOpen = $state(false);
 	let practiceOpen = $state(false);
 	let youtubeLinks = $state<YoutubeLink[]>([]);
+	let chordChartUrl = $state('');
+	let chordChartPath = $state('');
+	let chartUploading = $state(false);
+	let chartError = $state<string | null>(null);
+	const hasInfoPanel = $derived(canEdit || youtubeLinks.length > 0 || !!chordChartUrl);
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
@@ -130,6 +139,9 @@
 				collapsedSections = [...(s.collapsedSections ?? [])];
 				applyDisplayFlags(s, !authState.user);
 				youtubeLinks = [...(s.youtubeLinks ?? [])];
+				chordChartUrl = s.chordChartUrl ?? '';
+				chordChartPath = s.chordChartPath ?? '';
+				chartError = null;
 			})
 			.catch((err) => (loadError = err instanceof Error ? err.message : 'Ukendt fejl'))
 			.finally(() => (loading = false));
@@ -254,6 +266,73 @@
 		scheduleSave();
 	}
 
+	const CHART_MAX_BYTES = 15 * 1024 * 1024;
+	const CHART_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/svg']);
+	const CHART_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'svg']);
+
+	function chartUploadError(err: unknown, fallback: string): string {
+		if (!(err instanceof Error)) return fallback;
+		const code = (err as { code?: string }).code;
+		return code ? `${fallback} (${code})` : `${fallback} (${err.message})`;
+	}
+
+	async function handleChartUpload(file: File) {
+		if (!song || !authState.user) return;
+		const ext = file.name.split('.').pop()?.toLowerCase();
+		const typeOk = CHART_TYPES.has(file.type) || CHART_EXTS.has(ext ?? '');
+		if (!typeOk) {
+			chartError = 'Brug SVG, JPG, PNG eller WebP.';
+			return;
+		}
+		if (file.size > CHART_MAX_BYTES) {
+			chartError = 'Billedet må højst være 15 MB.';
+			return;
+		}
+		chartUploading = true;
+		chartError = null;
+		const previousPath = chordChartPath;
+		try {
+			const uploaded = await uploadChordChart(song.id, file, authState.user.uid);
+			await saveSongChordChart(
+				song.id,
+				{ url: uploaded.imageUrl, path: uploaded.imagePath },
+				authState.user.uid
+			);
+			chordChartUrl = uploaded.imageUrl;
+			chordChartPath = uploaded.imagePath;
+			song = { ...song, chordChartUrl: uploaded.imageUrl, chordChartPath: uploaded.imagePath };
+			if (previousPath && previousPath !== uploaded.imagePath) {
+				deleteChordChart(previousPath).catch((err) =>
+					console.warn('Kunne ikke slette gammelt akkordskema:', err)
+				);
+			}
+		} catch (err) {
+			chartError = chartUploadError(err, 'Kunne ikke uploade akkordskema.');
+		} finally {
+			chartUploading = false;
+		}
+	}
+
+	async function handleChartRemove() {
+		if (!song || !authState.user) return;
+		chartUploading = true;
+		chartError = null;
+		const previousPath = chordChartPath;
+		try {
+			await saveSongChordChart(song.id, null, authState.user.uid);
+			chordChartUrl = '';
+			chordChartPath = '';
+			song = { ...song, chordChartUrl: undefined, chordChartPath: undefined };
+			await deleteChordChart(previousPath).catch((err) =>
+				console.warn('Kunne ikke slette akkordskema:', err)
+			);
+		} catch (err) {
+			chartError = chartUploadError(err, 'Kunne ikke fjerne akkordskema.');
+		} finally {
+			chartUploading = false;
+		}
+	}
+
 	function addCategory(cat: string) {
 		const trimmed = cat.trim();
 		if (!trimmed) return;
@@ -323,7 +402,7 @@
 		if (!song) return;
 		const ok = confirm(`Slet "${song.title}"? Det kan ikke fortrydes.`);
 		if (!ok) return;
-		await deleteSong(song.id);
+		await deleteSong(song.id, chordChartPath);
 		goto('/songbook');
 	}
 
@@ -749,14 +828,14 @@
 					</div>
 				</div>
 
-				{#if artist || canEdit || youtubeLinks.length > 0}
+				{#if artist || hasInfoPanel}
 					<div class="song-meta">
 						{#if artist}
 							<p class="artist-line">{artist}</p>
 						{:else}
 							<span></span>
 						{/if}
-						{#if canEdit || youtubeLinks.length > 0}
+						{#if hasInfoPanel}
 							<button
 								type="button"
 								class="info-toggle"
@@ -783,11 +862,12 @@
 					</div>
 				{/if}
 
-				{#if canEdit || youtubeLinks.length > 0}
+				{#if hasInfoPanel}
 				<section class="info-block no-print" class:is-open={infoOpen}>
 					<div class="info-fold" class:is-open={infoOpen}>
 						<div class="info-inner">
-							<div class="info-panel">
+							<div class="info-panel" class:info-panel--with-chart={!!chordChartUrl}>
+								<div class="info-fields">
 								{#if canEdit}
 									<label class="info-field">
 										<span>Kunstner</span>
@@ -884,6 +964,29 @@
 									onRemove={removeYoutubeLink}
 									readOnly={!canEdit}
 								/>
+								{#if !chordChartUrl}
+									<SongChordChart
+										url={chordChartUrl}
+										songTitle={title}
+										canEdit={canEdit}
+										uploading={chartUploading}
+										error={chartError}
+										onUpload={handleChartUpload}
+										onRemove={handleChartRemove}
+									/>
+								{/if}
+								</div>
+								{#if chordChartUrl}
+									<SongChordChart
+										url={chordChartUrl}
+										songTitle={title}
+										canEdit={canEdit}
+										uploading={chartUploading}
+										error={chartError}
+										onUpload={handleChartUpload}
+										onRemove={handleChartRemove}
+									/>
+								{/if}
 							</div>
 							{#if canEdit}
 								<button type="button" class="info-delete" onclick={handleDelete}>Slet sang</button>

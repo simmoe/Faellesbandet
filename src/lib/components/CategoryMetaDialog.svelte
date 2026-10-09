@@ -227,7 +227,7 @@
 					<div class="category-image-block">
 						<div class="category-image-copy">
 							<p class="form-label">Forsidebillede</p>
-							<p class="category-help">JPG, PNG eller WebP. Bruges kun til publikums-PDF'en.</p>
+							<p class="category-help">JPG, PNG eller WebP. Cirkel med vidvinkel på akkord- og tekst-PDF.</p>
 							<div class="category-image-actions">
 								<label class="btn-secondary btn-sm">
 									{uploading ? 'Uploader…' : 'Upload billede'}
@@ -489,14 +489,15 @@
 		width: 6.75rem;
 		aspect-ratio: 1 / 1;
 		overflow: hidden;
-		border-radius: var(--radius-card);
+		border-radius: 50%;
 		border: 1px solid var(--color-border-subtle);
+		background: #efe7d6;
 	}
 	.category-preview {
 		display: block;
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
+		object-fit: contain;
 	}
 	input[type='file'] {
 		display: none;

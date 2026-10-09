@@ -96,6 +96,9 @@ export interface SongDoc {
 	notes?: string;
 	/** YouTube-links under sangens oplysninger. Alle medlemmer kan tilføje. */
 	youtubeLinks?: YoutubeLink[];
+	/** Valgfrit akkordskema (gribsdiagram) under oplysninger. */
+	chordChartUrl?: string;
+	chordChartPath?: string;
 	/**
 	 * Skema-version.
 	 * - v3 = ren WYSIWYG: chord-linjen er literal, bass-linjen er kun

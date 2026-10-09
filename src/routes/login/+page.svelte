@@ -147,6 +147,7 @@
 		width: clamp(72px, 22vw, 112px);
 		height: clamp(72px, 22vw, 112px);
 		object-fit: contain;
+		border-radius: 50%;
 	}
 	.login-brand h1 {
 		margin: 0;

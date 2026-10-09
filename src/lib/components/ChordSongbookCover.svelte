@@ -14,7 +14,7 @@
 <article class="chord-cover-page">
 	<div class="chord-cover-mark">{BAND.name}</div>
 	{#if categoryMeta?.imageUrl}
-		<img class="chord-cover-image" src={categoryMeta.imageUrl} alt="" crossorigin="anonymous" />
+		<img class="chord-cover-image" src={categoryMeta.imageUrl} alt="" />
 	{/if}
 	<div class="chord-cover-copy">
 		<p class="chord-cover-kicker">Akkordbog</p>
@@ -50,10 +50,15 @@
 	}
 
 	.chord-cover-image {
-		width: 100%;
-		height: 150mm;
+		width: min(100%, 148mm);
+		height: auto;
+		max-height: 148mm;
+		aspect-ratio: 1;
+		justify-self: center;
+		align-self: center;
 		object-fit: cover;
-		border-radius: 18px;
+		background: #efe7d6;
+		border-radius: 50%;
 		box-shadow: 0 24px 60px rgba(15, 23, 42, 0.13);
 	}
 

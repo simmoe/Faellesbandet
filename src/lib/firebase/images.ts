@@ -7,5 +7,9 @@ export async function categoryImageDataUrl(imagePath: string): Promise<string> {
 		'categoryImageDataUrl'
 	);
 	const result = await callable({ imagePath });
-	return result.data.dataUrl;
+	const dataUrl = result.data?.dataUrl;
+	if (!dataUrl?.startsWith('data:')) {
+		throw new Error('Funktionen returnerede ikke et billede.');
+	}
+	return dataUrl;
 }

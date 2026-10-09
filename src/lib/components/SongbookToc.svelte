@@ -13,16 +13,15 @@
 		<h2>{index === 0 ? 'Indhold' : 'Indhold fortsat'}</h2>
 		<ol>
 			{#each tocPage.songs as song (song.id)}
-				<li>
+				<li class:is-set={song.kind === 'set'}>
 					<div>
 						<span>{song.title}</span>
-						{#if song.artist}<small>{song.artist}</small>{/if}
+						{#if song.artist && song.kind !== 'set'}<small>{song.artist}</small>{/if}
 					</div>
 					<strong>{song.page}</strong>
 				</li>
 			{/each}
 		</ol>
-		<footer class="audience-page-number">{tocPage.number}</footer>
 	</section>
 {/each}
 
@@ -80,12 +79,14 @@
 		font-size: 8.3pt;
 		font-weight: 400;
 	}
-	.audience-page-number {
-		position: absolute;
-		right: 20mm;
-		bottom: 8mm;
-		color: #9ca3af;
-		font-family: var(--font-display);
+	.audience-toc li.is-set span {
+		color: #9a6a12;
 		font-size: 9pt;
+		font-weight: 800;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+	.audience-toc li.is-set strong {
+		color: #9a6a12;
 	}
 </style>
