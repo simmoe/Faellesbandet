@@ -14,7 +14,7 @@
 	const ARC_SWEEP = 300;
 	const BUFFER_SIZE = 4096;
 	const MIN_HZ = 70;
-	const MAX_HZ = 420;
+	const MAX_HZ = 750;
 	const MIN_CLARITY = 0.9;
 
 	let host: HTMLDivElement | undefined = $state();
@@ -63,6 +63,7 @@
 		let stream: MediaStream | null = null;
 		let worklet: AudioWorkletNode | null = null;
 		let filter: BiquadFilterNode | null = null;
+		let tap: GainNode | null = null;
 		const recent: number[] = [];
 		let silent = 0;
 
@@ -70,12 +71,12 @@
 			ctx = new AudioContext();
 			await ctx.resume();
 			try {
-				await ctx.audioWorklet.addModule('/tuner-worklet.js');
+				await ctx.audioWorklet.addModule('/tuner-worklet.js?v=2');
 				worklet = new AudioWorkletNode(ctx, 'karplus-strong');
 				filter = ctx.createBiquadFilter();
 				filter.type = 'lowpass';
-				filter.frequency.value = 3400;
-				filter.Q.value = 0.65;
+				filter.frequency.value = 6200;
+				filter.Q.value = 0.5;
 				const outGain = ctx.createGain();
 				outGain.gain.value = 0.72;
 				worklet.connect(filter);
@@ -106,7 +107,15 @@
 			const analyser = ctx.createAnalyser();
 			analyser.fftSize = BUFFER_SIZE;
 			analyser.smoothingTimeConstant = 0;
-			source.connect(analyser);
+			const mix = ctx.createGain();
+			source.connect(mix);
+			if (filter) {
+				tap = ctx.createGain();
+				tap.gain.value = 0.42;
+				filter.connect(tap);
+				tap.connect(mix);
+			}
+			mix.connect(analyser);
 			const samples = new Float32Array(BUFFER_SIZE);
 			const detector = PitchDetector.forFloat32Array(BUFFER_SIZE);
 			detector.clarityThreshold = 0.9;
@@ -143,6 +152,7 @@
 			playString = null;
 			worklet?.disconnect();
 			filter?.disconnect();
+			tap?.disconnect();
 			stream?.getTracks().forEach((track) => track.stop());
 			void ctx?.close();
 		};
