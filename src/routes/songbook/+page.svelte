@@ -25,6 +25,7 @@
 	import CategoryMetaDialog from '$lib/components/CategoryMetaDialog.svelte';
 	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
 	import ProfileDialog from '$lib/components/ProfileDialog.svelte';
+	import TunerModal from '$lib/components/TunerModal.svelte';
 	import { SONGBOOK_SESSION_SELECTION_KEY } from '$lib/songbookSelection';
 	import { exportAudienceSongbookAsPdf, exportSongsAsPdf, type SongbookPrintEntry } from '$lib/pdf';
 	import {
@@ -55,6 +56,7 @@
 	let categoryUploading = $state(false);
 	let categoryError = $state<string | null>(null);
 	let restoredSessionSelection = $state(false);
+	let tunerOpen = $state(false);
 	let editingProfile = $state(false);
 	let profileMembers = $state<BandMemberProfile[]>([]);
 	let profileLoading = $state(false);
@@ -713,7 +715,9 @@
 	<div class="songbook-chrome">
 		<header class="page-head">
 			<div class="page-brand">
-				<img class="page-mark" src="/logo-mark.png?v=10" alt="" />
+				<button type="button" class="page-mark-button" onclick={() => (tunerOpen = true)}>
+					<img class="page-mark" src="/logo-mark.png?v=10" alt="" />
+				</button>
 				<div>
 					<h1 class="font-display text-2xl font-bold tracking-tight text-[var(--color-accent)]">
 						{BAND.name}
@@ -1042,6 +1046,10 @@
 			onRemoveMember={removeMember}
 		/>
 	{/if}
+
+	{#if tunerOpen}
+		<TunerModal onClose={() => (tunerOpen = false)} />
+	{/if}
 </main>
 
 <style>
@@ -1123,6 +1131,15 @@
 		align-items: center;
 		gap: var(--gap);
 		min-width: 0;
+	}
+	.page-mark-button {
+		appearance: none;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		cursor: pointer;
+		line-height: 0;
 	}
 	.page-mark {
 		width: clamp(40px, 10vw, 60px);

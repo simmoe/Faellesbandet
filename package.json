@@ -36,6 +36,7 @@
 	"dependencies": {
 		"firebase": "^11.2.0",
 		"html2canvas-pro": "^2.0.2",
-		"jspdf": "^4.2.1"
+		"jspdf": "^4.2.1",
+		"pitchy": "^4.1.0"
 	}
 }
