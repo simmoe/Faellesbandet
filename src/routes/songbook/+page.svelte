@@ -737,31 +737,35 @@
 				{:else if !authState.loading}
 					<a href="/login?next=/songbook" class="account-link">Log ind</a>
 				{/if}
-				<button
-					type="button"
-					class="toolbar-tuner"
-					onclick={() => (tunerOpen = true)}
-					aria-label="Stemmer"
-					title="Stemmer"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.7"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
+				<div class="toolbar-pair">
+					<button
+						type="button"
+						class="toolbar-tuner"
+						onclick={() => (tunerOpen = true)}
+						aria-label="Stemmer"
+						title="Stemmer"
 					>
-						<path d="M8 3v11a4 4 0 0 0 8 0V3"></path>
-						<path d="M6 3h4"></path>
-						<path d="M14 3h4"></path>
-						<path d="M12 14v7"></path>
-					</svg>
-				</button>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.7"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M8 3v11a4 4 0 0 0 8 0V3"></path>
+							<path d="M6 3h4"></path>
+							<path d="M14 3h4"></path>
+							<path d="M12 14v7"></path>
+						</svg>
+					</button>
+					{#if canEdit}
+						<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj</a>
+					{/if}
+				</div>
 				{#if canEdit}
-					<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj</a>
 					<button type="button" class="cat-manage" onclick={openCategoryEditor}>Kategorier</button>
 				{/if}
 			</div>
@@ -1204,36 +1208,42 @@
 		gap: var(--gap);
 		min-width: 0;
 	}
+	.toolbar-pair {
+		display: flex;
+		align-items: stretch;
+		gap: 0.35rem;
+	}
 	.toolbar-add,
 	.toolbar-tuner {
 		appearance: none;
+		box-sizing: border-box;
 		display: inline-grid;
 		place-items: center;
 		margin: 0;
-		min-height: 0;
+		height: calc(var(--type-xs) + 0.28rem);
 		border: 1px solid color-mix(in srgb, var(--color-ink-on-dark) 26%, transparent);
 		border-radius: var(--radius-button);
 		background: transparent;
 		color: var(--color-ink-faint);
 		font: inherit;
+		font-size: var(--type-xs);
+		line-height: 1;
 		cursor: pointer;
 		text-decoration: none;
-		line-height: 1;
 	}
 	.toolbar-add {
-		padding: 0.18rem 0.55rem;
-		font-size: var(--type-xs);
+		padding: 0 0.55rem;
 		font-weight: 500;
 		white-space: nowrap;
 	}
 	.toolbar-tuner {
-		width: 1.7rem;
-		height: 1.7rem;
+		width: calc(var(--type-xs) + 0.28rem);
 		padding: 0;
 	}
 	.toolbar-tuner svg {
-		width: 0.88rem;
-		height: 0.88rem;
+		width: 0.72em;
+		height: 0.72em;
+		display: block;
 	}
 	.toolbar-add:hover,
 	.toolbar-tuner:hover {
