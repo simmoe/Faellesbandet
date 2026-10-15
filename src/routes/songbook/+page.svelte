@@ -762,7 +762,10 @@
 						</svg>
 					</button>
 					{#if canEdit}
-						<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">Tilføj</a>
+						<a href="/songbook/new" class="toolbar-add" aria-label="Tilføj ny sang">
+							<span class="toolbar-add-plus" aria-hidden="true">+</span>
+							Tilføj
+						</a>
 					{/if}
 				</div>
 				{#if canEdit}
@@ -1220,7 +1223,7 @@
 		display: inline-grid;
 		place-items: center;
 		margin: 0;
-		height: calc(var(--type-xs) + 0.28rem);
+		height: 1.85rem;
 		border: 1px solid color-mix(in srgb, var(--color-ink-on-dark) 26%, transparent);
 		border-radius: var(--radius-button);
 		background: transparent;
@@ -1232,20 +1235,34 @@
 		text-decoration: none;
 	}
 	.toolbar-add {
-		padding: 0 0.55rem;
-		font-weight: 500;
+		grid-auto-flow: column;
+		column-gap: 0.28em;
+		padding: 0 0.62rem 0 0.48rem;
+		border-color: var(--color-accent);
+		background: var(--color-accent);
+		color: #1c1917;
+		font-weight: 600;
 		white-space: nowrap;
 	}
+	.toolbar-add-plus {
+		font-size: 1.05em;
+		font-weight: 700;
+		line-height: 1;
+	}
 	.toolbar-tuner {
-		width: calc(var(--type-xs) + 0.28rem);
+		width: 1.85rem;
 		padding: 0;
 	}
 	.toolbar-tuner svg {
-		width: 0.72em;
-		height: 0.72em;
+		width: 0.95em;
+		height: 0.95em;
 		display: block;
 	}
-	.toolbar-add:hover,
+	.toolbar-add:hover {
+		background: var(--color-accent-hover);
+		border-color: var(--color-accent-hover);
+		color: #1c1917;
+	}
 	.toolbar-tuner:hover {
 		color: var(--color-ink-on-dark);
 		border-color: color-mix(in srgb, var(--color-ink-on-dark) 48%, transparent);
