@@ -1127,7 +1127,7 @@
 		top: 0;
 		z-index: 20;
 		margin-inline: calc(var(--pad) * -1);
-		padding: var(--pad) var(--pad) var(--gap);
+		padding: calc(var(--pad) + env(safe-area-inset-top, 0px)) var(--pad) var(--gap);
 		background: transparent;
 	}
 	.songbook-chrome::before {
@@ -1617,6 +1617,12 @@
 	}
 	.print-group .pdf-choice:last-child {
 		border-radius: 0 var(--radius-button) var(--radius-button) 0 !important;
+	}
+
+	@media (max-width: 47.99rem) and (orientation: portrait) {
+		.songbook-chrome {
+			padding-top: calc(0.7rem + var(--pad) + env(safe-area-inset-top, 0px));
+		}
 	}
 
 	@media (max-width: 47.99rem) {
