@@ -48,6 +48,49 @@
 		};
 	});
 
+	function linesClip(sheet: HTMLElement) {
+		const nodes = sheet.querySelectorAll<HTMLElement>(
+			'.is-chord .chord-cell-clickable, .lyric-cell, .lyrics-cell'
+		);
+		for (const el of nodes) {
+			if (el.scrollWidth > el.clientWidth + 1) return true;
+		}
+		return false;
+	}
+
+	function applySheet(sheet: HTMLElement, cols: number, scale: number) {
+		sheet.style.width = scale < 0.995 ? `${(100 / scale).toFixed(4)}%` : '100%';
+		sheet.style.setProperty('--practice-columns', String(cols));
+		sheet.style.setProperty('--practice-scale', String(scale));
+		void sheet.offsetHeight;
+	}
+
+	function sheetFits(sheet: HTMLElement, width: number, height: number, scale: number) {
+		if (sheet.scrollHeight * scale > height + 1) return false;
+		if (sheet.scrollWidth * scale > width + 1) return false;
+		if (linesClip(sheet)) return false;
+		return true;
+	}
+
+	function scaleForColumns(sheet: HTMLElement, cols: number, width: number, height: number) {
+		applySheet(sheet, cols, 1);
+		if (sheetFits(sheet, width, height, 1)) return 1;
+		let lo = 0.22;
+		let hi = 1;
+		let best = 0.22;
+		for (let i = 0; i < 11; i++) {
+			const mid = (lo + hi) / 2;
+			applySheet(sheet, cols, mid);
+			if (sheetFits(sheet, width, height, mid)) {
+				best = mid;
+				lo = mid;
+			} else {
+				hi = mid;
+			}
+		}
+		return best;
+	}
+
 	async function fitSheet() {
 		const stage = stageEl;
 		const sheet = sheetEl;
@@ -58,37 +101,26 @@
 
 		const compact = width < 720 || height < 520;
 		const gap = compact ? 12 : 26;
-		const minCol = compact ? Math.max(92, Math.round(width / 3.35)) : 210;
-		const maxCols = Math.max(2, Math.floor((width + gap) / (minCol + gap)));
+		const minCol = compact ? 152 : 210;
+		const maxCols = Math.min(8, Math.max(1, Math.floor((width + gap) / (minCol + gap))));
 
-		sheet.style.width = '100%';
-		sheet.style.setProperty('--practice-scale', '1');
 		sheet.style.setProperty('--practice-gap', compact ? '0.65em' : '1.6em');
+		sheet.style.setProperty('--practice-scale', '1');
+		sheet.style.width = '100%';
 		sheet.style.setProperty('--practice-columns', '1');
 		await tick();
 		void sheet.offsetHeight;
-		const oneHeight = Math.max(1, sheet.scrollHeight);
-		let cols = Math.min(maxCols, Math.max(2, Math.ceil(oneHeight / height)));
-		sheet.style.setProperty('--practice-columns', String(cols));
-		void sheet.offsetHeight;
-		while (cols < maxCols && sheet.scrollHeight > height + 1) {
-			cols += 1;
-			sheet.style.setProperty('--practice-columns', String(cols));
-			void sheet.offsetHeight;
-		}
 
-		let scale = 1;
-		for (let pass = 0; pass < 3; pass++) {
-			void sheet.offsetHeight;
-			scale = Math.min(
-				1,
-				width / Math.max(1, sheet.scrollWidth),
-				height / Math.max(1, sheet.scrollHeight)
-			);
-			scale = Math.max(0.22, scale);
-			sheet.style.width = scale < 0.995 ? `${(100 / scale).toFixed(4)}%` : '100%';
-			sheet.style.setProperty('--practice-scale', String(scale));
+		let bestCols = 1;
+		let bestScale = scaleForColumns(sheet, 1, width, height);
+		for (let cols = 2; cols <= maxCols; cols++) {
+			const scale = scaleForColumns(sheet, cols, width, height);
+			if (scale > bestScale + 0.008) {
+				bestScale = scale;
+				bestCols = cols;
+			}
 		}
+		applySheet(sheet, bestCols, bestScale);
 	}
 
 	$effect(() => {
@@ -225,5 +257,26 @@
 		max-width: none;
 		transform: scale(var(--practice-scale, 1));
 		transform-origin: top left;
+	}
+
+	@media (orientation: landscape) and (max-height: 34rem) {
+		.practice-head {
+			gap: 0.4rem;
+			padding-top: calc(0.2rem + env(safe-area-inset-top, 0px));
+			padding-bottom: 0.08rem;
+		}
+		.practice-head :global(.song-title) {
+			font-size: 1rem;
+		}
+		.practice-meta {
+			display: none;
+		}
+		.practice-close {
+			width: 1.7rem;
+			height: 1.7rem;
+		}
+		.practice-stage {
+			padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+		}
 	}
 </style>
