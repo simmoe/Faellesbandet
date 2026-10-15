@@ -1482,12 +1482,11 @@
 	:global(.practice-view) .editable-song {
 		display: block;
 		columns: var(--practice-columns, 2);
-		column-gap: 1.6em;
+		column-gap: var(--practice-gap, 1.6em);
 		column-fill: balance;
 	}
 	:global(.practice-view) .editable-song .song-section {
-		break-inside: avoid;
-		-webkit-column-break-inside: avoid;
+		break-inside: auto;
 	}
 	@media (max-width: 48rem) {
 		:global(.column-layout) .editable-song {

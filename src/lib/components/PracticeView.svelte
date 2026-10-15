@@ -56,11 +56,14 @@
 		const height = stage.clientHeight;
 		if (width < 8 || height < 8) return;
 
-		const gap = 26;
-		const minCol = 210;
+		const compact = width < 720 || height < 520;
+		const gap = compact ? 12 : 26;
+		const minCol = compact ? Math.max(92, Math.round(width / 3.35)) : 210;
 		const maxCols = Math.max(2, Math.floor((width + gap) / (minCol + gap)));
 
+		sheet.style.width = '100%';
 		sheet.style.setProperty('--practice-scale', '1');
+		sheet.style.setProperty('--practice-gap', compact ? '0.65em' : '1.6em');
 		sheet.style.setProperty('--practice-columns', '1');
 		await tick();
 		void sheet.offsetHeight;
@@ -74,12 +77,18 @@
 			void sheet.offsetHeight;
 		}
 
-		const scale = Math.min(
-			1,
-			width / Math.max(1, sheet.scrollWidth),
-			height / Math.max(1, sheet.scrollHeight)
-		);
-		sheet.style.setProperty('--practice-scale', String(Math.max(0.22, scale)));
+		let scale = 1;
+		for (let pass = 0; pass < 3; pass++) {
+			void sheet.offsetHeight;
+			scale = Math.min(
+				1,
+				width / Math.max(1, sheet.scrollWidth),
+				height / Math.max(1, sheet.scrollHeight)
+			);
+			scale = Math.max(0.22, scale);
+			sheet.style.width = scale < 0.995 ? `${(100 / scale).toFixed(4)}%` : '100%';
+			sheet.style.setProperty('--practice-scale', String(scale));
+		}
 	}
 
 	$effect(() => {
@@ -148,6 +157,9 @@
 	.practice-host {
 		position: fixed;
 		inset: 0;
+		width: 100%;
+		height: 100dvh;
+		max-height: 100dvh;
 		z-index: 500;
 	}
 	.practice-frame {
@@ -163,10 +175,10 @@
 		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: start;
 		gap: 0.75rem;
-		padding-top: calc(0.7rem + env(safe-area-inset-top, 0px));
-		padding-right: calc(0.85rem + env(safe-area-inset-right, 0px));
-		padding-bottom: 0.45rem;
-		padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+		padding-top: calc(0.45rem + env(safe-area-inset-top, 0px));
+		padding-right: calc(0.55rem + env(safe-area-inset-right, 0px));
+		padding-bottom: 0.3rem;
+		padding-left: calc(0.55rem + env(safe-area-inset-left, 0px));
 	}
 	.practice-heading {
 		min-width: 0;
@@ -201,15 +213,17 @@
 		color: var(--color-ink);
 	}
 	.practice-stage {
+		min-width: 0;
 		min-height: 0;
 		overflow: hidden;
-		padding-right: calc(1rem + env(safe-area-inset-right, 0px));
-		padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-		padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+		padding-right: calc(0.55rem + env(safe-area-inset-right, 0px));
+		padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));
+		padding-left: calc(0.55rem + env(safe-area-inset-left, 0px));
 	}
 	.practice-sheet {
 		width: 100%;
+		max-width: none;
 		transform: scale(var(--practice-scale, 1));
-		transform-origin: top center;
+		transform-origin: top left;
 	}
 </style>

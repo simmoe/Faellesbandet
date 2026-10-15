@@ -12,9 +12,8 @@
 <svelte:head><title>{BAND.name}</title></svelte:head>
 
 <main class="splash">
-	<p class="splash-title">{BAND.name}</p>
-	<p class="splash-tag">{BAND.tagline}</p>
-	<p class="splash-status">Indlæser…</p>
+	<img class="splash-mark" src="/logo-mark.png?v=10" alt="" />
+	<p class="splash-name">{BAND.name}</p>
 </main>
 
 <style>
@@ -25,19 +24,21 @@
 		min-height: 100dvh;
 		padding: clamp(16px, 5vw, 40px);
 		text-align: center;
-		gap: clamp(8px, 2vw, 12px);
+		gap: 0.85rem;
 	}
-	.splash-title {
+	.splash-mark {
+		width: clamp(88px, 26vw, 128px);
+		height: clamp(88px, 26vw, 128px);
+		object-fit: contain;
+		border-radius: 50%;
+	}
+	.splash-name {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: clamp(1.6rem, 7vw, 2rem);
-		font-weight: 700;
-		color: var(--color-accent);
-	}
-	.splash-tag,
-	.splash-status {
-		margin: 0;
-		font-size: clamp(13px, 3.4vw, 15px);
+		font-size: 0.78rem;
+		font-weight: 600;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
 		color: var(--color-ink-faint);
 	}
 </style>
