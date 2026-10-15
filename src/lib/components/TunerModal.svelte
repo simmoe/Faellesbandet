@@ -23,6 +23,9 @@
 	let live = $state(false);
 	let playingId = $state<string | null>(null);
 	let needle = $state(20);
+	let hit = $state(false);
+	let wasInTune = false;
+	let hitTimer: ReturnType<typeof setTimeout> | null = null;
 	let playString: ((hz: number) => void) | null = null;
 	let playTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -163,6 +166,10 @@
 		return 0;
 	}
 
+	function tickDelay(i: number) {
+		return (i / (TICKS - 1)) * 0.32;
+	}
+
 	function pluck(id: string, hz: number) {
 		playString?.(hz);
 		playingId = id;
@@ -175,6 +182,20 @@
 	const inTune = $derived(!!pitch && Math.abs(pitch.cents) < 4);
 	const flatCents = $derived(pitch && pitch.cents < -0.6 ? Math.abs(pitch.cents) : null);
 	const sharpCents = $derived(pitch && pitch.cents > 0.6 ? pitch.cents : null);
+
+	$effect(() => {
+		if (inTune && !wasInTune) {
+			hit = false;
+			requestAnimationFrame(() => {
+				hit = true;
+			});
+			if (hitTimer) clearTimeout(hitTimer);
+			hitTimer = setTimeout(() => {
+				hit = false;
+			}, 900);
+		}
+		wasInTune = inTune;
+	});
 </script>
 
 <div class="tuner-host" bind:this={host}>
@@ -194,7 +215,7 @@
 					<path d="m6 6 12 12"></path>
 				</svg>
 			</button>
-			<div class="tuner" class:live class:in-tune={inTune}>
+			<div class="tuner" class:live class:in-tune={inTune} class:hit>
 				<div class="tuner-io">
 					<div class="tuner-col">
 						<span class="tuner-label">♭</span>
@@ -215,7 +236,11 @@
 										y="4.6"
 										width="1.8"
 										height="9.3"
-										style="opacity: {pitch ? Math.max(0.14, tickLit(i)) : 0.14}"
+										style="animation-delay: {tickDelay(i)}s; opacity: {hit
+											? undefined
+											: pitch
+												? Math.max(0.14, tickLit(i))
+												: 0.14}"
 									/>
 								</g>
 							{/each}
@@ -435,6 +460,34 @@
 	}
 	.tuner.in-tune .tuner-tick.is-needle {
 		fill: var(--color-accent);
+	}
+	.tuner.hit .tuner-tick {
+		fill: #f59e0b;
+		animation: tuner-lock 0.9s ease-out both;
+	}
+	@keyframes tuner-lock {
+		0% {
+			fill: rgba(255, 255, 255, 0.16);
+			opacity: 0.16;
+		}
+		14% {
+			fill: #f59e0b;
+			opacity: 1;
+		}
+		62% {
+			fill: #ffb020;
+			opacity: 1;
+		}
+		100% {
+			fill: #f59e0b;
+			opacity: 0.38;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.tuner.hit .tuner-tick {
+			animation: none;
+			opacity: 1;
+		}
 	}
 	.tuner-ports {
 		display: flex;
