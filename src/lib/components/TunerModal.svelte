@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { PitchDetector } from 'pitchy';
-	import { GUITAR_STRINGS, hzToPitch, median, type DetectedPitch } from '$lib/tuner';
+	import { BASS_STRINGS, GUITAR_STRINGS, hzToPitch, median, type DetectedPitch } from '$lib/tuner';
 
 	interface Props {
 		onClose: () => void;
@@ -12,8 +12,8 @@
 	const TICKS = 40;
 	const ARC_START = 210;
 	const ARC_SWEEP = 300;
-	const BUFFER_SIZE = 4096;
-	const MIN_HZ = 70;
+	const BUFFER_SIZE = 8192;
+	const MIN_HZ = 36;
 	const MAX_HZ = 750;
 	const MIN_CLARITY = 0.9;
 
@@ -21,6 +21,7 @@
 	let closeBtn: HTMLButtonElement | undefined = $state();
 	let pitch = $state<DetectedPitch | null>(null);
 	let live = $state(false);
+	let kind = $state<'guitar' | 'bass'>('guitar');
 	let playingId = $state<string | null>(null);
 	let needle = $state(20);
 	let hit = $state(false);
@@ -71,7 +72,7 @@
 			ctx = new AudioContext();
 			await ctx.resume();
 			try {
-				await ctx.audioWorklet.addModule('/tuner-worklet.js?v=2');
+				await ctx.audioWorklet.addModule('/tuner-worklet.js?v=3');
 				worklet = new AudioWorkletNode(ctx, 'karplus-strong');
 				filter = ctx.createBiquadFilter();
 				filter.type = 'lowpass';
@@ -180,6 +181,8 @@
 		return (i / (TICKS - 1)) * 0.32;
 	}
 
+	const strings = $derived(kind === 'bass' ? BASS_STRINGS : GUITAR_STRINGS);
+
 	function pluck(id: string, hz: number) {
 		playString?.(hz);
 		playingId = id;
@@ -274,17 +277,37 @@
 						</span>
 					</div>
 
-					<div class="tuner-ports" aria-label="Strenge">
-						{#each GUITAR_STRINGS as string (string.id)}
+					<div class="tuner-strings">
+						<div class="tuner-ports" aria-label="Strenge">
+							{#each strings as string (string.id)}
+								<button
+									type="button"
+									class="tuner-port"
+									class:on={playingId === string.id || pitch?.stringId === string.id}
+									onclick={() => pluck(string.id, string.hz)}
+								>
+									{string.letter}
+								</button>
+							{/each}
+						</div>
+						<div class="tuner-kind">
 							<button
 								type="button"
-								class="tuner-port"
-								class:on={playingId === string.id || pitch?.stringId === string.id}
-								onclick={() => pluck(string.id, string.hz)}
+								class="tuner-kind-btn"
+								class:on={kind === 'guitar'}
+								onclick={() => (kind = 'guitar')}
 							>
-								{string.letter}
+								Guitar
 							</button>
-						{/each}
+							<button
+								type="button"
+								class="tuner-kind-btn"
+								class:on={kind === 'bass'}
+								onclick={() => (kind = 'bass')}
+							>
+								Bas
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -376,9 +399,12 @@
 		grid-column: 3;
 		grid-row: 1;
 	}
-	.tuner-ports {
+	.tuner-strings {
 		grid-column: 2;
 		grid-row: 2;
+		display: grid;
+		justify-items: center;
+		gap: 0.2rem;
 	}
 	.tuner-col {
 		display: flex;
@@ -521,6 +547,27 @@
 	.tuner-port.on,
 	.tuner-port:hover {
 		color: var(--color-accent);
+	}
+	.tuner-kind {
+		display: flex;
+		gap: 0.85rem;
+	}
+	.tuner-kind-btn {
+		appearance: none;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: #555;
+		font-size: 0.68rem;
+		font-weight: 400;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+	.tuner-kind-btn.on,
+	.tuner-kind-btn:hover {
+		color: #c8c8c8;
 	}
 	@media (max-width: 40rem) {
 		.tuner {

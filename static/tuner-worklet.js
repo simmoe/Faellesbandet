@@ -21,7 +21,7 @@ class KarplusStrongProcessor extends AudioWorkletProcessor {
 	}
 
 	pluck(hz) {
-		const freq = Math.max(40, Math.min(1200, Number(hz) || 110));
+		const freq = Math.max(35, Math.min(1200, Number(hz) || 110));
 		const t = Math.min(1, Math.max(0, (freq - 82) / 248));
 		this.damp = 0.46 - t * 0.3;
 		this.fb = 0.9935 + t * 0.0045;
