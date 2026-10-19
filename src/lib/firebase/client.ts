@@ -1,6 +1,11 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, type Firestore } from 'firebase/firestore';
+import {
+	connectFirestoreEmulator,
+	getFirestore,
+	initializeFirestore,
+	type Firestore
+} from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator, type Functions } from 'firebase/functions';
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
 import { browser } from '$app/environment';
@@ -54,7 +59,21 @@ export function getFirebaseAuth(): Auth {
 
 export function getDb(): Firestore {
 	if (_db) return _db;
-	_db = getFirestore(getFirebaseApp());
+	const app = getFirebaseApp();
+	const apple =
+		browser &&
+		(/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+			(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+	try {
+		_db = initializeFirestore(
+			app,
+			apple
+				? { experimentalForceLongPolling: true }
+				: { experimentalAutoDetectLongPolling: true }
+		);
+	} catch {
+		_db = getFirestore(app);
+	}
 	if (useFullEmu) {
 		connectFirestoreEmulator(_db, 'localhost', 8080);
 	}

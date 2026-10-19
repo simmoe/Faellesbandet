@@ -65,6 +65,40 @@ function decodeRows(rows: Row[]): Row[] {
 	return rows.map((r) => (r.kind === 'blank' ? r : { ...r, text: decodeHtmlEntities(r.text) }));
 }
 
+const songCache = new Map<string, SongDoc>();
+
+function rememberSongs(songs: SongDoc[]) {
+	for (const song of songs) songCache.set(song.id, song);
+}
+
+export function getCachedSong(id: string): SongDoc | null {
+	return songCache.get(id) ?? null;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+	return new Promise((resolve, reject) => {
+		const timer = setTimeout(() => reject(new Error('timeout')), ms);
+		promise.then(
+			(value) => {
+				clearTimeout(timer);
+				resolve(value);
+			},
+			(err) => {
+				clearTimeout(timer);
+				reject(err);
+			}
+		);
+	});
+}
+
+async function fetchSongDoc(id: string) {
+	const snap = await getDoc(songRef(id));
+	if (!snap.exists()) return null;
+	const song = sanitizeSong({ id: snap.id, ...snap.data() } as SongDoc);
+	songCache.set(song.id, song);
+	return song;
+}
+
 export function subscribeSongs(
 	cb: (songs: SongDoc[]) => void,
 	onError?: (err: Error) => void
@@ -73,16 +107,22 @@ export function subscribeSongs(
 	return onSnapshot(
 		q,
 		(snap) => {
-			cb(snap.docs.map((d) => sanitizeSong({ id: d.id, ...d.data() } as SongDoc)));
+			const songs = snap.docs.map((d) => sanitizeSong({ id: d.id, ...d.data() } as SongDoc));
+			rememberSongs(songs);
+			cb(songs);
 		},
 		(err) => onError?.(err)
 	);
 }
 
 export async function getSong(id: string): Promise<SongDoc | null> {
-	const snap = await getDoc(songRef(id));
-	if (!snap.exists()) return null;
-	return sanitizeSong({ id: snap.id, ...snap.data() } as SongDoc);
+	const cached = songCache.get(id);
+	if (cached) return cached;
+	try {
+		return await withTimeout(fetchSongDoc(id), 4000);
+	} catch {
+		return await withTimeout(fetchSongDoc(id), 6000);
+	}
 }
 
 /** Felter der kan sættes ved oprettelse — uden id/timestamps. */

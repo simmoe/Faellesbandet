@@ -6,6 +6,7 @@
 	import {
 		deleteChordChart,
 		deleteSong,
+		getCachedSong,
 		getSong,
 		saveCategoryColors,
 		saveSongChordChart,
@@ -77,7 +78,6 @@
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
-		if (authState.loading) return;
 		const unsub = subscribeSongs((s) => (allSongs = s));
 		return () => unsub();
 	});
@@ -117,34 +117,72 @@
 		}
 	});
 
+	function applyLoadedSong(s: SongDoc) {
+		song = s;
+		title = decodeHtmlEntities(s.title);
+		artist = decodeHtmlEntities(s.artist ?? '');
+		key = decodeHtmlEntities(s.key ?? '');
+		barsPerLine = s.barsPerLine;
+		categories = [...(s.categories ?? [])];
+		rows = [...(s.rows ?? parseRows(s.rawInput ?? ''))];
+		bassLines = { ...(s.bassLines ?? {}) };
+		collapsedSections = [...(s.collapsedSections ?? [])];
+		applyDisplayFlags(s, !authState.loading && !authState.user);
+		youtubeLinks = [...(s.youtubeLinks ?? [])];
+		chordChartUrl = s.chordChartUrl ?? '';
+		chordChartPath = s.chordChartPath ?? '';
+		chartError = null;
+		loadError = null;
+		loading = false;
+	}
+
 	$effect(() => {
 		const id = $page.params.id;
-		if (!id || authState.loading) return;
-		loading = true;
-		loadError = null;
-		getSong(id)
+		if (!id) return;
+		let cancelled = false;
+		const cached = getCachedSong(id);
+		if (cached) applyLoadedSong(cached);
+		else {
+			loading = true;
+			loadError = null;
+		}
+		void getSong(id)
 			.then((s) => {
+				if (cancelled) return;
 				if (!s) {
-					loadError = 'Sangen findes ikke (måske slettet).';
+					if (!cached) loadError = 'Sangen findes ikke (måske slettet).';
 					return;
 				}
-				song = s;
-				title = decodeHtmlEntities(s.title);
-				artist = decodeHtmlEntities(s.artist ?? '');
-				key = decodeHtmlEntities(s.key ?? '');
-				barsPerLine = s.barsPerLine;
-				categories = [...(s.categories ?? [])];
-				rows = [...(s.rows ?? parseRows(s.rawInput ?? ''))];
-				bassLines = { ...(s.bassLines ?? {}) };
-				collapsedSections = [...(s.collapsedSections ?? [])];
-				applyDisplayFlags(s, !authState.user);
-				youtubeLinks = [...(s.youtubeLinks ?? [])];
-				chordChartUrl = s.chordChartUrl ?? '';
-				chordChartPath = s.chordChartPath ?? '';
-				chartError = null;
+				applyLoadedSong(s);
 			})
-			.catch((err) => (loadError = err instanceof Error ? err.message : 'Ukendt fejl'))
-			.finally(() => (loading = false));
+			.catch((err) => {
+				if (cancelled || cached) return;
+				loadError = err instanceof Error ? err.message : 'Ukendt fejl';
+			})
+			.finally(() => {
+				if (!cancelled) loading = false;
+			});
+		const retry = () => {
+			if (cancelled || !loading) return;
+			void getSong(id).then((s) => {
+				if (cancelled || !s) return;
+				applyLoadedSong(s);
+			});
+		};
+		window.addEventListener('pageshow', retry);
+		document.addEventListener('visibilitychange', retry);
+		return () => {
+			cancelled = true;
+			window.removeEventListener('pageshow', retry);
+			document.removeEventListener('visibilitychange', retry);
+		};
+	});
+
+	$effect(() => {
+		const id = $page.params.id;
+		if (!id || !loading) return;
+		const hit = allSongs.find((item) => item.id === id);
+		if (hit) applyLoadedSong(hit);
 	});
 
 	// ───── Auto-save (debounced) ─────────────────────────────────────────

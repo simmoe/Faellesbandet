@@ -24,6 +24,9 @@ class AuthState {
 		if (this.#initialized) return;
 		this.#initialized = true;
 		const auth = getFirebaseAuth();
+		const watchdog = setTimeout(() => {
+			if (this.loading) this.loading = false;
+		}, 2500);
 		onAuthStateChanged(auth, async (u) => {
 			this.user = u;
 			this.notAuthorized = false;
@@ -41,6 +44,7 @@ class AuthState {
 				this.profile = null;
 			}
 			this.loading = false;
+			clearTimeout(watchdog);
 		});
 	}
 
