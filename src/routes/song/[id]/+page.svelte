@@ -118,6 +118,10 @@
 	});
 
 	function applyLoadedSong(s: SongDoc) {
+		if (song?.id === s.id) {
+			loading = false;
+			return;
+		}
 		song = s;
 		title = decodeHtmlEntities(s.title);
 		artist = decodeHtmlEntities(s.artist ?? '');
@@ -183,6 +187,11 @@
 		if (!id || !loading) return;
 		const hit = allSongs.find((item) => item.id === id);
 		if (hit) applyLoadedSong(hit);
+	});
+
+	$effect(() => {
+		if (authState.loading || authState.user || !song) return;
+		applyDisplayFlags(song, true);
 	});
 
 	// ───── Auto-save (debounced) ─────────────────────────────────────────
