@@ -8,7 +8,13 @@
 	 * af `rawInput` hvis et legacy-dokument slipper igennem.
 	 */
 	import { renderBarLine, sectionHeaderType, transposeBassLine } from '$lib/chordFormatter';
-	import { buildSections, parseRows, transposeRows, type Row } from '$lib/songParse';
+	import {
+		buildSections,
+		groupChordLyricPairs,
+		parseRows,
+		transposeRows,
+		type Row
+	} from '$lib/songParse';
 	import type { BassLines, SongDoc } from '$lib/types';
 
 	interface Props {
@@ -112,6 +118,10 @@
 	function isRepeatSection(section: PrintableSection): boolean {
 		return Boolean(section.chorusCue) || (section.compact && !!section.label);
 	}
+
+	function groupedPrintRows(sectionRows: PrintableRow[]): PrintableRow[][] {
+		return groupChordLyricPairs(sectionRows, (item) => item.row.kind);
+	}
 </script>
 
 {#snippet sectionHeading(text: string, repeat: boolean)}
@@ -175,17 +185,21 @@
 					{/if}
 					{#if !section.compact}
 						<div class="pdf-section-grid">
-							{#each section.rows as item}
-								{#if item.row.kind === 'blank'}
-									<div class="pdf-line pdf-line--blank"></div>
-									<div class="pdf-bass pdf-line--blank">{@html bassHtmlFor(item.rowIdx)}</div>
-								{:else if item.row.kind === 'chord'}
-									<div class="pdf-line pdf-chord">{@html renderPrintableBarLine(item.row.text)}</div>
-									<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
-								{:else if item.row.kind === 'lyric'}
-									<div class="pdf-line pdf-lyric">{item.row.text}</div>
-									<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
-								{/if}
+							{#each groupedPrintRows(section.rows) as group}
+								<div class="pdf-line-group">
+									{#each group as item}
+										{#if item.row.kind === 'blank'}
+											<div class="pdf-line pdf-line--blank"></div>
+											<div class="pdf-bass pdf-line--blank">{@html bassHtmlFor(item.rowIdx)}</div>
+										{:else if item.row.kind === 'chord'}
+											<div class="pdf-line pdf-chord">{@html renderPrintableBarLine(item.row.text)}</div>
+											<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
+										{:else if item.row.kind === 'lyric'}
+											<div class="pdf-line pdf-lyric">{item.row.text}</div>
+											<div class="pdf-bass">{@html bassHtmlFor(item.rowIdx)}</div>
+										{/if}
+									{/each}
+								</div>
 							{/each}
 						</div>
 					{/if}

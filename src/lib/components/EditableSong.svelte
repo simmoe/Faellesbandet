@@ -13,6 +13,7 @@
 	import {
 		buildSections,
 		findPreviousSameType,
+		groupChordLyricRowIdxs,
 		parseRows,
 		type Row
 	} from '$lib/songParse';
@@ -1236,8 +1237,12 @@
 		<section class="song-section song-section--unlabeled">
 			{@render sectionInserts(0, unlabeledEnd)}
 			<div class="song-section-grid chord-grid">
-				{#each unlabeledRowIdxs as i (i)}
-					{@render songLine(i)}
+				{#each groupChordLyricRowIdxs(rows, unlabeledRowIdxs[0] ?? 0, unlabeledEnd) as group (group[0])}
+					<div class="song-line-pair">
+						{#each group as i (i)}
+							{@render songLine(i)}
+						{/each}
+					</div>
 				{/each}
 			</div>
 		</section>
@@ -1394,8 +1399,12 @@
 				</div>
 				<div class="song-section-end"></div>
 				{#if !hideBody}
-					{#each Array.from({ length: section.bodyEnd - section.bodyStart }, (_, offset) => section.bodyStart + offset) as i (i)}
-						{@render songLine(i)}
+					{#each groupChordLyricRowIdxs(rows, section.bodyStart, section.bodyEnd) as group (group[0])}
+						<div class="song-line-pair">
+							{#each group as i (i)}
+								{@render songLine(i)}
+							{/each}
+						</div>
 					{/each}
 				{/if}
 			</div>
@@ -1490,8 +1499,7 @@
 		column-fill: balance;
 	}
 	:global(.column-layout) .editable-song .song-section {
-		break-inside: avoid;
-		-webkit-column-break-inside: avoid;
+		break-inside: auto;
 	}
 	:global(.practice-view) .editable-song {
 		display: block;
@@ -1752,6 +1760,28 @@
 		gap: 0.75em;
 		padding-bottom: 0;
 		opacity: 1;
+	}
+	.editable-song .song-line-pair {
+		display: contents;
+	}
+	:global(.column-layout) .editable-song .song-section-grid,
+	:global(.practice-view) .editable-song .song-section-grid {
+		display: contents;
+	}
+	:global(.column-layout) .editable-song .song-line-pair,
+	:global(.practice-view) .editable-song .song-line-pair {
+		display: inline-flex;
+		flex-direction: column;
+		width: 100%;
+		row-gap: 0.18em;
+		break-inside: avoid;
+		page-break-inside: avoid;
+		-webkit-column-break-inside: avoid;
+	}
+	:global(.column-layout) .editable-song .song-section-label,
+	:global(.practice-view) .editable-song .song-section-label {
+		break-after: avoid;
+		-webkit-column-break-after: avoid;
 	}
 	.editable-song .song-section-grid {
 		display: grid;

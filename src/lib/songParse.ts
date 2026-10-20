@@ -138,6 +138,32 @@ export function findPreviousSameType(
 	return null;
 }
 
+/**
+ * Keep a chord line glued to the lyric that follows it, so CSS columns
+ * cannot leave chords at the bottom of one column and words at the top
+ * of the next.
+ */
+export function groupChordLyricPairs<T>(items: T[], kind: (item: T) => Row['kind']): T[][] {
+	const groups: T[][] = [];
+	for (let i = 0; i < items.length; i++) {
+		const item = items[i];
+		const next = items[i + 1];
+		if (kind(item) === 'chord' && next && kind(next) === 'lyric') {
+			groups.push([item, next]);
+			i += 1;
+		} else {
+			groups.push([item]);
+		}
+	}
+	return groups;
+}
+
+export function groupChordLyricRowIdxs(rows: Row[], start: number, end: number): number[][] {
+	const idxs: number[] = [];
+	for (let i = start; i < end; i++) idxs.push(i);
+	return groupChordLyricPairs(idxs, (i) => rows[i]?.kind ?? 'blank');
+}
+
 /** Chord/lyric body of a formstykke, ignoring blanks — used to spot 1:1 repeats. */
 export function sectionBodySignature(rows: Row[], section: Section): string {
 	const parts: string[] = [];

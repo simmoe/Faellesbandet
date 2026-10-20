@@ -704,8 +704,26 @@ select {
 	column-fill: balance;
 }
 .column-layout .editable-song > .song-section {
+	break-inside: auto;
+}
+.column-layout .editable-song .song-section-grid,
+.practice-view .editable-song .song-section-grid {
+	display: contents;
+}
+.column-layout .editable-song .song-line-pair,
+.practice-view .editable-song .song-line-pair {
+	display: inline-flex;
+	flex-direction: column;
+	width: 100%;
+	row-gap: 0.18em;
 	break-inside: avoid;
+	page-break-inside: avoid;
 	-webkit-column-break-inside: avoid;
+}
+.column-layout .editable-song .song-section-label,
+.practice-view .editable-song .song-section-label {
+	break-after: avoid;
+	-webkit-column-break-after: avoid;
 }
 .practice-view .editable-song {
 	display: block;
@@ -722,6 +740,30 @@ select {
 	columns: 2;
 	column-gap: 8mm;
 	column-fill: balance;
+}
+.column-layout .pdf-song-section {
+	break-inside: auto;
+}
+.column-layout .pdf-song-section--repeat,
+.column-layout .pdf-song-section--compact,
+.column-layout .pdf-song-section--chorus-cue {
+	break-inside: avoid;
+	-webkit-column-break-inside: avoid;
+}
+.column-layout .pdf-section-grid {
+	display: contents;
+}
+.column-layout .pdf-line-group {
+	display: inline-flex;
+	flex-direction: column;
+	width: 100%;
+	break-inside: avoid;
+	page-break-inside: avoid;
+	-webkit-column-break-inside: avoid;
+}
+.column-layout .pdf-section-label {
+	break-after: avoid;
+	-webkit-column-break-after: avoid;
 }
 @media (max-width: 48rem) {
 	.column-layout .editable-song {
@@ -944,6 +986,9 @@ select {
 	column-gap: calc(3mm * var(--pdf-layout-scale));
 	row-gap: 0;
 	align-items: baseline;
+}
+.pdf-line-group {
+	display: contents;
 }
 .pdf-line,
 .pdf-bass {
