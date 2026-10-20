@@ -271,8 +271,13 @@
 		transform-origin: top left;
 	}
 	.practice-sheet :global(.song-section--collapsed) {
-		padding-top: 0.12em;
-		padding-bottom: 0.04em;
+		width: max-content;
+		min-width: 11em;
+		max-width: 100%;
+		border: 0.4pt solid #111827;
+		border-radius: 4px;
+		padding: 0.45em 0.7em;
+		margin-top: 0.35em;
 	}
 
 	@media (orientation: landscape) and (max-height: 34rem) {

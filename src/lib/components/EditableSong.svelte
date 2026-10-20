@@ -1309,7 +1309,21 @@
 						aria-label={readOnly ? undefined : 'Sektionsnavn'}
 					></div>
 					{#if isCollapsed}
-						<span class="song-section-ellipsis" aria-hidden="true">…</span>
+						<svg
+							class="song-repeat-icon"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.8"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M17 1.5 21 5.5 17 9.5"></path>
+							<path d="M3 11.5v-2a4 4 0 0 1 4-4h14"></path>
+							<path d="M7 22.5 3 18.5 7 14.5"></path>
+							<path d="M21 12.5v2a4 4 0 0 1-4 4H3"></path>
+						</svg>
 					{/if}
 					{#if !readOnly}
 						<div class="section-header-actions">
@@ -1725,11 +1739,19 @@
 		outline: none;
 		color: #374151;
 	}
-	.editable-song .song-section-ellipsis {
+	.editable-song .song-repeat-icon {
+		width: 1.15em;
+		height: 1.15em;
+		flex: 0 0 auto;
 		color: var(--section-accent);
-		opacity: 0.55;
-		letter-spacing: 0.15em;
-		font-weight: 700;
+		opacity: 0.88;
+	}
+	:global(.practice-view) .editable-song .song-section--collapsed .song-section-label {
+		width: 100%;
+		justify-content: space-between;
+		gap: 0.75em;
+		padding-bottom: 0;
+		opacity: 1;
 	}
 	.editable-song .song-section-grid {
 		display: grid;
