@@ -1053,6 +1053,7 @@
 					keyLabel={key.trim()}
 					{rows}
 					{barsPerLine}
+					{collapsedSections}
 					onClose={() => (practiceOpen = false)}
 				/>
 			{/if}

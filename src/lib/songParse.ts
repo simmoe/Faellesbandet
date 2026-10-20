@@ -138,6 +138,56 @@ export function findPreviousSameType(
 	return null;
 }
 
+/** Chord/lyric body of a formstykke, ignoring blanks — used to spot 1:1 repeats. */
+export function sectionBodySignature(rows: Row[], section: Section): string {
+	const parts: string[] = [];
+	for (let i = section.bodyStart; i < section.bodyEnd; i++) {
+		const row = rows[i];
+		if (!row || row.kind === 'blank' || row.kind === 'header') continue;
+		const text = row.text.trim();
+		if (!text) continue;
+		parts.push(`${row.kind}:${text}`);
+	}
+	return parts.join('\n');
+}
+
+/**
+ * Formstykker that chord-print already treats as form-only: empty bodies,
+ * user-collapsed sections, later choruses, and 1:1 repeats of an earlier
+ * same-type stykke.
+ */
+export function compactRepeatHeaderIdxs(rows: Row[], extraCollapsed: number[] = []): number[] {
+	const sections = buildSections(rows);
+	const out = new Set(extraCollapsed.filter((idx) => Number.isInteger(idx) && idx >= 0));
+	const seenByType = new Map<string, string[]>();
+	let seenFullChorus = false;
+
+	for (const section of sections) {
+		if (out.has(section.headerIdx)) continue;
+		const signature = sectionBodySignature(rows, section);
+		if (!signature) {
+			out.add(section.headerIdx);
+			continue;
+		}
+		if (section.type === 'chorus') {
+			if (seenFullChorus) {
+				out.add(section.headerIdx);
+				continue;
+			}
+			seenFullChorus = true;
+		}
+		const previous = seenByType.get(section.type) ?? [];
+		if (previous.includes(signature)) {
+			out.add(section.headerIdx);
+			continue;
+		}
+		previous.push(signature);
+		seenByType.set(section.type, previous);
+	}
+
+	return [...out].sort((a, b) => a - b);
+}
+
 /**
  * Sektion-header-ord vi accepterer. Hvis brugerens lyric-linje kunne
  * være et prefix af en af disse, holder vi den som lyric for ikke at

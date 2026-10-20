@@ -2,7 +2,8 @@
 	import { browser } from '$app/environment';
 	import { tick } from 'svelte';
 	import EditableSong from './EditableSong.svelte';
-	import type { Row } from '$lib/songParse';
+	import { compactRepeatHeaderIdxs, type Row } from '$lib/songParse';
+	import type { CollapsedSections } from '$lib/types';
 
 	interface Props {
 		title: string;
@@ -10,10 +11,20 @@
 		keyLabel?: string;
 		rows: Row[];
 		barsPerLine: 2 | 4 | 8;
+		collapsedSections?: CollapsedSections;
 		onClose: () => void;
 	}
 
-	const { title, artist = '', keyLabel = '', rows, barsPerLine, onClose }: Props = $props();
+	const {
+		title,
+		artist = '',
+		keyLabel = '',
+		rows,
+		barsPerLine,
+		collapsedSections = [],
+		onClose
+	}: Props = $props();
+	const practiceCollapsed = $derived(compactRepeatHeaderIdxs(rows, collapsedSections));
 
 	let host: HTMLDivElement | undefined = $state();
 	let stageEl: HTMLElement | undefined = $state();
@@ -126,6 +137,7 @@
 	$effect(() => {
 		void title;
 		void rows;
+		void practiceCollapsed;
 		if (!browser || !stageEl || !sheetEl) return;
 		void fitSheet();
 		const observer = new ResizeObserver(() => void fitSheet());
@@ -179,7 +191,7 @@
 		</header>
 		<div class="practice-stage" bind:this={stageEl}>
 			<div class="practice-sheet practice-view no-bass-tabs" bind:this={sheetEl}>
-				<EditableSong {rows} {barsPerLine} collapsedSections={[]} readOnly={true} />
+				<EditableSong {rows} {barsPerLine} collapsedSections={practiceCollapsed} readOnly={true} />
 			</div>
 		</div>
 	</div>
@@ -257,6 +269,10 @@
 		max-width: none;
 		transform: scale(var(--practice-scale, 1));
 		transform-origin: top left;
+	}
+	.practice-sheet :global(.song-section--collapsed) {
+		padding-top: 0.12em;
+		padding-bottom: 0.04em;
 	}
 
 	@media (orientation: landscape) and (max-height: 34rem) {
