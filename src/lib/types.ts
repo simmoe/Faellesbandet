@@ -62,6 +62,17 @@ export interface YoutubeLink {
 	url: string;
 }
 
+export interface SongRecording {
+	id: string;
+	title: string;
+	url: string;
+	path: string;
+	createdAt: number;
+	durationMs?: number;
+	mimeType?: string;
+	createdBy?: string;
+}
+
 export interface SongDoc {
 	id: string;
 	title: string;
@@ -96,6 +107,8 @@ export interface SongDoc {
 	notes?: string;
 	/** YouTube-links under sangens oplysninger. Alle medlemmer kan tilføje. */
 	youtubeLinks?: YoutubeLink[];
+	/** Øveoptagelser under sangens oplysninger. Alle medlemmer kan tilføje. */
+	recordings?: SongRecording[];
 	/** Valgfrit akkordskema (gribsdiagram) under oplysninger. */
 	chordChartUrl?: string;
 	chordChartPath?: string;

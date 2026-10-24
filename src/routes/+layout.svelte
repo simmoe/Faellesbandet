@@ -4,6 +4,8 @@
 	import { authState } from '$lib/auth.svelte';
 	import { BUILD_TIME, BUILD_TIME_LABEL } from '$lib/buildInfo';
 	import { songPlayBar } from '$lib/songPlayBar.svelte';
+	import { songRecordBar } from '$lib/songRecordBar.svelte';
+	import SongRecordControl from '$lib/components/SongRecordControl.svelte';
 
 	let { children } = $props();
 
@@ -26,6 +28,7 @@
 
 {#if songPlayBar.active}
 	<div id="song-play-bar" class="no-print">
+		<div class="play-bar-row">
 		<div class="play-controls" class:is-playing={songPlayBar.playing}>
 			<button
 				type="button"
@@ -61,6 +64,10 @@
 			>
 				+
 			</button>
+		</div>
+		{#if songRecordBar.active}
+			<SongRecordControl />
+		{/if}
 		</div>
 	</div>
 {/if}

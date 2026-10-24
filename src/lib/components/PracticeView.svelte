@@ -2,7 +2,9 @@
 	import { browser } from '$app/environment';
 	import { tick } from 'svelte';
 	import EditableSong from './EditableSong.svelte';
+	import SongRecordControl from './SongRecordControl.svelte';
 	import { compactRepeatHeaderIdxs, type Row } from '$lib/songParse';
+	import { songRecordBar } from '$lib/songRecordBar.svelte';
 	import type { CollapsedSections } from '$lib/types';
 
 	interface Props {
@@ -154,7 +156,13 @@
 </script>
 
 <div class="practice-host" bind:this={host}>
-	<div class="practice-frame" role="dialog" aria-modal="true" aria-labelledby="practice-title">
+	<div
+		class="practice-frame"
+		class:has-rec={songRecordBar.active}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="practice-title"
+	>
 		<header class="practice-head">
 			<div class="practice-heading">
 				<h2 id="practice-title" class="song-title">{title || 'Uden titel'}</h2>
@@ -194,6 +202,11 @@
 				<EditableSong {rows} {barsPerLine} collapsedSections={practiceCollapsed} readOnly={true} />
 			</div>
 		</div>
+		{#if songRecordBar.active}
+			<footer class="practice-rec">
+				<SongRecordControl compact />
+			</footer>
+		{/if}
 	</div>
 </div>
 
@@ -213,6 +226,9 @@
 		grid-template-rows: auto minmax(0, 1fr);
 		background: #ffffff;
 		color: var(--color-ink);
+	}
+	.practice-frame.has-rec {
+		grid-template-rows: auto minmax(0, 1fr) auto;
 	}
 	.practice-head {
 		display: grid;
@@ -261,8 +277,13 @@
 		min-height: 0;
 		overflow: hidden;
 		padding-right: calc(0.55rem + env(safe-area-inset-right, 0px));
-		padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));
+		padding-bottom: 0.2rem;
 		padding-left: calc(0.55rem + env(safe-area-inset-left, 0px));
+	}
+	.practice-rec {
+		display: grid;
+		justify-content: center;
+		padding: 0.15rem 0.55rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
 	}
 	.practice-sheet {
 		width: 100%;
@@ -297,7 +318,10 @@
 			height: 1.7rem;
 		}
 		.practice-stage {
-			padding-bottom: calc(0.25rem + env(safe-area-inset-bottom, 0px));
+			padding-bottom: 0.08rem;
+		}
+		.practice-rec {
+			padding-bottom: calc(0.2rem + env(safe-area-inset-bottom, 0px));
 		}
 	}
 </style>

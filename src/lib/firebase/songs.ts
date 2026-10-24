@@ -23,7 +23,7 @@ import {
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getDb, getStorageBucket, COL } from './client';
 import { BAND } from '$lib/data/band';
-import type { CategoryColorMap, CategoryMetaMap, SongDoc } from '$lib/types';
+import type { CategoryColorMap, CategoryMetaMap, SongDoc, SongRecording } from '$lib/types';
 import { decodeHtmlEntities } from '$lib/chordFormatter';
 import { migrateSong } from '$lib/migrate';
 import type { Row } from '$lib/songParse';
@@ -56,6 +56,10 @@ function sanitizeSong(s: SongDoc): SongDoc {
 		youtubeLinks: s.youtubeLinks?.map((link) => ({
 			...link,
 			title: decodeHtmlEntities(link.title)
+		})),
+		recordings: s.recordings?.map((take) => ({
+			...take,
+			title: decodeHtmlEntities(take.title)
 		}))
 	};
 	return migrateSong(cleaned);
@@ -151,8 +155,13 @@ export async function updateSong(
 	});
 }
 
-export async function deleteSong(id: string, chordChartPath?: string): Promise<void> {
+export async function deleteSong(
+	id: string,
+	chordChartPath?: string,
+	recordingPaths: string[] = []
+): Promise<void> {
 	await deleteChordChart(chordChartPath).catch(() => undefined);
+	await Promise.all(recordingPaths.map((path) => deleteSongRecordingFile(path).catch(() => undefined)));
 	await deleteDoc(songRef(id));
 }
 
@@ -240,6 +249,39 @@ export async function uploadCategoryImage(
 export async function deleteCategoryImage(imagePath: string | undefined): Promise<void> {
 	if (!imagePath) return;
 	await deleteObject(ref(getStorageBucket(), imagePath));
+}
+
+export async function uploadSongRecording(
+	songId: string,
+	file: Blob,
+	uid: string,
+	meta: { extension: string; mimeType: string; recordingId: string }
+): Promise<{ url: string; path: string }> {
+	const path = `${COL.bands}/${BAND.id}/recordings/${uid}/${meta.recordingId}.${meta.extension}`;
+	const storageRef = ref(getStorageBucket(), path);
+	await uploadBytes(storageRef, file, {
+		contentType: meta.mimeType.startsWith('audio/') ? meta.mimeType : `audio/${meta.extension}`,
+		customMetadata: { songId, kind: 'songRecording' }
+	});
+	const url = await getDownloadURL(storageRef);
+	return { url, path };
+}
+
+export async function saveSongRecordings(
+	id: string,
+	recordings: SongRecording[],
+	uid: string
+): Promise<void> {
+	await updateDoc(songRef(id), {
+		recordings,
+		updatedBy: uid,
+		updatedAt: serverTimestamp()
+	});
+}
+
+export async function deleteSongRecordingFile(path: string | undefined): Promise<void> {
+	if (!path) return;
+	await deleteObject(ref(getStorageBucket(), path));
 }
 
 function extensionForFile(file: File): string {

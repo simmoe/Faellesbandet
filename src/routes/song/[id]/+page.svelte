@@ -9,12 +9,15 @@
 		getCachedSong,
 		getSong,
 		saveCategoryColors,
+		deleteSongRecordingFile,
 		saveSongChordChart,
+		saveSongRecordings,
 		subscribeCategoryColors,
 		subscribeCategoryMeta,
 		subscribeSongs,
 		updateSong,
-		uploadChordChart
+		uploadChordChart,
+		uploadSongRecording
 	} from '$lib/firebase/songs';
 	import {
 		uniqueCategoriesFromSongs,
@@ -27,6 +30,7 @@
 	import PracticeView from '$lib/components/PracticeView.svelte';
 	import CategoryPicker from '$lib/components/CategoryPicker.svelte';
 	import SongYoutubeLinks from '$lib/components/SongYoutubeLinks.svelte';
+	import SongRecordings from '$lib/components/SongRecordings.svelte';
 	import SongChordChart from '$lib/components/SongChordChart.svelte';
 	import { persistSongbookCategory } from '$lib/songbookSelection';
 	import { readSongDisplayFlags, writeSongDisplayFlags } from '$lib/songDisplay';
@@ -39,12 +43,16 @@
 	import { tick } from 'svelte';
 	import { browser } from '$app/environment';
 	import { songPlayBar } from '$lib/songPlayBar.svelte';
+	import { songRecordBar } from '$lib/songRecordBar.svelte';
+	import { startSongRecording, type RecordingSession } from '$lib/recordAudio';
+	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
 		BassLines,
 		CategoryColorMap,
 		CategoryMetaMap,
 		CollapsedSections,
 		SongDoc,
+		SongRecording,
 		YoutubeLink
 	} from '$lib/types';
 
@@ -70,11 +78,14 @@
 	let infoOpen = $state(false);
 	let practiceOpen = $state(false);
 	let youtubeLinks = $state<YoutubeLink[]>([]);
+	let recordings = $state<SongRecording[]>([]);
 	let chordChartUrl = $state('');
 	let chordChartPath = $state('');
 	let chartUploading = $state(false);
 	let chartError = $state<string | null>(null);
-	const hasInfoPanel = $derived(canEdit || youtubeLinks.length > 0 || !!chordChartUrl);
+	const hasInfoPanel = $derived(
+		canEdit || youtubeLinks.length > 0 || recordings.length > 0 || !!chordChartUrl
+	);
 
 	let allSongs = $state<SongDoc[]>([]);
 	$effect(() => {
@@ -133,6 +144,7 @@
 		collapsedSections = [...(s.collapsedSections ?? [])];
 		applyDisplayFlags(s, !authState.loading && !authState.user);
 		youtubeLinks = [...(s.youtubeLinks ?? [])];
+		recordings = [...(s.recordings ?? [])];
 		chordChartUrl = s.chordChartUrl ?? '';
 		chordChartPath = s.chordChartPath ?? '';
 		chartError = null;
@@ -253,6 +265,7 @@
 				columnLayout,
 				fitSinglePage,
 				youtubeLinks,
+				recordings,
 				schemaVersion: 4
 			};
 			await updateSong(song.id, patch, authState.user.uid);
@@ -311,6 +324,15 @@
 	function removeYoutubeLink(id: string) {
 		youtubeLinks = youtubeLinks.filter((link) => link.id !== id);
 		scheduleSave();
+	}
+
+	async function removeRecording(id: string) {
+		const take = recordings.find((item) => item.id === id);
+		recordings = recordings.filter((item) => item.id !== id);
+		if (song && authState.user) {
+			await saveSongRecordings(song.id, recordings, authState.user.uid).catch(() => undefined);
+		}
+		if (take?.path) deleteSongRecordingFile(take.path).catch(() => undefined);
 	}
 
 	const CHART_MAX_BYTES = 15 * 1024 * 1024;
@@ -449,7 +471,11 @@
 		if (!song) return;
 		const ok = confirm(`Slet "${song.title}"? Det kan ikke fortrydes.`);
 		if (!ok) return;
-		await deleteSong(song.id, chordChartPath);
+		await deleteSong(
+			song.id,
+			chordChartPath,
+			recordings.map((take) => take.path)
+		);
 		goto('/songbook');
 	}
 
@@ -682,6 +708,133 @@
 			songPlayBar.start = () => {};
 			songPlayBar.slower = () => {};
 			songPlayBar.faster = () => {};
+		};
+	});
+
+	let recSession: RecordingSession | null = null;
+	let recTimer: ReturnType<typeof setInterval> | null = null;
+	let recStartedAt = 0;
+	let recWake: WakeLockSentinel | null = null;
+
+	function recMessage(err: unknown): string {
+		const name = err instanceof DOMException ? err.name : '';
+		if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+			return 'Tillad mikrofonen for at optage.';
+		}
+		if (name === 'NotFoundError') return 'Ingen mikrofon fundet.';
+		return err instanceof Error ? err.message : 'Kunne ikke optage.';
+	}
+
+	function clearRecTimer() {
+		if (recTimer) clearInterval(recTimer);
+		recTimer = null;
+		songRecordBar.elapsedLabel = '0:00';
+		songRecordBar.level = 0;
+	}
+
+	async function releaseRecWake() {
+		const lock = recWake;
+		recWake = null;
+		await lock?.release().catch(() => undefined);
+	}
+
+	async function startRecord() {
+		if (!song || !authState.user || recSession) return;
+		songRecordBar.error = null;
+		songRecordBar.phase = 'busy';
+		try {
+			recSession = await startSongRecording((level) => {
+				songRecordBar.level = level;
+			});
+			recStartedAt = Date.now();
+			songRecordBar.phase = 'recording';
+			songRecordBar.elapsedLabel = '0:00';
+			recTimer = setInterval(() => {
+				songRecordBar.elapsedLabel = formatElapsed(Date.now() - recStartedAt);
+			}, 250);
+			try {
+				recWake = await navigator.wakeLock?.request('screen');
+			} catch {
+				recWake = null;
+			}
+		} catch (err) {
+			recSession = null;
+			songRecordBar.phase = 'idle';
+			songRecordBar.error = recMessage(err);
+		}
+	}
+
+	async function finishRecord() {
+		const session = recSession;
+		if (!session) return;
+		recSession = null;
+		clearRecTimer();
+		songRecordBar.phase = 'busy';
+		try {
+			const take = await session.stop();
+			await releaseRecWake();
+			if (take.blob.size > 40 * 1024 * 1024) {
+				throw new Error('Optagelsen er for lang til at gemme.');
+			}
+			if (!song || !authState.user) {
+				songRecordBar.phase = 'idle';
+				return;
+			}
+			const id = crypto.randomUUID();
+			const uploaded = await uploadSongRecording(song.id, take.blob, authState.user.uid, {
+				extension: take.extension,
+				mimeType: take.mimeType,
+				recordingId: id
+			});
+			const next: SongRecording = {
+				id,
+				title: recordingTitle(
+					title.trim() || song.title,
+					new Date(),
+					recordings.map((item) => item.title)
+				),
+				url: uploaded.url,
+				path: uploaded.path,
+				createdAt: Date.now(),
+				durationMs: take.durationMs,
+				mimeType: take.mimeType,
+				createdBy: authState.user.uid
+			};
+			recordings = [...recordings, next];
+			await saveSongRecordings(song.id, recordings, authState.user.uid);
+			songRecordBar.phase = 'idle';
+		} catch (err) {
+			await releaseRecWake();
+			songRecordBar.phase = 'idle';
+			songRecordBar.error = recMessage(err);
+		}
+	}
+
+	function toggleRecord() {
+		if (songRecordBar.phase === 'recording') {
+			void finishRecord();
+			return;
+		}
+		if (songRecordBar.phase === 'busy') return;
+		void startRecord();
+	}
+
+	$effect(() => {
+		if (!browser) return;
+		songRecordBar.active = canEdit;
+		songRecordBar.toggle = toggleRecord;
+		return () => {
+			songRecordBar.active = false;
+			songRecordBar.toggle = () => {};
+			clearRecTimer();
+			void releaseRecWake();
+			if (recSession) {
+				const session = recSession;
+				recSession = null;
+				void session.stop().catch(() => undefined);
+			}
+			songRecordBar.phase = 'idle';
+			songRecordBar.error = null;
 		};
 	});
 
@@ -1009,6 +1162,11 @@
 									links={youtubeLinks}
 									onAdd={addYoutubeLink}
 									onRemove={removeYoutubeLink}
+									readOnly={!canEdit}
+								/>
+								<SongRecordings
+									{recordings}
+									onRemove={removeRecording}
 									readOnly={!canEdit}
 								/>
 								{#if !chordChartUrl}

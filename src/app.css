@@ -99,6 +99,13 @@ body > * {
 	justify-content: center;
 	pointer-events: none;
 }
+#song-play-bar .play-bar-row {
+	pointer-events: auto;
+	display: flex;
+	align-items: stretch;
+	justify-content: center;
+	gap: 0.55rem;
+}
 #song-play-bar .play-controls {
 	pointer-events: auto;
 	display: grid;
@@ -152,6 +159,9 @@ body > * {
 #song-play-bar .play-controls.is-playing .play-main {
 	background: var(--color-accent);
 	color: #ffffff;
+}
+html.practice-open #song-play-bar {
+	display: none;
 }
 @media (prefers-reduced-motion: reduce) {
 	body::before {
