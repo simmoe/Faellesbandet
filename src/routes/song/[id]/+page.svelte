@@ -128,11 +128,14 @@
 		}
 	});
 
+	let displayFlagsLocked = false;
+
 	function applyLoadedSong(s: SongDoc) {
 		if (song?.id === s.id) {
 			loading = false;
 			return;
 		}
+		displayFlagsLocked = false;
 		song = s;
 		title = decodeHtmlEntities(s.title);
 		artist = decodeHtmlEntities(s.artist ?? '');
@@ -213,6 +216,7 @@
 	const DEBOUNCE_MS = 800;
 
 	function applyDisplayFlags(s: SongDoc, useLocal: boolean) {
+		if (displayFlagsLocked) return;
 		const local = useLocal ? readSongDisplayFlags(s.id) : null;
 		columnLayout = local?.columnLayout ?? s.columnLayout ?? false;
 		fitSinglePage = local?.fitSinglePage ?? s.fitSinglePage ?? true;
@@ -221,10 +225,16 @@
 
 	function persistDisplayFlags() {
 		if (!song || !browser) return;
-		writeSongDisplayFlags(song.id, { showBassTabs, columnLayout, fitSinglePage });
+		writeSongDisplayFlags(song.id, {
+			showBassTabs: columnLayout ? false : showBassTabs,
+			columnLayout,
+			fitSinglePage
+		});
 	}
 
 	function onDisplayFlagsChange() {
+		displayFlagsLocked = true;
+		if (columnLayout) showBassTabs = false;
 		persistDisplayFlags();
 		scheduleSave();
 	}
@@ -1008,9 +1018,9 @@
 						<label class="print-toggle">
 							<input
 								type="checkbox"
-								bind:checked={columnLayout}
-								onchange={() => {
-									if (columnLayout) showBassTabs = false;
+								checked={columnLayout}
+								onchange={(e) => {
+									columnLayout = e.currentTarget.checked;
 									onDisplayFlagsChange();
 								}}
 							/>
@@ -1344,12 +1354,16 @@
 		color: var(--color-ink);
 	}
 	.song-head {
+		position: relative;
+		z-index: 3;
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: var(--space-2);
 		min-width: 0;
 	}
 	.song-prints {
+		position: relative;
+		z-index: 3;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;

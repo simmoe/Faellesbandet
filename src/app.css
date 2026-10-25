@@ -716,11 +716,19 @@ select {
 .column-layout .editable-song > .song-section {
 	break-inside: auto;
 }
-.column-layout .editable-song .song-section-grid,
+.column-layout .editable-song .song-line-pair {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	row-gap: 0.18em;
+	break-inside: avoid;
+	page-break-inside: avoid;
+	-webkit-column-break-inside: avoid;
+}
 .practice-view .editable-song .song-section-grid {
 	display: contents;
 }
-.column-layout .editable-song .song-line-pair,
 .practice-view .editable-song .song-line-pair {
 	display: inline-flex;
 	flex-direction: column;
@@ -774,11 +782,6 @@ select {
 .column-layout .pdf-section-label {
 	break-after: avoid;
 	-webkit-column-break-after: avoid;
-}
-@media (max-width: 48rem) {
-	.column-layout .editable-song {
-		columns: 1;
-	}
 }
 @media print {
 	.column-layout .editable-song {

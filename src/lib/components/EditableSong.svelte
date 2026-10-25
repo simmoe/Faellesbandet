@@ -1510,11 +1510,6 @@
 	:global(.practice-view) .editable-song .song-section {
 		break-inside: auto;
 	}
-	@media (max-width: 48rem) {
-		:global(.column-layout) .editable-song {
-			columns: 1;
-		}
-	}
 	@media print {
 		:global(.column-layout) .editable-song {
 			columns: 2;
@@ -1764,11 +1759,19 @@
 	.editable-song .song-line-pair {
 		display: contents;
 	}
-	:global(.column-layout) .editable-song .song-section-grid,
+	:global(.column-layout) .editable-song .song-line-pair {
+		grid-column: 1 / -1;
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		row-gap: 0.18em;
+		break-inside: avoid;
+		page-break-inside: avoid;
+		-webkit-column-break-inside: avoid;
+	}
 	:global(.practice-view) .editable-song .song-section-grid {
 		display: contents;
 	}
-	:global(.column-layout) .editable-song .song-line-pair,
 	:global(.practice-view) .editable-song .song-line-pair {
 		display: inline-flex;
 		flex-direction: column;
