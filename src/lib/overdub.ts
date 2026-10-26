@@ -161,16 +161,16 @@ async function countIn(
 
 	const heard = loudest(chunks, rate, beat1);
 	const beat4 = 3 * beat;
-	const latency = heard.at - beat4;
+	const raw = heard.at - beat4;
 	if (heard.samples === 0 || heard.peak < 0.02) {
 		throw new Error('Måling: ingen lyd i optagelsen.');
 	}
-	if (latency < 0 || latency > 0.7) {
+	if (raw < 0 || raw > 0.7) {
 		throw new Error(
 			`Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`
 		);
 	}
-	return { latency, songAt: beat1 + 4 * beat };
+	return { latency: Math.max(0, raw - 0.05), songAt: beat1 + 4 * beat };
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
