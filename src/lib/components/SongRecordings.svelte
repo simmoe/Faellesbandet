@@ -5,10 +5,12 @@
 	interface Props {
 		recordings: SongRecording[];
 		onRemove: (id: string) => void;
-		onOverdub?: (take: SongRecording, nudgeMs: number) => void;
+		onOverdub?: (take: SongRecording, settings: { bpm: number; metronome: boolean }) => void;
 		onRevert?: (id: string) => void;
+		onMeasure?: () => void;
+		latencyMs?: number | null;
 		overdubId?: string | null;
-		overdubPhase?: 'idle' | 'arming' | 'counting' | 'recording' | 'saving';
+		overdubPhase?: 'idle' | 'arming' | 'measuring' | 'counting' | 'recording' | 'saving';
 		overdubElapsed?: string;
 		overdubLevel?: number;
 		overdubError?: string | null;
@@ -21,6 +23,8 @@
 		onRemove,
 		onOverdub,
 		onRevert,
+		onMeasure,
+		latencyMs = null,
 		overdubId = null,
 		overdubPhase = 'idle',
 		overdubElapsed = '0:00',
@@ -31,33 +35,45 @@
 	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
-	let nudgeMs = $state(0);
-	let nudgeReady = false;
+	let bpm = $state(100);
+	let metronome = $state(false);
+	let prefsReady = false;
 
 	$effect(() => {
 		if (overdubId) playingId = null;
 	});
 
 	$effect(() => {
-		if (!browser || nudgeReady) return;
-		nudgeReady = true;
-		const saved = localStorage.getItem('faellesbandet.overdub-clap-nudge');
-		const parsed = saved == null ? NaN : Number(saved);
-		if (Number.isFinite(parsed)) nudgeMs = Math.min(150, Math.max(-150, Math.round(parsed)));
+		if (!browser || prefsReady) return;
+		prefsReady = true;
+		const savedBpm = Number(localStorage.getItem('faellesbandet.overdub-bpm'));
+		if (Number.isFinite(savedBpm) && savedBpm >= 40 && savedBpm <= 200) bpm = Math.round(savedBpm);
+		metronome = localStorage.getItem('faellesbandet.overdub-metronome') === '1';
 	});
 
 	$effect(() => {
-		if (!browser || !nudgeReady) return;
-		localStorage.setItem('faellesbandet.overdub-clap-nudge', String(nudgeMs));
+		if (!browser || !prefsReady) return;
+		localStorage.setItem('faellesbandet.overdub-bpm', String(bpm));
+		localStorage.setItem('faellesbandet.overdub-metronome', metronome ? '1' : '0');
 	});
+
+	const busy = $derived(overdubPhase !== 'idle');
 
 	function overdubLabel(id: string): string {
 		if (overdubId !== id || overdubPhase === 'idle') return 'Overdub';
-		if (overdubPhase === 'counting') return 'Klap';
+		if (overdubPhase === 'counting') return 'Tæller';
 		if (overdubPhase === 'recording') return overdubElapsed;
 		if (overdubPhase === 'saving') return 'Gemmer';
 		return 'Starter';
 	}
+
+	const measureLabel = $derived(
+		overdubPhase === 'measuring'
+			? 'Klap'
+			: latencyMs == null
+				? 'Mål forsinkelse'
+				: `${latencyMs} ms`
+	);
 
 	function durationLabel(ms: number | undefined): string {
 		if (!ms || ms < 1000) return '';
@@ -72,10 +88,50 @@
 	<div class="info-field">
 		<span>Optagelser</span>
 		<div class="rec-block">
-			{#if overdubPhase === 'counting'}
-				<p class="rec-hint">Klap på slag 4</p>
-			{:else if overdubHint && overdubPhase === 'recording'}
+			{#if !readOnly}
+				<div class="rec-tools">
+					<label class="rec-tempo">
+						<input
+							type="range"
+							min="40"
+							max="200"
+							step="1"
+							value={bpm}
+							disabled={busy}
+							aria-label="Tempo"
+							oninput={(event) => {
+								bpm = Number(event.currentTarget.value);
+							}}
+						/>
+						<span>{bpm} bpm</span>
+					</label>
+					<button
+						type="button"
+						class="rec-action"
+						class:is-on={metronome}
+						aria-pressed={metronome}
+						disabled={busy}
+						title="Hør metronomen i høretelefonerne, mens du optager. Den kommer ikke med på optagelsen."
+						onclick={() => (metronome = !metronome)}
+					>
+						Metronom
+					</button>
+					<button
+						type="button"
+						class="rec-action"
+						disabled={busy}
+						title="Tre klik, klap på slag 4. Så kender vi forsinkelsen i dine høretelefoner."
+						onclick={() => onMeasure?.()}
+					>
+						{measureLabel}
+					</button>
+				</div>
+			{/if}
+			{#if overdubHint}
 				<p class="rec-hint">{overdubHint}</p>
+			{/if}
+			{#if overdubError && overdubId == null}
+				<p class="rec-error">{overdubError}</p>
 			{/if}
 			<ul class="rec-list">
 				{#each recordings as take (take.id)}
@@ -94,22 +150,6 @@
 						</div>
 						{#if !readOnly}
 							<div class="rec-actions">
-								<label class="rec-nudge">
-									<input
-										type="range"
-										min="-150"
-										max="150"
-										step="1"
-										value={nudgeMs}
-										disabled={overdubPhase !== 'idle'}
-										aria-label="Millisekunder"
-										title="Højere tal lægger andenstemmen senere."
-										oninput={(event) => {
-											nudgeMs = Number(event.currentTarget.value);
-										}}
-									/>
-									<span>{nudgeMs} ms</span>
-								</label>
 								<button
 									type="button"
 									class="rec-action"
@@ -119,8 +159,8 @@
 											(overdubPhase === 'arming' ||
 												overdubPhase === 'counting' ||
 												overdubPhase === 'saving'))}
-									title="Læg en stemme ovenpå. Klap på det fjerde slag."
-									onclick={() => onOverdub?.(take, nudgeMs)}
+									title="Læg en stemme ovenpå. Fire klik tæller ind, så starter sangen."
+									onclick={() => onOverdub?.(take, { bpm, metronome })}
 								>
 									{#if overdubId === take.id && overdubPhase === 'recording'}
 										<span class="rec-dot" style:transform={`scale(${0.8 + overdubLevel * 0.45})`}></span>
@@ -213,21 +253,30 @@
 		align-items: center;
 		gap: 0.75rem;
 	}
-	.rec-nudge {
+	.rec-tools {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 1rem;
+	}
+	.rec-tempo {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 0.45rem;
 		color: var(--color-ink-faint);
 		font-size: var(--type-xs);
 		font-variant-numeric: tabular-nums;
 	}
-	.rec-nudge input {
-		width: 5.5rem;
+	.rec-tempo input {
+		width: 7rem;
 		margin: 0;
 		accent-color: var(--color-ink-muted, currentColor);
 	}
-	.rec-nudge input:disabled {
+	.rec-tempo input:disabled {
 		opacity: 0.45;
+	}
+	.rec-action.is-on {
+		color: var(--color-ink);
 	}
 	.rec-action {
 		appearance: none;

@@ -23,17 +23,17 @@ function voiceConstraints(): MediaTrackConstraints {
 	} as MediaTrackConstraints;
 }
 
-/** One beat of the count-in. Slow enough that a plosive can sit on the fourth. */
+/** One beat of the clap measurement. Slow enough that a clap can sit on the fourth. */
 const COUNT_BEAT = 0.7;
 
-function scheduleClick(ctx: AudioContext, time: number) {
+function scheduleClick(ctx: AudioContext, time: number, accent = false) {
 	const osc = ctx.createOscillator();
 	const gain = ctx.createGain();
 	osc.type = 'sine';
-	osc.frequency.setValueAtTime(1800, time);
-	osc.frequency.exponentialRampToValueAtTime(700, time + 0.028);
+	osc.frequency.setValueAtTime(accent ? 2400 : 1800, time);
+	osc.frequency.exponentialRampToValueAtTime(accent ? 900 : 700, time + 0.028);
 	gain.gain.setValueAtTime(0.0001, time);
-	gain.gain.exponentialRampToValueAtTime(0.32, time + 0.002);
+	gain.gain.exponentialRampToValueAtTime(accent ? 0.4 : 0.32, time + 0.002);
 	gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
 	osc.connect(gain);
 	gain.connect(ctx.destination);
@@ -85,7 +85,7 @@ function loudest(chunks: { t: number; data: Float32Array }[], rate: number, beat
 }
 
 const PROBE_SOURCE = `
-class PyhhProbe extends AudioWorkletProcessor {
+class ClapProbe extends AudioWorkletProcessor {
 	process(inputs, outputs) {
 		const channel = inputs[0] && inputs[0][0];
 		const out = outputs[0] && outputs[0][0];
@@ -97,15 +97,14 @@ class PyhhProbe extends AudioWorkletProcessor {
 		return true;
 	}
 }
-registerProcessor('pyhh-probe', PyhhProbe);
+registerProcessor('clap-probe', ClapProbe);
 `;
 
 /** Three clicks, then the singer claps on the fourth beat. */
-async function countIn(
+async function clapMeasure(
 	ctx: AudioContext,
 	mic: AudioNode,
-	onCue: () => void,
-	nudgeMs: number
+	onCue: () => void
 ): Promise<{ latency: number; songAt: number }> {
 	const rate = ctx.sampleRate;
 	const chunks: { t: number; data: Float32Array }[] = [];
@@ -118,7 +117,7 @@ async function countIn(
 		URL.revokeObjectURL(url);
 	}
 
-	const probe = new AudioWorkletNode(ctx, 'pyhh-probe', {
+	const probe = new AudioWorkletNode(ctx, 'clap-probe', {
 		numberOfInputs: 1,
 		numberOfOutputs: 1,
 		outputChannelCount: [1],
@@ -174,7 +173,54 @@ async function countIn(
 			`Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`
 		);
 	}
-	return { latency: raw - nudgeMs / 1000, songAt: beat1 + 4 * beat };
+	return { latency: raw, songAt: beat1 + 4 * beat };
+}
+
+/** Measure the headphone round trip alone: three clicks, clap on four. Closes the context. */
+export async function measureLatency(
+	ctx: AudioContext,
+	ready: Promise<unknown>,
+	onCue: () => void = () => {}
+): Promise<number> {
+	let stream: MediaStream | null = null;
+	try {
+		await ready;
+		if (ctx.state === 'suspended') await ctx.resume();
+		stream = await navigator.mediaDevices.getUserMedia({ audio: voiceConstraints(), video: false });
+		const mic = ctx.createMediaStreamSource(stream);
+		const { latency } = await clapMeasure(ctx, mic, onCue);
+		return latency;
+	} finally {
+		for (const track of stream?.getTracks() ?? []) track.stop();
+		void ctx.close();
+	}
+}
+
+/** One bar of clicks at the chosen tempo. The song starts on the next downbeat. */
+function scheduleCountIn(
+	ctx: AudioContext,
+	bpm: number,
+	onBeat: (beat: number) => void
+): { songAt: number; timers: ReturnType<typeof setTimeout>[] } {
+	const beat = 60 / bpm;
+	const t0 = ctx.currentTime + 0.3;
+	const timers: ReturnType<typeof setTimeout>[] = [];
+	for (let i = 0; i < 4; i++) {
+		const at = t0 + i * beat;
+		scheduleClick(ctx, at, i === 0);
+		timers.push(setTimeout(() => onBeat(i + 1), Math.max(0, (at - ctx.currentTime) * 1000)));
+	}
+	return { songAt: t0 + 4 * beat, timers };
+}
+
+export interface OverdubOptions {
+	bpm: number;
+	/** Keep clicking in the headphones while recording. Never printed. */
+	metronome: boolean;
+	/** Measured round trip in seconds. null measures with a clap first. */
+	latency: number | null;
+	onCue?: (kind: 'clap' | 'count', beat: number) => void;
+	onMeasured?: (latency: number) => void;
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
@@ -235,10 +281,10 @@ export async function startOverdub(
 	backingBytes: Promise<ArrayBuffer>,
 	onLevel: (level: number) => void,
 	onFinished: () => void,
-	onCue: () => void = () => {},
-	onMeasured: (latency: number) => void = () => {},
-	nudgeMs = 0
+	options: OverdubOptions
 ): Promise<OverdubSession> {
+	const bpm = Math.min(240, Math.max(30, options.bpm || 100));
+	const onCue = options.onCue ?? (() => {});
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
 	try {
@@ -250,7 +296,7 @@ export async function startOverdub(
 			backingBytes.then((bytes) => ctx.decodeAudioData(bytes.slice(0)))
 		]);
 		stream = micStream;
-		const mic = ctx.createMediaStreamSource(stream);
+		const mic = ctx.createMediaStreamSource(micStream);
 
 		const rumble = ctx.createBiquadFilter();
 		rumble.type = 'highpass';
@@ -403,9 +449,13 @@ export async function startOverdub(
 		let tail: ReturnType<typeof setTimeout> | null = null;
 		let stopPromise: Promise<SongTake> | null = null;
 		let startedAt = 0;
+		let countTimers: ReturnType<typeof setTimeout>[] = [];
+		let metroTimer: ReturnType<typeof setInterval> | null = null;
 
 		const teardown = () => {
 			if (tail) clearTimeout(tail);
+			for (const timer of countTimers) clearTimeout(timer);
+			if (metroTimer) clearInterval(metroTimer);
 			cancelAnimationFrame(raf);
 			onLevel(0);
 			try {
@@ -413,7 +463,7 @@ export async function startOverdub(
 			} catch {
 				// already ended
 			}
-			for (const track of stream.getTracks()) track.stop();
+			for (const track of micStream.getTracks()) track.stop();
 			void ctx.close();
 		};
 
@@ -453,7 +503,20 @@ export async function startOverdub(
 			tail = setTimeout(() => onFinished(), 700);
 		};
 
-		const { latency, songAt } = await countIn(ctx, mic, onCue, nudgeMs);
+		let latency = options.latency;
+		let songAt: number;
+		if (latency == null) {
+			const measured = await clapMeasure(ctx, mic, () => onCue('clap', 4));
+			latency = measured.latency;
+			songAt = measured.songAt;
+			options.onMeasured?.(latency);
+		} else {
+			const counted = scheduleCountIn(ctx, bpm, (beat) => onCue('count', beat));
+			songAt = counted.songAt;
+			countTimers = counted.timers;
+			const wait = (songAt - ctx.currentTime - 0.08) * 1000;
+			if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+		}
 		if (latency >= 0) {
 			align.delayTime.value = Math.min(0.8, latency);
 			voiceAlign.delayTime.value = 0;
@@ -461,12 +524,26 @@ export async function startOverdub(
 			align.delayTime.value = 0;
 			voiceAlign.delayTime.value = Math.min(0.15, -latency);
 		}
-		onMeasured(latency);
+
+		const startAt = Math.max(songAt, ctx.currentTime + 0.03);
+		if (options.metronome) {
+			const beat = 60 / bpm;
+			let next = startAt;
+			const schedule = () => {
+				while (next < ctx.currentTime + 0.6) {
+					const index = Math.round((next - startAt) / beat);
+					scheduleClick(ctx, next, index % 4 === 0);
+					next += beat;
+				}
+			};
+			schedule();
+			metroTimer = setInterval(schedule, 200);
+		}
 
 		raf = requestAnimationFrame(tick);
 		startedAt = performance.now();
 		recorder.start(1000);
-		backingSrc.start(Math.max(songAt, ctx.currentTime + 0.06));
+		backingSrc.start(startAt);
 
 		return { stop };
 	} catch (err) {

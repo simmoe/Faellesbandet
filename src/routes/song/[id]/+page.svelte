@@ -45,7 +45,7 @@
 	import { songPlayBar } from '$lib/songPlayBar.svelte';
 	import { songRecordBar } from '$lib/songRecordBar.svelte';
 	import { startSongRecording, type RecordingSession } from '$lib/recordAudio';
-	import { startOverdub, type OverdubSession } from '$lib/overdub';
+	import { measureLatency, startOverdub, type OverdubSession } from '$lib/overdub';
 	import { recordingAudioBytes } from '$lib/firebase/recordings';
 	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
@@ -736,11 +736,58 @@
 	let dubStartedAt = 0;
 	let dubGone = false;
 	let dubTakeId = $state<string | null>(null);
-	let dubPhase = $state<'idle' | 'arming' | 'counting' | 'recording' | 'saving'>('idle');
+	let dubPhase = $state<'idle' | 'arming' | 'measuring' | 'counting' | 'recording' | 'saving'>(
+		'idle'
+	);
 	let dubElapsed = $state('0:00');
 	let dubLevel = $state(0);
 	let dubError = $state<string | null>(null);
 	let dubHint = $state('');
+	let dubLatencyMs = $state<number | null>(null);
+	let dubLatencyReady = false;
+
+	$effect(() => {
+		if (!browser || dubLatencyReady) return;
+		dubLatencyReady = true;
+		const saved = localStorage.getItem('faellesbandet.overdub-latency-ms');
+		const parsed = saved == null ? NaN : Number(saved);
+		if (Number.isFinite(parsed)) dubLatencyMs = Math.round(parsed);
+	});
+
+	function storeDubLatency(seconds: number) {
+		dubLatencyMs = Math.round(seconds * 1000);
+		if (browser) localStorage.setItem('faellesbandet.overdub-latency-ms', String(dubLatencyMs));
+	}
+
+	function newDubContext(): AudioContext {
+		try {
+			return new AudioContext({ latencyHint: 'interactive', sampleRate: 48000 });
+		} catch {
+			return new AudioContext({ latencyHint: 'interactive' });
+		}
+	}
+
+	async function measureDubLatency() {
+		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle' || dubSession) return;
+		if (!authState.user) return;
+		const ctx = newDubContext();
+		const ready = ctx.resume();
+		dubError = null;
+		dubHint = '';
+		dubTakeId = null;
+		dubPhase = 'measuring';
+		try {
+			if (playing) stopPlay();
+			const latency = await measureLatency(ctx, ready, () => {
+				dubHint = 'Klap på slag 4';
+			});
+			storeDubLatency(latency);
+		} catch (err) {
+			dubError = recMessage(err);
+		}
+		dubHint = '';
+		dubPhase = 'idle';
+	}
 
 	function recMessage(err: unknown): string {
 		const name = err instanceof DOMException ? err.name : '';
@@ -893,23 +940,18 @@
 		dubLevel = 0;
 	}
 
-	function onOverdub(take: SongRecording, nudgeMs = 0) {
+	function onOverdub(take: SongRecording, settings: { bpm: number; metronome: boolean }) {
 		if (dubPhase === 'recording' && dubTakeId === take.id) {
 			void finishOverdub();
 			return;
 		}
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
-		void beginOverdub(take, nudgeMs);
+		void beginOverdub(take, settings);
 	}
 
-	async function beginOverdub(take: SongRecording, nudgeMs = 0) {
+	async function beginOverdub(take: SongRecording, settings: { bpm: number; metronome: boolean }) {
 		if (!song || !authState.user || dubSession) return;
-		let ctx: AudioContext;
-		try {
-			ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 48000 });
-		} catch {
-			ctx = new AudioContext({ latencyHint: 'interactive' });
-		}
+		const ctx = newDubContext();
 		const ready = ctx.resume();
 		dubError = null;
 		dubHint = '';
@@ -927,14 +969,18 @@
 				() => {
 					void finishOverdub();
 				},
-				() => {
-					dubPhase = 'counting';
-				},
-				(latency) => {
-					dubHint = `${latency.toFixed(2).replace('.', ',')} s`;
-				},
-				nudgeMs
+				{
+					bpm: settings.bpm,
+					metronome: settings.metronome,
+					latency: dubLatencyMs == null ? null : dubLatencyMs / 1000,
+					onCue: (kind, beat) => {
+						dubPhase = 'counting';
+						dubHint = kind === 'clap' ? 'Klap på slag 4' : String(beat);
+					},
+					onMeasured: storeDubLatency
+				}
 			);
+			dubHint = '';
 			if (dubGone) {
 				const session = dubSession;
 				dubSession = null;
@@ -955,6 +1001,7 @@
 		} catch (err) {
 			dubSession = null;
 			clearDubTimer();
+			dubHint = '';
 			dubPhase = 'idle';
 			dubError = recMessage(err);
 		}
@@ -1380,6 +1427,8 @@
 									{recordings}
 									onRemove={removeRecording}
 									onOverdub={onOverdub}
+									onMeasure={measureDubLatency}
+									latencyMs={dubLatencyMs}
 									onRevert={revertRecording}
 									overdubId={dubTakeId}
 									overdubPhase={dubPhase}
