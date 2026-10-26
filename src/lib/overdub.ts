@@ -41,11 +41,11 @@ function scheduleClick(ctx: AudioContext, time: number) {
 	osc.stop(time + 0.06);
 }
 
-/** Loudest sample after beat 1. `at` is seconds from beat 1. */
+/** Onset of the loudest sound after beat 1. `at` is seconds from beat 1. */
 function loudest(chunks: { t: number; data: Float32Array }[], rate: number, beat1: number) {
 	let samples = 0;
 	let peak = 0;
-	let at = 0;
+	let peakAt = 0;
 	for (const chunk of chunks) {
 		for (let i = 0; i < chunk.data.length; i++) {
 			const rel = chunk.t + i / rate - beat1;
@@ -54,11 +54,31 @@ function loudest(chunks: { t: number; data: Float32Array }[], rate: number, beat
 			const level = Math.abs(chunk.data[i]);
 			if (level > peak) {
 				peak = level;
-				at = rel;
+				peakAt = rel;
 			}
 		}
 	}
-	return { samples, peak, at };
+	const gate = peak * 0.3;
+	const hold = Math.max(3, Math.floor(rate * 0.003));
+	let run = 0;
+	let at = peakAt;
+	for (const chunk of chunks) {
+		for (let i = 0; i < chunk.data.length; i++) {
+			const rel = chunk.t + i / rate - beat1;
+			if (rel < peakAt - 0.12 || rel > peakAt) {
+				run = 0;
+				continue;
+			}
+			if (Math.abs(chunk.data[i]) >= gate) {
+				if (run === 0) at = rel;
+				run += 1;
+				if (run >= hold) return { samples, peak, at };
+			} else {
+				run = 0;
+			}
+		}
+	}
+	return { samples, peak, at: peakAt };
 }
 
 const PROBE_SOURCE = `
