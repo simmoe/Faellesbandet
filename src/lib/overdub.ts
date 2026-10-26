@@ -41,60 +41,24 @@ function scheduleClick(ctx: AudioContext, time: number) {
 	osc.stop(time + 0.06);
 }
 
-function pyhhLatency(
-	chunks: { t: number; data: Float32Array }[],
-	rate: number,
-	expected: number,
-	searchFrom: number,
-	searchTo: number
-): number {
-	const quiet: number[] = [];
+/** Loudest sample after beat 1. `at` is seconds from beat 1. */
+function loudest(chunks: { t: number; data: Float32Array }[], rate: number, beat1: number) {
+	let samples = 0;
 	let peak = 0;
+	let at = 0;
 	for (const chunk of chunks) {
-		let block = 0;
 		for (let i = 0; i < chunk.data.length; i++) {
-			const t = chunk.t + i / rate;
+			const rel = chunk.t + i / rate - beat1;
+			if (rel < 0) continue;
+			samples += 1;
 			const level = Math.abs(chunk.data[i]);
-			if (t < searchFrom) {
-				if (level > block) block = level;
-				continue;
-			}
-			if (t > searchTo) continue;
-			if (level > peak) peak = level;
-		}
-		if (block > 0) quiet.push(block);
-	}
-	quiet.sort((a, b) => a - b);
-	const floor = quiet.length ? quiet[Math.floor(quiet.length / 2)] : 0.001;
-	if (peak < Math.max(0.02, floor * 3)) {
-		throw new Error('Kunne ikke høre Pyyh. Prøv igen.');
-	}
-	const gate = Math.min(peak * 0.55, Math.max(floor * 3, peak * 0.28));
-	const hold = Math.max(4, Math.floor(rate * 0.006));
-	let run = 0;
-	let runStart = 0;
-	for (const chunk of chunks) {
-		for (let i = 0; i < chunk.data.length; i++) {
-			const t = chunk.t + i / rate;
-			if (t < searchFrom || t > searchTo) {
-				run = 0;
-				continue;
-			}
-			if (Math.abs(chunk.data[i]) >= gate) {
-				if (run === 0) runStart = t;
-				run += 1;
-				if (run >= hold) {
-					const latency = runStart - expected;
-					if (latency < -0.12) throw new Error('Pyyh kom for tidligt. Sig den på slaget.');
-					if (latency > 0.44) throw new Error('Pyyh kom for sent. Sig den på slaget.');
-					return latency;
-				}
-			} else {
-				run = 0;
+			if (level > peak) {
+				peak = level;
+				at = rel;
 			}
 		}
 	}
-	throw new Error('Kunne ikke høre Pyyh. Prøv igen.');
+	return { samples, peak, at };
 }
 
 const PROBE_SOURCE = `
@@ -144,23 +108,21 @@ async function countIn(
 	sink.connect(ctx.destination);
 
 	const beat = COUNT_BEAT;
-	const t0 = ctx.currentTime + 0.35;
-	const expected = t0 + 3 * beat;
-	const searchFrom = expected - 0.12;
-	const searchTo = expected + 0.5;
-	scheduleClick(ctx, t0);
-	scheduleClick(ctx, t0 + beat);
-	scheduleClick(ctx, t0 + 2 * beat);
+	const beat1 = ctx.currentTime + 0.35;
+	const until = beat1 + 4 * beat;
+	scheduleClick(ctx, beat1);
+	scheduleClick(ctx, beat1 + beat);
+	scheduleClick(ctx, beat1 + 2 * beat);
 	onCue();
 
 	try {
-		await new Promise<void>((resolve, reject) => {
-			const timer = setTimeout(() => reject(new Error('Kunne ikke høre Pyyh. Prøv igen.')), 5000);
+		await new Promise<void>((resolve) => {
+			const timer = setTimeout(() => resolve(), 5000);
 			probe.port.onmessage = (event: MessageEvent<{ t: number; samples: Float32Array }>) => {
 				const { t, samples } = event.data;
-				if (!samples || t + samples.length / rate < t0 - 0.05) return;
+				if (!samples || samples.length === 0) return;
 				chunks.push({ t, data: samples });
-				if (t + samples.length / rate >= searchTo) {
+				if (t + samples.length / rate >= until) {
 					clearTimeout(timer);
 					resolve();
 				}
@@ -177,10 +139,13 @@ async function countIn(
 		}
 	}
 
-	return {
-		latency: pyhhLatency(chunks, rate, expected, searchFrom, searchTo),
-		songAt: expected + beat
-	};
+	const heard = loudest(chunks, rate, beat1);
+	const beat4 = 3 * beat;
+	const line =
+		heard.samples === 0
+			? 'Måling: ingen lyd i optagelsen.'
+			: `Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`;
+	throw new Error(line);
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {

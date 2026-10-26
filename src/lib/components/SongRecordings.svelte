@@ -55,7 +55,7 @@
 		<span>Optagelser</span>
 		<div class="rec-block">
 			{#if overdubPhase === 'counting'}
-				<p class="rec-hint">1, 2, 3 — sig Pyyh</p>
+				<p class="rec-hint">Sig Pyyh på slag 4</p>
 			{/if}
 			<ul class="rec-list">
 				{#each recordings as take (take.id)}
