@@ -736,7 +736,7 @@
 	let dubStartedAt = 0;
 	let dubGone = false;
 	let dubTakeId = $state<string | null>(null);
-	let dubPhase = $state<'idle' | 'arming' | 'recording' | 'saving'>('idle');
+	let dubPhase = $state<'idle' | 'arming' | 'counting' | 'recording' | 'saving'>('idle');
 	let dubElapsed = $state('0:00');
 	let dubLevel = $state(0);
 	let dubError = $state<string | null>(null);
@@ -892,16 +892,16 @@
 		dubLevel = 0;
 	}
 
-	function onOverdub(take: SongRecording, bluetooth = false) {
+	function onOverdub(take: SongRecording) {
 		if (dubPhase === 'recording' && dubTakeId === take.id) {
 			void finishOverdub();
 			return;
 		}
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
-		void beginOverdub(take, bluetooth);
+		void beginOverdub(take);
 	}
 
-	async function beginOverdub(take: SongRecording, bluetooth = false) {
+	async function beginOverdub(take: SongRecording) {
 		if (!song || !authState.user || dubSession) return;
 		let ctx: AudioContext;
 		try {
@@ -925,7 +925,9 @@
 				() => {
 					void finishOverdub();
 				},
-				bluetooth
+				() => {
+					dubPhase = 'counting';
+				}
 			);
 			if (dubGone) {
 				const session = dubSession;

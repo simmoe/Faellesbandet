@@ -1,8 +1,9 @@
 /**
  * Overdub: play the existing take in the headphones, record a new voice
  * through a short vocal chain (body cut, presence, plate), and print one
- * mixed file. The backing is delayed into the mix by the output latency so
- * the sung line lands on what the singer actually heard.
+ * mixed file. A count-in (1, 2, 3, Pyyh) measures how late the voice arrives
+ * against the click the singer actually heard, and that offset delays the
+ * backing into the mix.
  */
 import type { RecordingSession, SongTake } from './recordAudio';
 
@@ -22,20 +23,164 @@ function voiceConstraints(): MediaTrackConstraints {
 	} as MediaTrackConstraints;
 }
 
-/** AirPods and other wireless headsets sit well behind outputLatency. */
-const BLUETOOTH_LAG = 0.16;
+/** One beat of the count-in. Slow enough that a plosive can sit on the fourth. */
+const COUNT_BEAT = 0.7;
 
-async function usesBluetoothOutput(stream: MediaStream): Promise<boolean> {
-	const labels = stream.getAudioTracks().map((track) => track.label);
-	try {
-		const devices = await navigator.mediaDevices.enumerateDevices();
-		for (const device of devices) {
-			if (device.kind === 'audiooutput' || device.kind === 'audioinput') labels.push(device.label);
+function scheduleClick(ctx: AudioContext, time: number) {
+	const osc = ctx.createOscillator();
+	const gain = ctx.createGain();
+	osc.type = 'sine';
+	osc.frequency.setValueAtTime(1800, time);
+	osc.frequency.exponentialRampToValueAtTime(700, time + 0.028);
+	gain.gain.setValueAtTime(0.0001, time);
+	gain.gain.exponentialRampToValueAtTime(0.32, time + 0.002);
+	gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
+	osc.connect(gain);
+	gain.connect(ctx.destination);
+	osc.start(time);
+	osc.stop(time + 0.06);
+}
+
+function pyhhLatency(
+	chunks: { t: number; data: Float32Array }[],
+	rate: number,
+	expected: number,
+	searchFrom: number,
+	searchTo: number
+): number {
+	const quiet: number[] = [];
+	let peak = 0;
+	for (const chunk of chunks) {
+		let block = 0;
+		for (let i = 0; i < chunk.data.length; i++) {
+			const t = chunk.t + i / rate;
+			const level = Math.abs(chunk.data[i]);
+			if (t < searchFrom) {
+				if (level > block) block = level;
+				continue;
+			}
+			if (t > searchTo) continue;
+			if (level > peak) peak = level;
 		}
-	} catch {
-		// Labels stay empty on some phones. The Bluetooth toggle covers that.
+		if (block > 0) quiet.push(block);
 	}
-	return labels.some((label) => /airpod|bluetooth|beats|bose|headset|buds|wh-|wf-/i.test(label));
+	quiet.sort((a, b) => a - b);
+	const floor = quiet.length ? quiet[Math.floor(quiet.length / 2)] : 0.001;
+	if (peak < Math.max(0.02, floor * 3)) {
+		throw new Error('Kunne ikke høre Pyyh. Prøv igen.');
+	}
+	const gate = Math.min(peak * 0.55, Math.max(floor * 3, peak * 0.28));
+	const hold = Math.max(4, Math.floor(rate * 0.006));
+	let run = 0;
+	let runStart = 0;
+	for (const chunk of chunks) {
+		for (let i = 0; i < chunk.data.length; i++) {
+			const t = chunk.t + i / rate;
+			if (t < searchFrom || t > searchTo) {
+				run = 0;
+				continue;
+			}
+			if (Math.abs(chunk.data[i]) >= gate) {
+				if (run === 0) runStart = t;
+				run += 1;
+				if (run >= hold) {
+					const latency = runStart - expected;
+					if (latency < -0.12) throw new Error('Pyyh kom for tidligt. Sig den på slaget.');
+					if (latency > 0.44) throw new Error('Pyyh kom for sent. Sig den på slaget.');
+					return latency;
+				}
+			} else {
+				run = 0;
+			}
+		}
+	}
+	throw new Error('Kunne ikke høre Pyyh. Prøv igen.');
+}
+
+const PROBE_SOURCE = `
+class PyhhProbe extends AudioWorkletProcessor {
+	process(inputs, outputs) {
+		const channel = inputs[0] && inputs[0][0];
+		const out = outputs[0] && outputs[0][0];
+		if (out) out.fill(0);
+		if (channel && channel.length) {
+			const copy = new Float32Array(channel);
+			this.port.postMessage({ t: currentTime, samples: copy }, [copy.buffer]);
+		}
+		return true;
+	}
+}
+registerProcessor('pyhh-probe', PyhhProbe);
+`;
+
+/** Three clicks, then the singer says Pyyh on the fourth beat. */
+async function countIn(
+	ctx: AudioContext,
+	mic: AudioNode,
+	onCue: () => void
+): Promise<{ latency: number; songAt: number }> {
+	const rate = ctx.sampleRate;
+	const chunks: { t: number; data: Float32Array }[] = [];
+	const url = URL.createObjectURL(new Blob([PROBE_SOURCE], { type: 'application/javascript' }));
+	try {
+		await ctx.audioWorklet.addModule(url);
+	} catch {
+		throw new Error('Kunne ikke måle forsinkelsen i den her browser.');
+	} finally {
+		URL.revokeObjectURL(url);
+	}
+
+	const probe = new AudioWorkletNode(ctx, 'pyhh-probe', {
+		numberOfInputs: 1,
+		numberOfOutputs: 1,
+		outputChannelCount: [1],
+		channelCount: 1,
+		channelCountMode: 'explicit'
+	});
+	const sink = ctx.createGain();
+	sink.gain.value = 0;
+	mic.connect(probe);
+	probe.connect(sink);
+	sink.connect(ctx.destination);
+
+	const beat = COUNT_BEAT;
+	const t0 = ctx.currentTime + 0.35;
+	const expected = t0 + 3 * beat;
+	const searchFrom = expected - 0.12;
+	const searchTo = expected + 0.5;
+	scheduleClick(ctx, t0);
+	scheduleClick(ctx, t0 + beat);
+	scheduleClick(ctx, t0 + 2 * beat);
+	onCue();
+
+	try {
+		await new Promise<void>((resolve, reject) => {
+			const timer = setTimeout(() => reject(new Error('Kunne ikke høre Pyyh. Prøv igen.')), 5000);
+			probe.port.onmessage = (event: MessageEvent<{ t: number; samples: Float32Array }>) => {
+				const { t, samples } = event.data;
+				if (!samples || t + samples.length / rate < t0 - 0.05) return;
+				chunks.push({ t, data: samples });
+				if (t + samples.length / rate >= searchTo) {
+					clearTimeout(timer);
+					resolve();
+				}
+			};
+		});
+	} finally {
+		probe.port.onmessage = null;
+		try {
+			probe.disconnect();
+			sink.disconnect();
+			mic.disconnect(probe);
+		} catch {
+			// The context may already be closing.
+		}
+	}
+
+	return {
+		latency: pyhhLatency(chunks, rate, expected, searchFrom, searchTo),
+		songAt: expected + beat
+	};
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
@@ -96,7 +241,7 @@ export async function startOverdub(
 	backingBytes: Promise<ArrayBuffer>,
 	onLevel: (level: number) => void,
 	onFinished: () => void,
-	bluetooth = false
+	onCue: () => void = () => {}
 ): Promise<OverdubSession> {
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
@@ -109,8 +254,6 @@ export async function startOverdub(
 			backingBytes.then((bytes) => ctx.decodeAudioData(bytes.slice(0)))
 		]);
 		stream = micStream;
-		const wireless = bluetooth || (await usesBluetoothOutput(stream));
-
 		const mic = ctx.createMediaStreamSource(stream);
 
 		const rumble = ctx.createBiquadFilter();
@@ -165,7 +308,7 @@ export async function startOverdub(
 		const wet = ctx.createGain();
 		wet.gain.value = 0.16;
 		const voiceMonitor = ctx.createGain();
-		voiceMonitor.gain.value = 0.4;
+		voiceMonitor.gain.value = 0;
 
 		mic.connect(rumble);
 		rumble.connect(body);
@@ -181,7 +324,7 @@ export async function startOverdub(
 		plate.connect(tailLp);
 		tailLp.connect(wet);
 		const plateMonitor = ctx.createGain();
-		plateMonitor.gain.value = 0.34;
+		plateMonitor.gain.value = 0;
 		tailLp.connect(plateMonitor);
 		voiceMonitor.connect(ctx.destination);
 		plateMonitor.connect(ctx.destination);
@@ -191,10 +334,7 @@ export async function startOverdub(
 		const printed = ctx.createGain();
 		printed.gain.value = 0.66;
 		const align = ctx.createDelay(0.45);
-		const reported = ctx.outputLatency > 0 ? ctx.outputLatency : ctx.baseLatency || 0;
-		align.delayTime.value = wireless
-			? Math.max(reported, BLUETOOTH_LAG)
-			: Math.min(0.25, Math.max(0, reported));
+		align.delayTime.value = 0;
 
 		const backingSrc = ctx.createBufferSource();
 		backingSrc.buffer = backing;
@@ -205,8 +345,11 @@ export async function startOverdub(
 
 		const mix = ctx.createGain();
 		mix.gain.value = 1;
-		dry.connect(mix);
-		wet.connect(mix);
+		const voiceAlign = ctx.createDelay(0.15);
+		voiceAlign.delayTime.value = 0;
+		dry.connect(voiceAlign);
+		wet.connect(voiceAlign);
+		voiceAlign.connect(mix);
 		printed.connect(mix);
 
 		const glue = ctx.createDynamicsCompressor();
@@ -263,7 +406,7 @@ export async function startOverdub(
 		let stopped = false;
 		let tail: ReturnType<typeof setTimeout> | null = null;
 		let stopPromise: Promise<SongTake> | null = null;
-		const startedAt = performance.now();
+		let startedAt = 0;
 
 		const teardown = () => {
 			if (tail) clearTimeout(tail);
@@ -314,9 +457,18 @@ export async function startOverdub(
 			tail = setTimeout(() => onFinished(), 700);
 		};
 
+		const { latency, songAt } = await countIn(ctx, mic, onCue);
+		if (latency > 0) align.delayTime.value = Math.min(0.44, latency);
+		else voiceAlign.delayTime.value = Math.min(0.12, -latency);
+		if (latency < 0.045) {
+			voiceMonitor.gain.value = 0.3;
+			plateMonitor.gain.value = 0.2;
+		}
+
 		raf = requestAnimationFrame(tick);
+		startedAt = performance.now();
 		recorder.start(1000);
-		backingSrc.start(ctx.currentTime + 0.03);
+		backingSrc.start(Math.max(songAt, ctx.currentTime + 0.06));
 
 		return { stop };
 	} catch (err) {

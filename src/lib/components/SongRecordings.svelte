@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import type { SongRecording } from '$lib/types';
 
 	interface Props {
 		recordings: SongRecording[];
 		onRemove: (id: string) => void;
-		onOverdub?: (take: SongRecording, bluetooth: boolean) => void;
+		onOverdub?: (take: SongRecording) => void;
 		onRevert?: (id: string) => void;
 		overdubId?: string | null;
-		overdubPhase?: 'idle' | 'arming' | 'recording' | 'saving';
+		overdubPhase?: 'idle' | 'arming' | 'counting' | 'recording' | 'saving';
 		overdubElapsed?: string;
 		overdubLevel?: number;
 		overdubError?: string | null;
@@ -29,19 +28,6 @@
 	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
-	let bluetooth = $state(false);
-	let bluetoothReady = false;
-
-	$effect(() => {
-		if (!browser || bluetoothReady) return;
-		bluetoothReady = true;
-		bluetooth = localStorage.getItem('faellesbandet.overdub-bluetooth') === '1';
-	});
-
-	function toggleBluetooth() {
-		bluetooth = !bluetooth;
-		localStorage.setItem('faellesbandet.overdub-bluetooth', bluetooth ? '1' : '0');
-	}
 
 	$effect(() => {
 		if (overdubId) playingId = null;
@@ -49,6 +35,7 @@
 
 	function overdubLabel(id: string): string {
 		if (overdubId !== id || overdubPhase === 'idle') return 'Overdub';
+		if (overdubPhase === 'counting') return 'Pyyh';
 		if (overdubPhase === 'recording') return overdubElapsed;
 		if (overdubPhase === 'saving') return 'Gemmer';
 		return 'Starter';
@@ -67,17 +54,8 @@
 	<div class="info-field">
 		<span>Optagelser</span>
 		<div class="rec-block">
-			{#if !readOnly}
-				<button
-					type="button"
-					class="rec-action"
-					class:is-on={bluetooth}
-					aria-pressed={bluetooth}
-					title="Tænd når du bruger trådløse høretelefoner, så andenstemmen rammer takten."
-					onclick={toggleBluetooth}
-				>
-					Bluetooth
-				</button>
+			{#if overdubPhase === 'counting'}
+				<p class="rec-hint">1, 2, 3 — sig Pyyh</p>
 			{/if}
 			<ul class="rec-list">
 				{#each recordings as take (take.id)}
@@ -102,9 +80,11 @@
 									class:is-live={overdubId === take.id && overdubPhase === 'recording'}
 									disabled={(overdubPhase !== 'idle' && overdubId !== take.id) ||
 										(overdubId === take.id &&
-											(overdubPhase === 'arming' || overdubPhase === 'saving'))}
-									title="Læg en stemme ovenpå. Høretelefoner er bedst."
-									onclick={() => onOverdub?.(take, bluetooth)}
+											(overdubPhase === 'arming' ||
+												overdubPhase === 'counting' ||
+												overdubPhase === 'saving'))}
+									title="Læg en stemme ovenpå. Sig Pyyh på det fjerde slag."
+									onclick={() => onOverdub?.(take)}
 								>
 									{#if overdubId === take.id && overdubPhase === 'recording'}
 										<span class="rec-dot" style:transform={`scale(${0.8 + overdubLevel * 0.45})`}></span>
@@ -220,8 +200,10 @@
 		opacity: 0.45;
 		cursor: default;
 	}
-	.rec-action.is-on {
-		color: var(--color-ink);
+	.rec-hint {
+		margin: 0;
+		color: var(--color-ink-muted);
+		font-size: var(--type-xs);
 	}
 	.rec-action.is-live {
 		color: #b91c1c;
