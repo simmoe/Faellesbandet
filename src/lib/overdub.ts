@@ -170,7 +170,7 @@ async function countIn(
 			`Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`
 		);
 	}
-	return { latency: Math.max(0, raw - 0.05), songAt: beat1 + 4 * beat };
+	return { latency: Math.max(0, raw - 0.075), songAt: beat1 + 4 * beat };
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
