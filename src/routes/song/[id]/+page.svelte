@@ -740,6 +740,7 @@
 	let dubElapsed = $state('0:00');
 	let dubLevel = $state(0);
 	let dubError = $state<string | null>(null);
+	let dubHint = $state('');
 
 	function recMessage(err: unknown): string {
 		const name = err instanceof DOMException ? err.name : '';
@@ -911,6 +912,7 @@
 		}
 		const ready = ctx.resume();
 		dubError = null;
+		dubHint = '';
 		dubTakeId = take.id;
 		dubPhase = 'arming';
 		try {
@@ -927,6 +929,9 @@
 				},
 				() => {
 					dubPhase = 'counting';
+				},
+				(latency) => {
+					dubHint = `${latency.toFixed(2).replace('.', ',')} s`;
 				}
 			);
 			if (dubGone) {
@@ -1380,6 +1385,7 @@
 									overdubElapsed={dubElapsed}
 									overdubLevel={dubLevel}
 									overdubError={dubError}
+									overdubHint={dubHint}
 									readOnly={!canEdit}
 								/>
 								{#if !chordChartUrl}

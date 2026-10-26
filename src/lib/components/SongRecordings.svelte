@@ -11,6 +11,7 @@
 		overdubElapsed?: string;
 		overdubLevel?: number;
 		overdubError?: string | null;
+		overdubHint?: string;
 		readOnly?: boolean;
 	}
 
@@ -24,6 +25,7 @@
 		overdubElapsed = '0:00',
 		overdubLevel = 0,
 		overdubError = null,
+		overdubHint = '',
 		readOnly = false
 	}: Props = $props();
 
@@ -56,6 +58,8 @@
 		<div class="rec-block">
 			{#if overdubPhase === 'counting'}
 				<p class="rec-hint">Sig Pyyh på slag 4</p>
+			{:else if overdubHint && overdubPhase === 'recording'}
+				<p class="rec-hint">{overdubHint}</p>
 			{/if}
 			<ul class="rec-list">
 				{#each recordings as take (take.id)}

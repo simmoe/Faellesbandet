@@ -141,11 +141,16 @@ async function countIn(
 
 	const heard = loudest(chunks, rate, beat1);
 	const beat4 = 3 * beat;
-	const line =
-		heard.samples === 0
-			? 'Måling: ingen lyd i optagelsen.'
-			: `Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`;
-	throw new Error(line);
+	const latency = heard.at - beat4;
+	if (heard.samples === 0 || heard.peak < 0.02) {
+		throw new Error('Måling: ingen lyd i optagelsen.');
+	}
+	if (latency < 0 || latency > 0.7) {
+		throw new Error(
+			`Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`
+		);
+	}
+	return { latency, songAt: beat1 + 4 * beat };
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
@@ -206,7 +211,8 @@ export async function startOverdub(
 	backingBytes: Promise<ArrayBuffer>,
 	onLevel: (level: number) => void,
 	onFinished: () => void,
-	onCue: () => void = () => {}
+	onCue: () => void = () => {},
+	onMeasured: (latency: number) => void = () => {}
 ): Promise<OverdubSession> {
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
@@ -298,7 +304,7 @@ export async function startOverdub(
 		heard.gain.value = 0.88;
 		const printed = ctx.createGain();
 		printed.gain.value = 0.66;
-		const align = ctx.createDelay(0.45);
+		const align = ctx.createDelay(0.8);
 		align.delayTime.value = 0;
 
 		const backingSrc = ctx.createBufferSource();
@@ -423,12 +429,8 @@ export async function startOverdub(
 		};
 
 		const { latency, songAt } = await countIn(ctx, mic, onCue);
-		if (latency > 0) align.delayTime.value = Math.min(0.44, latency);
-		else voiceAlign.delayTime.value = Math.min(0.12, -latency);
-		if (latency < 0.045) {
-			voiceMonitor.gain.value = 0.3;
-			plateMonitor.gain.value = 0.2;
-		}
+		align.delayTime.value = latency;
+		onMeasured(latency);
 
 		raf = requestAnimationFrame(tick);
 		startedAt = performance.now();
