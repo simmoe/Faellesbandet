@@ -1,3 +1,5 @@
+import { scheduleClick } from './click';
+
 /**
  * Capture a rehearsal take through Web Audio instead of a raw MediaRecorder
  * tap: disable phone "voice" DSP, then a short music chain (rumble cut,
@@ -96,7 +98,8 @@ function connectMusicChain(ctx: AudioContext, source: MediaStreamAudioSourceNode
 }
 
 export async function startSongRecording(
-	onLevel: (level: number) => void
+	onLevel: (level: number) => void,
+	metronome?: { bpm: number }
 ): Promise<RecordingSession> {
 	const { mimeType, extension } = pickMimeType();
 	const stream = await navigator.mediaDevices.getUserMedia({
@@ -160,6 +163,22 @@ export async function startSongRecording(
 	raf = requestAnimationFrame(tick);
 	recorder.start(1000);
 
+	let metroTimer: ReturnType<typeof setInterval> | null = null;
+	if (metronome && metronome.bpm >= 40) {
+		const beat = 60 / metronome.bpm;
+		const startAt = ctx.currentTime + 0.05;
+		let next = startAt;
+		const schedule = () => {
+			while (next < ctx.currentTime + 0.6) {
+				const index = Math.round((next - startAt) / beat);
+				scheduleClick(ctx, next, index % 4 === 0);
+				next += beat;
+			}
+		};
+		schedule();
+		metroTimer = setInterval(schedule, 200);
+	}
+
 	let stopped = false;
 	return {
 		stop: () =>
@@ -168,6 +187,7 @@ export async function startSongRecording(
 				stopped = true;
 				const teardown = () => {
 					cancelAnimationFrame(raf);
+					if (metroTimer) clearInterval(metroTimer);
 					onLevel(0);
 					for (const track of stream.getTracks()) track.stop();
 					void ctx.close();

@@ -46,6 +46,7 @@
 	import { songRecordBar } from '$lib/songRecordBar.svelte';
 	import { startSongRecording, type RecordingSession } from '$lib/recordAudio';
 	import { measureLatency, startOverdub, type OverdubSession } from '$lib/overdub';
+	import { scheduleClick } from '$lib/click';
 	import { recordingAudioBytes } from '$lib/firebase/recordings';
 	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
@@ -745,6 +746,11 @@
 	let dubHint = $state('');
 	let dubLatencyMs = $state<number | null>(null);
 	let dubLatencyReady = false;
+	let tempoBpm = $state(100);
+	let tempoOn = $state(false);
+	let tempoReady = false;
+	let tempoBeat = $state(0);
+	let tempoPreview: { ctx: AudioContext; timers: ReturnType<typeof setTimeout>[] } | null = null;
 
 	$effect(() => {
 		if (!browser || dubLatencyReady) return;
@@ -757,6 +763,61 @@
 	function storeDubLatency(seconds: number) {
 		dubLatencyMs = Math.round(seconds * 1000);
 		if (browser) localStorage.setItem('faellesbandet.overdub-latency-ms', String(dubLatencyMs));
+	}
+
+	$effect(() => {
+		if (!browser || tempoReady) return;
+		tempoReady = true;
+		const savedBpm = Number(
+			localStorage.getItem('faellesbandet.tempo-bpm') ??
+				localStorage.getItem('faellesbandet.overdub-bpm')
+		);
+		if (Number.isFinite(savedBpm) && savedBpm >= 40 && savedBpm <= 200) tempoBpm = Math.round(savedBpm);
+		tempoOn =
+			localStorage.getItem('faellesbandet.tempo-on') === '1' ||
+			(localStorage.getItem('faellesbandet.tempo-on') == null &&
+				localStorage.getItem('faellesbandet.overdub-metronome') === '1');
+	});
+
+	$effect(() => {
+		if (!browser || !tempoReady) return;
+		localStorage.setItem('faellesbandet.tempo-bpm', String(tempoBpm));
+		localStorage.setItem('faellesbandet.tempo-on', tempoOn ? '1' : '0');
+	});
+
+	function stopTempoPreview() {
+		const preview = tempoPreview;
+		tempoPreview = null;
+		if (!preview) return;
+		for (const timer of preview.timers) clearTimeout(timer);
+		void preview.ctx.close();
+		tempoBeat = 0;
+	}
+
+	function playFourBeats() {
+		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
+		stopTempoPreview();
+		const ctx = new AudioContext();
+		void ctx.resume();
+		const beat = 60 / tempoBpm;
+		const t0 = ctx.currentTime + 0.08;
+		const timers: ReturnType<typeof setTimeout>[] = [];
+		for (let i = 0; i < 4; i++) {
+			scheduleClick(ctx, t0 + i * beat, i === 0);
+			timers.push(
+				setTimeout(() => {
+					tempoBeat = i + 1;
+				}, Math.max(0, (t0 + i * beat - ctx.currentTime) * 1000))
+			);
+		}
+		timers.push(
+			setTimeout(() => {
+				tempoBeat = 0;
+				void ctx.close();
+				tempoPreview = null;
+			}, (t0 + 4 * beat + 0.2 - ctx.currentTime) * 1000)
+		);
+		tempoPreview = { ctx, timers };
 	}
 
 	function newDubContext(): AudioContext {
@@ -817,9 +878,12 @@
 		songRecordBar.error = null;
 		songRecordBar.phase = 'busy';
 		try {
-			recSession = await startSongRecording((level) => {
-				songRecordBar.level = level;
-			});
+			recSession = await startSongRecording(
+				(level) => {
+					songRecordBar.level = level;
+				},
+				tempoOn ? { bpm: tempoBpm } : undefined
+			);
 			recStartedAt = Date.now();
 			songRecordBar.phase = 'recording';
 			songRecordBar.elapsedLabel = '0:00';
@@ -915,6 +979,7 @@
 
 	onDestroy(() => {
 		dubGone = true;
+		stopTempoPreview();
 		clearDubTimer();
 		if (dubSession) {
 			const session = dubSession;
@@ -940,16 +1005,16 @@
 		dubLevel = 0;
 	}
 
-	function onOverdub(take: SongRecording, settings: { bpm: number; metronome: boolean }) {
+	function onOverdub(take: SongRecording) {
 		if (dubPhase === 'recording' && dubTakeId === take.id) {
 			void finishOverdub();
 			return;
 		}
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
-		void beginOverdub(take, settings);
+		void beginOverdub(take);
 	}
 
-	async function beginOverdub(take: SongRecording, settings: { bpm: number; metronome: boolean }) {
+	async function beginOverdub(take: SongRecording) {
 		if (!song || !authState.user || dubSession) return;
 		const ctx = newDubContext();
 		const ready = ctx.resume();
@@ -970,8 +1035,8 @@
 					void finishOverdub();
 				},
 				{
-					bpm: settings.bpm,
-					metronome: settings.metronome,
+					bpm: tempoBpm,
+					metronome: tempoOn,
 					latency: dubLatencyMs == null ? null : dubLatencyMs / 1000,
 					onCue: (kind, beat) => {
 						dubPhase = 'counting';
@@ -1351,6 +1416,49 @@
 												spellcheck="false"
 											/>
 											<button type="button" class="key-btn" title="Transponér op" onclick={() => transpose(1)}>+</button>
+										</div>
+									</div>
+									<div class="info-field">
+										<span>Tempo</span>
+										<div class="tempo-row">
+											<input
+												type="range"
+												min="40"
+												max="200"
+												step="1"
+												value={tempoBpm}
+												aria-label="Tempo"
+												disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
+												oninput={(event) => {
+													tempoBpm = Number(event.currentTarget.value);
+												}}
+											/>
+											<span class="tempo-bpm">{tempoBpm}</span>
+											<button
+												type="button"
+												class="tempo-play"
+												disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
+												title="Hør fire slag i det tempo"
+												onclick={playFourBeats}
+											>
+												Fire slag
+											</button>
+											<span class="tempo-beats" aria-hidden="true">
+												{#each [1, 2, 3, 4] as beat (beat)}
+													<i class:is-on={tempoBeat === beat}>{beat}</i>
+												{/each}
+											</span>
+											<button
+												type="button"
+												class="tempo-metro"
+												class:is-on={tempoOn}
+												aria-pressed={tempoOn}
+												disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
+												title="Klik med under optagelse og overdub. Kommer ikke med på optagelsen."
+												onclick={() => (tempoOn = !tempoOn)}
+											>
+												Metronom
+											</button>
 										</div>
 									</div>
 									<div class="info-field">

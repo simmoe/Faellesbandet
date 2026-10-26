@@ -303,6 +303,63 @@ select {
 .song-page .info-field > span:empty {
 	display: none;
 }
+.song-page .tempo-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem 0.7rem;
+	min-width: 0;
+}
+.song-page .tempo-row input[type='range'] {
+	width: 7rem;
+	margin: 0;
+	accent-color: var(--color-ink-muted, currentColor);
+}
+.song-page .tempo-bpm {
+	min-width: 2.2rem;
+	font-size: var(--type-xs);
+	font-variant-numeric: tabular-nums;
+	color: var(--color-ink-faint);
+}
+.song-page .tempo-play,
+.song-page .tempo-metro {
+	appearance: none;
+	border: none;
+	background: transparent;
+	padding: 0;
+	font-size: var(--type-label);
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--color-ink-faint);
+	cursor: pointer;
+}
+.song-page .tempo-play:hover:not(:disabled),
+.song-page .tempo-metro:hover:not(:disabled),
+.song-page .tempo-metro.is-on {
+	color: var(--color-ink);
+}
+.song-page .tempo-play:disabled,
+.song-page .tempo-metro:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+.song-page .tempo-beats {
+	display: inline-flex;
+	gap: 0.35rem;
+	font-size: var(--type-xs);
+	font-variant-numeric: tabular-nums;
+	color: var(--color-ink-faint);
+}
+.song-page .tempo-beats i {
+	font-style: normal;
+	min-width: 0.7rem;
+	text-align: center;
+}
+.song-page .tempo-beats i.is-on {
+	color: var(--color-ink);
+	font-weight: 600;
+}
 @media (max-width: 40rem) {
 	.song-page .info-field {
 		grid-template-columns: minmax(0, 1fr);

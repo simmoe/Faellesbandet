@@ -5,6 +5,7 @@
  * against the click the singer actually heard, and that offset delays the
  * backing into the mix.
  */
+import { scheduleClick } from './click';
 import type { RecordingSession, SongTake } from './recordAudio';
 
 export type OverdubSession = RecordingSession;
@@ -25,21 +26,6 @@ function voiceConstraints(): MediaTrackConstraints {
 
 /** One beat of the clap measurement. Slow enough that a clap can sit on the fourth. */
 const COUNT_BEAT = 0.7;
-
-function scheduleClick(ctx: AudioContext, time: number, accent = false) {
-	const osc = ctx.createOscillator();
-	const gain = ctx.createGain();
-	osc.type = 'sine';
-	osc.frequency.setValueAtTime(accent ? 2400 : 1800, time);
-	osc.frequency.exponentialRampToValueAtTime(accent ? 900 : 700, time + 0.028);
-	gain.gain.setValueAtTime(0.0001, time);
-	gain.gain.exponentialRampToValueAtTime(accent ? 0.4 : 0.32, time + 0.002);
-	gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
-	osc.connect(gain);
-	gain.connect(ctx.destination);
-	osc.start(time);
-	osc.stop(time + 0.06);
-}
 
 /**
  * Onset of the clap after beat 1. `at` is seconds from beat 1.

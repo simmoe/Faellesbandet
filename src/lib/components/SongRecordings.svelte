@@ -1,11 +1,10 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import type { SongRecording } from '$lib/types';
 
 	interface Props {
 		recordings: SongRecording[];
 		onRemove: (id: string) => void;
-		onOverdub?: (take: SongRecording, settings: { bpm: number; metronome: boolean }) => void;
+		onOverdub?: (take: SongRecording) => void;
 		onRevert?: (id: string) => void;
 		onMeasure?: () => void;
 		latencyMs?: number | null;
@@ -35,26 +34,9 @@
 	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
-	let bpm = $state(100);
-	let metronome = $state(false);
-	let prefsReady = false;
 
 	$effect(() => {
 		if (overdubId) playingId = null;
-	});
-
-	$effect(() => {
-		if (!browser || prefsReady) return;
-		prefsReady = true;
-		const savedBpm = Number(localStorage.getItem('faellesbandet.overdub-bpm'));
-		if (Number.isFinite(savedBpm) && savedBpm >= 40 && savedBpm <= 200) bpm = Math.round(savedBpm);
-		metronome = localStorage.getItem('faellesbandet.overdub-metronome') === '1';
-	});
-
-	$effect(() => {
-		if (!browser || !prefsReady) return;
-		localStorage.setItem('faellesbandet.overdub-bpm', String(bpm));
-		localStorage.setItem('faellesbandet.overdub-metronome', metronome ? '1' : '0');
 	});
 
 	const busy = $derived(overdubPhase !== 'idle');
@@ -90,32 +72,6 @@
 		<div class="rec-block">
 			{#if !readOnly}
 				<div class="rec-tools">
-					<label class="rec-tempo">
-						<input
-							type="range"
-							min="40"
-							max="200"
-							step="1"
-							value={bpm}
-							disabled={busy}
-							aria-label="Tempo"
-							oninput={(event) => {
-								bpm = Number(event.currentTarget.value);
-							}}
-						/>
-						<span>{bpm} bpm</span>
-					</label>
-					<button
-						type="button"
-						class="rec-action"
-						class:is-on={metronome}
-						aria-pressed={metronome}
-						disabled={busy}
-						title="Hør metronomen i høretelefonerne, mens du optager. Den kommer ikke med på optagelsen."
-						onclick={() => (metronome = !metronome)}
-					>
-						Metronom
-					</button>
 					<button
 						type="button"
 						class="rec-action"
@@ -160,7 +116,7 @@
 												overdubPhase === 'counting' ||
 												overdubPhase === 'saving'))}
 									title="Læg en stemme ovenpå. Fire klik tæller ind, så starter sangen."
-									onclick={() => onOverdub?.(take, { bpm, metronome })}
+									onclick={() => onOverdub?.(take)}
 								>
 									{#if overdubId === take.id && overdubPhase === 'recording'}
 										<span class="rec-dot" style:transform={`scale(${0.8 + overdubLevel * 0.45})`}></span>
@@ -258,25 +214,6 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.5rem 1rem;
-	}
-	.rec-tempo {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.45rem;
-		color: var(--color-ink-faint);
-		font-size: var(--type-xs);
-		font-variant-numeric: tabular-nums;
-	}
-	.rec-tempo input {
-		width: 7rem;
-		margin: 0;
-		accent-color: var(--color-ink-muted, currentColor);
-	}
-	.rec-tempo input:disabled {
-		opacity: 0.45;
-	}
-	.rec-action.is-on {
-		color: var(--color-ink);
 	}
 	.rec-action {
 		appearance: none;
