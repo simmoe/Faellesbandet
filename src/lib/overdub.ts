@@ -6,12 +6,13 @@
  * backing into the mix.
  */
 import { scheduleClick } from './click';
+import { applyMicDevice } from './micChoice';
 import type { RecordingSession, SongTake } from './recordAudio';
 
 export type OverdubSession = RecordingSession;
 
 function voiceConstraints(): MediaTrackConstraints {
-	return {
+	return applyMicDevice({
 		channelCount: 1,
 		echoCancellation: false,
 		noiseSuppression: false,
@@ -21,7 +22,7 @@ function voiceConstraints(): MediaTrackConstraints {
 		googNoiseSuppression: false,
 		googAutoGainControl: false,
 		googHighpassFilter: false
-	} as MediaTrackConstraints;
+	} as MediaTrackConstraints);
 }
 
 /** One beat of the clap measurement. Slow enough that a clap can sit on the fourth. */

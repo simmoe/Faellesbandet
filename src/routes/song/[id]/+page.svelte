@@ -47,6 +47,12 @@
 	import { startSongRecording, type RecordingSession } from '$lib/recordAudio';
 	import { measureLatency, startOverdub, type OverdubSession } from '$lib/overdub';
 	import { scheduleClick } from '$lib/click';
+	import {
+		listMicrophones,
+		readMicDeviceId,
+		writeMicDeviceId,
+		type MicDevice
+	} from '$lib/micChoice';
 	import { recordingAudioBytes } from '$lib/firebase/recordings';
 	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
@@ -751,6 +757,9 @@
 	let tempoReady = false;
 	let tempoBeat = $state(0);
 	let tempoPreview: { ctx: AudioContext; timers: ReturnType<typeof setTimeout>[] } | null = null;
+	let micId = $state(browser ? readMicDeviceId() : '');
+	let mics = $state<MicDevice[]>([]);
+	let micStandardLabel = $state('Browserens standard');
 
 	$effect(() => {
 		if (!browser || dubLatencyReady) return;
@@ -793,6 +802,33 @@
 		void preview.ctx.close();
 		tempoBeat = 0;
 	}
+
+	async function refreshMics(ask: boolean) {
+		try {
+			const listed = await listMicrophones(ask);
+			mics = listed.mics;
+			micStandardLabel = listed.standardLabel;
+			if (listed.labeled && micId && !listed.mics.some((mic) => mic.deviceId === micId)) {
+				micId = '';
+				writeMicDeviceId('');
+			}
+		} catch {
+			/* permission denied or no input — Standard stays available */
+		}
+	}
+
+	function chooseMic(id: string) {
+		micId = id;
+		writeMicDeviceId(id);
+	}
+
+	$effect(() => {
+		if (!browser || !infoOpen || !canEdit) return;
+		void refreshMics(false);
+		const onChange = () => void refreshMics(false);
+		navigator.mediaDevices?.addEventListener('devicechange', onChange);
+		return () => navigator.mediaDevices?.removeEventListener('devicechange', onChange);
+	});
 
 	function playFourBeats() {
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
@@ -855,7 +891,9 @@
 		if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
 			return 'Tillad mikrofonen for at optage.';
 		}
-		if (name === 'NotFoundError') return 'Ingen mikrofon fundet.';
+		if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+			return 'Den valgte mikrofon er væk. Vælg en anden under Oplysninger.';
+		}
 		if (name === 'EncodingError') return 'Kunne ikke læse optagelsen i den her browser.';
 		return err instanceof Error ? err.message : 'Kunne ikke optage.';
 	}
@@ -1462,6 +1500,22 @@
 										</div>
 									</div>
 									<div class="info-field">
+										<span>Mikrofon</span>
+										<select
+											class="mic-select"
+											value={micId}
+											aria-label="Mikrofon"
+											disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
+											onpointerdown={() => void refreshMics(true)}
+											onchange={(event) => chooseMic(event.currentTarget.value)}
+										>
+											<option value="">{micStandardLabel}</option>
+											{#each mics as mic (mic.deviceId)}
+												<option value={mic.deviceId}>{mic.label}</option>
+											{/each}
+										</select>
+									</div>
+									<div class="info-field">
 										<span>Kategorier</span>
 										<div class="info-cats">
 											{#each categories as cat (cat)}
@@ -1789,6 +1843,24 @@
 	.song-tool:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+	@media (max-width: 48rem) {
+		.song-tool {
+			min-width: 2.75rem;
+			min-height: 2.75rem;
+			padding: 0.35rem 0.45rem;
+		}
+		.print-icon {
+			width: 1.15rem;
+			height: 1.15rem;
+		}
+		.song-prints :global(.print-toggle) {
+			min-height: 2.5rem;
+		}
+		.song-prints :global(.print-toggle input) {
+			width: 1.15rem;
+			height: 1.15rem;
+		}
 	}
 	.title-input {
 		width: 100%;

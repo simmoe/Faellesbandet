@@ -272,6 +272,20 @@
 	.practice-close:hover {
 		color: var(--color-ink);
 	}
+	@media (max-width: 48rem) {
+		.practice-head {
+			align-items: center;
+			padding-top: calc(1.15rem + env(safe-area-inset-top, 0px));
+		}
+		.practice-close {
+			width: 2.75rem;
+			height: 2.75rem;
+		}
+		.practice-close svg {
+			width: 1.4rem;
+			height: 1.4rem;
+		}
+	}
 	.practice-stage {
 		min-width: 0;
 		min-height: 0;
@@ -313,15 +327,16 @@
 		.practice-meta {
 			display: none;
 		}
-		.practice-close {
-			width: 1.7rem;
-			height: 1.7rem;
-		}
 		.practice-stage {
 			padding-bottom: 0.08rem;
 		}
 		.practice-rec {
 			padding-bottom: calc(0.2rem + env(safe-area-inset-bottom, 0px));
+		}
+	}
+	@media (orientation: landscape) and (max-height: 34rem) and (max-width: 48rem) {
+		.practice-head {
+			padding-top: calc(0.85rem + env(safe-area-inset-top, 0px));
 		}
 	}
 </style>

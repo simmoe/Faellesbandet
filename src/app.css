@@ -360,20 +360,41 @@ select {
 	color: var(--color-ink);
 	font-weight: 600;
 }
-@media (max-width: 40rem) {
-	.song-page .info-field {
-		grid-template-columns: minmax(0, 1fr);
-		justify-items: start;
-		gap: var(--space-1);
-	}
-	.song-page .yt-add {
-		width: 100%;
-	}
-	.song-page .yt-add .info-input,
-	.song-page .yt-add .info-input[type='url'] {
-		width: 100%;
-	}
+.song-page .mic-select {
+	width: 100%;
+	max-width: 22rem;
+	min-width: 0;
+	margin: 0;
+	padding: 0.2rem 1.6rem 0.2rem 0;
+	border: none;
+	background-color: transparent;
+	font: inherit;
+	font-size: 0.95rem;
+	color: var(--color-ink);
+	cursor: pointer;
 }
+.song-page .mic-select:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+	@media (max-width: 48rem) {
+		.song-page .info-field {
+			grid-template-columns: minmax(0, 1fr);
+			justify-items: start;
+			gap: var(--space-1);
+		}
+		.song-page .mic-select {
+			min-height: 2.75rem;
+			font-size: 16px;
+		}
+		.song-page .yt-add {
+			width: 100%;
+		}
+		.song-page .yt-add .info-input,
+		.song-page .yt-add .info-input[type='url'] {
+			width: 100%;
+		}
+	}
 .song-page .info-input {
 	width: 100%;
 	min-width: 0;

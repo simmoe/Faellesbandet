@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { PitchDetector } from 'pitchy';
+	import { applyMicDevice } from '$lib/micChoice';
 	import { BASS_STRINGS, GUITAR_STRINGS, hzToPitch, median, type DetectedPitch } from '$lib/tuner';
 
 	interface Props {
@@ -92,11 +93,11 @@
 
 			try {
 				stream = await navigator.mediaDevices.getUserMedia({
-					audio: {
+					audio: applyMicDevice({
 						echoCancellation: false,
 						noiseSuppression: false,
 						autoGainControl: false
-					},
+					}),
 					video: false
 				});
 			} catch {

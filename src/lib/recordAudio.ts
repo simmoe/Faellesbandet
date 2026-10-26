@@ -1,4 +1,5 @@
 import { scheduleClick } from './click';
+import { applyMicDevice } from './micChoice';
 
 /**
  * Capture a rehearsal take through Web Audio instead of a raw MediaRecorder
@@ -39,7 +40,7 @@ function pickMimeType(): { mimeType: string; extension: string } {
 }
 
 function audioConstraints(): MediaTrackConstraints {
-	return {
+	return applyMicDevice({
 		channelCount: 1,
 		sampleRate: 48000,
 		echoCancellation: false,
@@ -51,7 +52,7 @@ function audioConstraints(): MediaTrackConstraints {
 		googHighpassFilter: false,
 		googTypingNoiseDetection: false,
 		voiceIsolation: false
-	} as MediaTrackConstraints;
+	} as MediaTrackConstraints);
 }
 
 function connectMusicChain(ctx: AudioContext, source: MediaStreamAudioSourceNode) {
