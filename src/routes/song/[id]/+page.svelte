@@ -893,7 +893,7 @@
 		dubLevel = 0;
 	}
 
-	function onOverdub(take: SongRecording, nudgeMs = 75) {
+	function onOverdub(take: SongRecording, nudgeMs = 0) {
 		if (dubPhase === 'recording' && dubTakeId === take.id) {
 			void finishOverdub();
 			return;
@@ -902,7 +902,7 @@
 		void beginOverdub(take, nudgeMs);
 	}
 
-	async function beginOverdub(take: SongRecording, nudgeMs = 75) {
+	async function beginOverdub(take: SongRecording, nudgeMs = 0) {
 		if (!song || !authState.user || dubSession) return;
 		let ctx: AudioContext;
 		try {

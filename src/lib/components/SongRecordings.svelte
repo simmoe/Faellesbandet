@@ -31,7 +31,7 @@
 	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
-	let nudgeMs = $state(75);
+	let nudgeMs = $state(0);
 	let nudgeReady = false;
 
 	$effect(() => {
@@ -41,19 +41,19 @@
 	$effect(() => {
 		if (!browser || nudgeReady) return;
 		nudgeReady = true;
-		const saved = localStorage.getItem('faellesbandet.overdub-nudge');
+		const saved = localStorage.getItem('faellesbandet.overdub-clap-nudge');
 		const parsed = saved == null ? NaN : Number(saved);
-		if (Number.isFinite(parsed)) nudgeMs = Math.min(150, Math.max(0, Math.round(parsed)));
+		if (Number.isFinite(parsed)) nudgeMs = Math.min(150, Math.max(-150, Math.round(parsed)));
 	});
 
 	$effect(() => {
 		if (!browser || !nudgeReady) return;
-		localStorage.setItem('faellesbandet.overdub-nudge', String(nudgeMs));
+		localStorage.setItem('faellesbandet.overdub-clap-nudge', String(nudgeMs));
 	});
 
 	function overdubLabel(id: string): string {
 		if (overdubId !== id || overdubPhase === 'idle') return 'Overdub';
-		if (overdubPhase === 'counting') return 'Pyyh';
+		if (overdubPhase === 'counting') return 'Klap';
 		if (overdubPhase === 'recording') return overdubElapsed;
 		if (overdubPhase === 'saving') return 'Gemmer';
 		return 'Starter';
@@ -73,7 +73,7 @@
 		<span>Optagelser</span>
 		<div class="rec-block">
 			{#if overdubPhase === 'counting'}
-				<p class="rec-hint">Sig Pyyh på slag 4</p>
+				<p class="rec-hint">Klap på slag 4</p>
 			{:else if overdubHint && overdubPhase === 'recording'}
 				<p class="rec-hint">{overdubHint}</p>
 			{/if}
@@ -97,7 +97,7 @@
 								<label class="rec-nudge">
 									<input
 										type="range"
-										min="0"
+										min="-150"
 										max="150"
 										step="1"
 										value={nudgeMs}
@@ -119,7 +119,7 @@
 											(overdubPhase === 'arming' ||
 												overdubPhase === 'counting' ||
 												overdubPhase === 'saving'))}
-									title="Læg en stemme ovenpå. Sig Pyyh på det fjerde slag."
+									title="Læg en stemme ovenpå. Klap på det fjerde slag."
 									onclick={() => onOverdub?.(take, nudgeMs)}
 								>
 									{#if overdubId === take.id && overdubPhase === 'recording'}

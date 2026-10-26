@@ -1,7 +1,7 @@
 /**
  * Overdub: play the existing take in the headphones, record a new voice
  * through a short vocal chain (body cut, presence, plate), and print one
- * mixed file. A count-in (1, 2, 3, Pyyh) measures how late the voice arrives
+ * mixed file. A count-in (1, 2, 3, clap) measures how late the clap arrives
  * against the click the singer actually heard, and that offset delays the
  * backing into the mix.
  */
@@ -41,7 +41,11 @@ function scheduleClick(ctx: AudioContext, time: number) {
 	osc.stop(time + 0.06);
 }
 
-/** Onset of the loudest sound after beat 1. `at` is seconds from beat 1. */
+/**
+ * Onset of the clap after beat 1. `at` is seconds from beat 1.
+ * A clap has a steep front, so the first sample that leaps well above the
+ * room noise right before the peak is the edge we want.
+ */
 function loudest(chunks: { t: number; data: Float32Array }[], rate: number, beat1: number) {
 	let samples = 0;
 	let peak = 0;
@@ -58,24 +62,23 @@ function loudest(chunks: { t: number; data: Float32Array }[], rate: number, beat
 			}
 		}
 	}
-	const gate = peak * 0.3;
-	const hold = Math.max(3, Math.floor(rate * 0.003));
-	let run = 0;
-	let at = peakAt;
+	let noise = 0;
+	let noiseCount = 0;
 	for (const chunk of chunks) {
 		for (let i = 0; i < chunk.data.length; i++) {
 			const rel = chunk.t + i / rate - beat1;
-			if (rel < peakAt - 0.12 || rel > peakAt) {
-				run = 0;
-				continue;
-			}
-			if (Math.abs(chunk.data[i]) >= gate) {
-				if (run === 0) at = rel;
-				run += 1;
-				if (run >= hold) return { samples, peak, at };
-			} else {
-				run = 0;
-			}
+			if (rel < peakAt - 0.25 || rel > peakAt - 0.08) continue;
+			noise += Math.abs(chunk.data[i]);
+			noiseCount += 1;
+		}
+	}
+	const floor = noiseCount ? noise / noiseCount : 0;
+	const gate = Math.max(floor * 8, peak * 0.08);
+	for (const chunk of chunks) {
+		for (let i = 0; i < chunk.data.length; i++) {
+			const rel = chunk.t + i / rate - beat1;
+			if (rel < peakAt - 0.08 || rel > peakAt) continue;
+			if (Math.abs(chunk.data[i]) >= gate) return { samples, peak, at: rel };
 		}
 	}
 	return { samples, peak, at: peakAt };
@@ -97,7 +100,7 @@ class PyhhProbe extends AudioWorkletProcessor {
 registerProcessor('pyhh-probe', PyhhProbe);
 `;
 
-/** Three clicks, then the singer says Pyyh on the fourth beat. */
+/** Three clicks, then the singer claps on the fourth beat. */
 async function countIn(
 	ctx: AudioContext,
 	mic: AudioNode,
@@ -171,7 +174,7 @@ async function countIn(
 			`Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`
 		);
 	}
-	return { latency: Math.max(0, raw - nudgeMs / 1000), songAt: beat1 + 4 * beat };
+	return { latency: raw - nudgeMs / 1000, songAt: beat1 + 4 * beat };
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
@@ -234,7 +237,7 @@ export async function startOverdub(
 	onFinished: () => void,
 	onCue: () => void = () => {},
 	onMeasured: (latency: number) => void = () => {},
-	nudgeMs = 75
+	nudgeMs = 0
 ): Promise<OverdubSession> {
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
@@ -451,7 +454,13 @@ export async function startOverdub(
 		};
 
 		const { latency, songAt } = await countIn(ctx, mic, onCue, nudgeMs);
-		align.delayTime.value = latency;
+		if (latency >= 0) {
+			align.delayTime.value = Math.min(0.8, latency);
+			voiceAlign.delayTime.value = 0;
+		} else {
+			align.delayTime.value = 0;
+			voiceAlign.delayTime.value = Math.min(0.15, -latency);
+		}
 		onMeasured(latency);
 
 		raf = requestAnimationFrame(tick);
