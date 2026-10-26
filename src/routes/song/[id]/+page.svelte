@@ -893,16 +893,16 @@
 		dubLevel = 0;
 	}
 
-	function onOverdub(take: SongRecording) {
+	function onOverdub(take: SongRecording, nudgeMs = 75) {
 		if (dubPhase === 'recording' && dubTakeId === take.id) {
 			void finishOverdub();
 			return;
 		}
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
-		void beginOverdub(take);
+		void beginOverdub(take, nudgeMs);
 	}
 
-	async function beginOverdub(take: SongRecording) {
+	async function beginOverdub(take: SongRecording, nudgeMs = 75) {
 		if (!song || !authState.user || dubSession) return;
 		let ctx: AudioContext;
 		try {
@@ -932,7 +932,8 @@
 				},
 				(latency) => {
 					dubHint = `${latency.toFixed(2).replace('.', ',')} s`;
-				}
+				},
+				nudgeMs
 			);
 			if (dubGone) {
 				const session = dubSession;

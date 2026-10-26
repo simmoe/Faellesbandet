@@ -101,7 +101,8 @@ registerProcessor('pyhh-probe', PyhhProbe);
 async function countIn(
 	ctx: AudioContext,
 	mic: AudioNode,
-	onCue: () => void
+	onCue: () => void,
+	nudgeMs: number
 ): Promise<{ latency: number; songAt: number }> {
 	const rate = ctx.sampleRate;
 	const chunks: { t: number; data: Float32Array }[] = [];
@@ -170,7 +171,7 @@ async function countIn(
 			`Måling: top ${heard.peak.toFixed(2)} ved ${heard.at.toFixed(2)} s. Slag 4 er ${beat4.toFixed(2)} s.`
 		);
 	}
-	return { latency: Math.max(0, raw - 0.075), songAt: beat1 + 4 * beat };
+	return { latency: Math.max(0, raw - nudgeMs / 1000), songAt: beat1 + 4 * beat };
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
@@ -232,7 +233,8 @@ export async function startOverdub(
 	onLevel: (level: number) => void,
 	onFinished: () => void,
 	onCue: () => void = () => {},
-	onMeasured: (latency: number) => void = () => {}
+	onMeasured: (latency: number) => void = () => {},
+	nudgeMs = 75
 ): Promise<OverdubSession> {
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
@@ -448,7 +450,7 @@ export async function startOverdub(
 			tail = setTimeout(() => onFinished(), 700);
 		};
 
-		const { latency, songAt } = await countIn(ctx, mic, onCue);
+		const { latency, songAt } = await countIn(ctx, mic, onCue, nudgeMs);
 		align.delayTime.value = latency;
 		onMeasured(latency);
 

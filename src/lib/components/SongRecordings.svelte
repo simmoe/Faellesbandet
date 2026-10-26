@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import type { SongRecording } from '$lib/types';
 
 	interface Props {
 		recordings: SongRecording[];
 		onRemove: (id: string) => void;
-		onOverdub?: (take: SongRecording) => void;
+		onOverdub?: (take: SongRecording, nudgeMs: number) => void;
 		onRevert?: (id: string) => void;
 		overdubId?: string | null;
 		overdubPhase?: 'idle' | 'arming' | 'counting' | 'recording' | 'saving';
@@ -30,9 +31,24 @@
 	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
+	let nudgeMs = $state(75);
+	let nudgeReady = false;
 
 	$effect(() => {
 		if (overdubId) playingId = null;
+	});
+
+	$effect(() => {
+		if (!browser || nudgeReady) return;
+		nudgeReady = true;
+		const saved = localStorage.getItem('faellesbandet.overdub-nudge');
+		const parsed = saved == null ? NaN : Number(saved);
+		if (Number.isFinite(parsed)) nudgeMs = Math.min(150, Math.max(0, Math.round(parsed)));
+	});
+
+	$effect(() => {
+		if (!browser || !nudgeReady) return;
+		localStorage.setItem('faellesbandet.overdub-nudge', String(nudgeMs));
 	});
 
 	function overdubLabel(id: string): string {
@@ -78,6 +94,22 @@
 						</div>
 						{#if !readOnly}
 							<div class="rec-actions">
+								<label class="rec-nudge">
+									<input
+										type="range"
+										min="0"
+										max="150"
+										step="1"
+										value={nudgeMs}
+										disabled={overdubPhase !== 'idle'}
+										aria-label="Millisekunder"
+										title="Højere tal lægger andenstemmen senere."
+										oninput={(event) => {
+											nudgeMs = Number(event.currentTarget.value);
+										}}
+									/>
+									<span>{nudgeMs} ms</span>
+								</label>
 								<button
 									type="button"
 									class="rec-action"
@@ -88,7 +120,7 @@
 												overdubPhase === 'counting' ||
 												overdubPhase === 'saving'))}
 									title="Læg en stemme ovenpå. Sig Pyyh på det fjerde slag."
-									onclick={() => onOverdub?.(take)}
+									onclick={() => onOverdub?.(take, nudgeMs)}
 								>
 									{#if overdubId === take.id && overdubPhase === 'recording'}
 										<span class="rec-dot" style:transform={`scale(${0.8 + overdubLevel * 0.45})`}></span>
@@ -180,6 +212,22 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
+	}
+	.rec-nudge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--color-ink-faint);
+		font-size: var(--type-xs);
+		font-variant-numeric: tabular-nums;
+	}
+	.rec-nudge input {
+		width: 5.5rem;
+		margin: 0;
+		accent-color: var(--color-ink-muted, currentColor);
+	}
+	.rec-nudge input:disabled {
+		opacity: 0.45;
 	}
 	.rec-action {
 		appearance: none;
