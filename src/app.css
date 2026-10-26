@@ -395,6 +395,50 @@ select {
 			width: 100%;
 		}
 	}
+@media screen and (orientation: landscape) and (max-height: 34rem) {
+	.song-page .info-field {
+		grid-template-columns: minmax(0, 1fr);
+		justify-items: stretch;
+	}
+	.song-page .info-field > :not(span) {
+		width: 100%;
+		min-width: 0;
+	}
+	.song-page .tempo-row {
+		width: 100%;
+	}
+	.song-page .tempo-row input[type='range'] {
+		flex: 1 1 100%;
+		width: 100%;
+	}
+	.song-page .mic-select {
+		max-width: none;
+		min-height: 2.75rem;
+		font-size: 16px;
+	}
+	.song-page .key-cluster:not(.is-static) {
+		width: 100%;
+		grid-template-columns: var(--control-h) minmax(0, 1fr) var(--control-h);
+	}
+	.song-page .info-input,
+	.song-page .yt-add,
+	.song-page .yt-add .info-input,
+	.song-page .yt-add .info-input[type='url'],
+	.song-page .yt-add-btn,
+	.song-page .info-cats .category-picker,
+	.song-page .info-cats .category-picker-trigger,
+	.song-page audio {
+		width: 100%;
+		max-width: none;
+	}
+	.song-page .yt-add {
+		display: grid;
+	}
+	.song-page .yt-add-btn {
+		min-height: 2.75rem;
+		text-align: left;
+	}
+}
 .song-page .info-input {
 	width: 100%;
 	min-width: 0;
