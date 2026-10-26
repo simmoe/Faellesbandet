@@ -110,6 +110,8 @@ export interface SongDoc {
 	 * og sætter skærm + print/PDF op i to spalter.
 	 */
 	columnLayout?: boolean;
+	/** Slag i minuttet til klik og optagelse. Hører til sangen. */
+	tempoBpm?: number;
 	/** Om PDF-export som udgangspunkt skal skalere sangen til maks én A4-side. */
 	fitSinglePage?: boolean;
 	categories?: string[];

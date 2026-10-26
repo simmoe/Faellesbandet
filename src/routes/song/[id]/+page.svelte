@@ -160,6 +160,7 @@
 		recordings = [...(s.recordings ?? [])];
 		chordChartUrl = s.chordChartUrl ?? '';
 		chordChartPath = s.chordChartPath ?? '';
+		tempoBpm = clampTempo(s.tempoBpm);
 		chartError = null;
 		loadError = null;
 		loading = false;
@@ -284,6 +285,7 @@
 				showBassTabs,
 				columnLayout,
 				fitSinglePage,
+				tempoBpm,
 				youtubeLinks,
 				recordings,
 				schemaVersion: 4
@@ -774,14 +776,14 @@
 		if (browser) localStorage.setItem('faellesbandet.overdub-latency-ms', String(dubLatencyMs));
 	}
 
+	function clampTempo(value: number | undefined): number {
+		if (value == null || !Number.isFinite(value)) return 100;
+		return Math.min(200, Math.max(40, Math.round(value)));
+	}
+
 	$effect(() => {
 		if (!browser || tempoReady) return;
 		tempoReady = true;
-		const savedBpm = Number(
-			localStorage.getItem('faellesbandet.tempo-bpm') ??
-				localStorage.getItem('faellesbandet.overdub-bpm')
-		);
-		if (Number.isFinite(savedBpm) && savedBpm >= 40 && savedBpm <= 200) tempoBpm = Math.round(savedBpm);
 		tempoOn =
 			localStorage.getItem('faellesbandet.tempo-on') === '1' ||
 			(localStorage.getItem('faellesbandet.tempo-on') == null &&
@@ -790,7 +792,6 @@
 
 	$effect(() => {
 		if (!browser || !tempoReady) return;
-		localStorage.setItem('faellesbandet.tempo-bpm', String(tempoBpm));
 		localStorage.setItem('faellesbandet.tempo-on', tempoOn ? '1' : '0');
 	});
 
@@ -1468,7 +1469,8 @@
 												aria-label="Tempo"
 												disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
 												oninput={(event) => {
-													tempoBpm = Number(event.currentTarget.value);
+													tempoBpm = clampTempo(Number(event.currentTarget.value));
+													scheduleSave();
 												}}
 											/>
 											<span class="tempo-bpm">{tempoBpm}</span>
