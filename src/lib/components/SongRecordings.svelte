@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import type { SongRecording } from '$lib/types';
 
 	interface Props {
 		recordings: SongRecording[];
 		onRemove: (id: string) => void;
-		onOverdub?: (take: SongRecording) => void;
+		onOverdub?: (take: SongRecording, bluetooth: boolean) => void;
 		onRevert?: (id: string) => void;
 		overdubId?: string | null;
 		overdubPhase?: 'idle' | 'arming' | 'recording' | 'saving';
@@ -28,6 +29,19 @@
 	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
+	let bluetooth = $state(false);
+	let bluetoothReady = false;
+
+	$effect(() => {
+		if (!browser || bluetoothReady) return;
+		bluetoothReady = true;
+		bluetooth = localStorage.getItem('faellesbandet.overdub-bluetooth') === '1';
+	});
+
+	function toggleBluetooth() {
+		bluetooth = !bluetooth;
+		localStorage.setItem('faellesbandet.overdub-bluetooth', bluetooth ? '1' : '0');
+	}
 
 	$effect(() => {
 		if (overdubId) playingId = null;
@@ -53,6 +67,18 @@
 	<div class="info-field">
 		<span>Optagelser</span>
 		<div class="rec-block">
+			{#if !readOnly}
+				<button
+					type="button"
+					class="rec-action"
+					class:is-on={bluetooth}
+					aria-pressed={bluetooth}
+					title="Tænd når du bruger trådløse høretelefoner, så andenstemmen rammer takten."
+					onclick={toggleBluetooth}
+				>
+					Bluetooth
+				</button>
+			{/if}
 			<ul class="rec-list">
 				{#each recordings as take (take.id)}
 					<li class="rec-row">
@@ -78,7 +104,7 @@
 										(overdubId === take.id &&
 											(overdubPhase === 'arming' || overdubPhase === 'saving'))}
 									title="Læg en stemme ovenpå. Høretelefoner er bedst."
-									onclick={() => onOverdub?.(take)}
+									onclick={() => onOverdub?.(take, bluetooth)}
 								>
 									{#if overdubId === take.id && overdubPhase === 'recording'}
 										<span class="rec-dot" style:transform={`scale(${0.8 + overdubLevel * 0.45})`}></span>
@@ -193,6 +219,9 @@
 	.rec-action:disabled {
 		opacity: 0.45;
 		cursor: default;
+	}
+	.rec-action.is-on {
+		color: var(--color-ink);
 	}
 	.rec-action.is-live {
 		color: #b91c1c;

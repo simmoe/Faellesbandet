@@ -892,16 +892,16 @@
 		dubLevel = 0;
 	}
 
-	function onOverdub(take: SongRecording) {
+	function onOverdub(take: SongRecording, bluetooth = false) {
 		if (dubPhase === 'recording' && dubTakeId === take.id) {
 			void finishOverdub();
 			return;
 		}
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
-		void beginOverdub(take);
+		void beginOverdub(take, bluetooth);
 	}
 
-	async function beginOverdub(take: SongRecording) {
+	async function beginOverdub(take: SongRecording, bluetooth = false) {
 		if (!song || !authState.user || dubSession) return;
 		let ctx: AudioContext;
 		try {
@@ -924,7 +924,8 @@
 				},
 				() => {
 					void finishOverdub();
-				}
+				},
+				bluetooth
 			);
 			if (dubGone) {
 				const session = dubSession;

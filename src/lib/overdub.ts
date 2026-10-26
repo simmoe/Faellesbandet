@@ -11,15 +11,31 @@ export type OverdubSession = RecordingSession;
 function voiceConstraints(): MediaTrackConstraints {
 	return {
 		channelCount: 1,
-		echoCancellation: true,
+		echoCancellation: false,
 		noiseSuppression: false,
 		autoGainControl: false,
-		voiceIsolation: true,
-		googEchoCancellation: true,
+		voiceIsolation: false,
+		googEchoCancellation: false,
 		googNoiseSuppression: false,
 		googAutoGainControl: false,
 		googHighpassFilter: false
 	} as MediaTrackConstraints;
+}
+
+/** AirPods and other wireless headsets sit well behind outputLatency. */
+const BLUETOOTH_LAG = 0.16;
+
+async function usesBluetoothOutput(stream: MediaStream): Promise<boolean> {
+	const labels = stream.getAudioTracks().map((track) => track.label);
+	try {
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		for (const device of devices) {
+			if (device.kind === 'audiooutput' || device.kind === 'audioinput') labels.push(device.label);
+		}
+	} catch {
+		// Labels stay empty on some phones. The Bluetooth toggle covers that.
+	}
+	return labels.some((label) => /airpod|bluetooth|beats|bose|headset|buds|wh-|wf-/i.test(label));
 }
 
 function pickMimeType(): { mimeType: string; extension: string } {
@@ -79,7 +95,8 @@ export async function startOverdub(
 	ready: Promise<unknown>,
 	backingBytes: Promise<ArrayBuffer>,
 	onLevel: (level: number) => void,
-	onFinished: () => void
+	onFinished: () => void,
+	bluetooth = false
 ): Promise<OverdubSession> {
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
@@ -92,6 +109,7 @@ export async function startOverdub(
 			backingBytes.then((bytes) => ctx.decodeAudioData(bytes.slice(0)))
 		]);
 		stream = micStream;
+		const wireless = bluetooth || (await usesBluetoothOutput(stream));
 
 		const mic = ctx.createMediaStreamSource(stream);
 
@@ -140,21 +158,24 @@ export async function startOverdub(
 		tailLp.frequency.value = 6400;
 		tailLp.Q.value = 0.7;
 
+		const makeup = ctx.createGain();
+		makeup.gain.value = 1.9;
 		const dry = ctx.createGain();
 		dry.gain.value = 1;
 		const wet = ctx.createGain();
-		wet.gain.value = 0.2;
+		wet.gain.value = 0.16;
 		const voiceMonitor = ctx.createGain();
-		voiceMonitor.gain.value = 0.28;
+		voiceMonitor.gain.value = 0.4;
 
 		mic.connect(rumble);
 		rumble.connect(body);
 		body.connect(presence);
 		presence.connect(air);
 		air.connect(vocal);
-		vocal.connect(dry);
-		vocal.connect(predelay);
-		vocal.connect(voiceMonitor);
+		vocal.connect(makeup);
+		makeup.connect(dry);
+		makeup.connect(predelay);
+		makeup.connect(voiceMonitor);
 		predelay.connect(sendHp);
 		sendHp.connect(plate);
 		plate.connect(tailLp);
@@ -166,12 +187,14 @@ export async function startOverdub(
 		plateMonitor.connect(ctx.destination);
 
 		const heard = ctx.createGain();
-		heard.gain.value = 0.92;
+		heard.gain.value = 0.88;
 		const printed = ctx.createGain();
-		printed.gain.value = 0.84;
-		const align = ctx.createDelay(0.2);
-		const latency = ctx.outputLatency || ctx.baseLatency || 0;
-		align.delayTime.value = Math.min(0.08, Math.max(0, latency));
+		printed.gain.value = 0.66;
+		const align = ctx.createDelay(0.45);
+		const reported = ctx.outputLatency > 0 ? ctx.outputLatency : ctx.baseLatency || 0;
+		align.delayTime.value = wireless
+			? Math.max(reported, BLUETOOTH_LAG)
+			: Math.min(0.25, Math.max(0, reported));
 
 		const backingSrc = ctx.createBufferSource();
 		backingSrc.buffer = backing;
@@ -187,9 +210,9 @@ export async function startOverdub(
 		printed.connect(mix);
 
 		const glue = ctx.createDynamicsCompressor();
-		glue.threshold.value = -16;
-		glue.knee.value = 10;
-		glue.ratio.value = 2.2;
+		glue.threshold.value = -18;
+		glue.knee.value = 8;
+		glue.ratio.value = 1.6;
 		glue.attack.value = 0.01;
 		glue.release.value = 0.18;
 
