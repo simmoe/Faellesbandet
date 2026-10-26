@@ -46,6 +46,7 @@
 	import { songRecordBar } from '$lib/songRecordBar.svelte';
 	import { startSongRecording, type RecordingSession } from '$lib/recordAudio';
 	import { startOverdub, type OverdubSession } from '$lib/overdub';
+	import { recordingAudioBytes } from '$lib/firebase/recordings';
 	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
 		BassLines,
@@ -917,7 +918,7 @@
 			dubSession = await startOverdub(
 				ctx,
 				ready,
-				take.url,
+				recordingAudioBytes(take.path),
 				(level) => {
 					dubLevel = level;
 				},

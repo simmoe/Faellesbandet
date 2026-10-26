@@ -108,6 +108,40 @@ export const categoryImageDataUrl = onCall<CategoryImageDataUrlRequest>(
 	}
 );
 
+interface RecordingAudioDataUrlRequest {
+	path?: string;
+}
+
+export const recordingAudioDataUrl = onCall<RecordingAudioDataUrlRequest>(
+	{ memory: '512MiB', timeoutSeconds: 60 },
+	async (req) => {
+		await assertBandMember(req.auth?.uid);
+		const path = (req.data?.path ?? '').toString().trim();
+		const allowedPrefix = `chord_bands/${BAND_ID}/recordings/`;
+		if (!path.startsWith(allowedPrefix) || path.includes('..')) {
+			throw new HttpsError('invalid-argument', 'Ugyldig optagelse.');
+		}
+		const file = getStorage().bucket('p5-firebase-eebc1.appspot.com').file(path);
+		const [exists] = await file.exists();
+		if (!exists) {
+			throw new HttpsError('not-found', 'Optagelsen findes ikke.');
+		}
+		const [metadata] = await file.getMetadata();
+		const contentType = (metadata.contentType ?? 'audio/webm').split(';')[0];
+		if (!contentType.startsWith('audio/')) {
+			throw new HttpsError('failed-precondition', 'Filen er ikke lyd.');
+		}
+		const size = Number(metadata.size ?? 0);
+		if (size > 7 * 1024 * 1024) {
+			throw new HttpsError('failed-precondition', 'Optagelsen er for lang til overdub.');
+		}
+		const [buffer] = await file.download();
+		return {
+			dataUrl: `data:${contentType};base64,${buffer.toString('base64')}`
+		};
+	}
+);
+
 interface UpdateMyProfileRequest {
 	displayName?: string;
 	email?: string;

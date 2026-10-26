@@ -77,7 +77,7 @@ function vocalPlate(ctx: AudioContext): AudioBuffer {
 export async function startOverdub(
 	ctx: AudioContext,
 	ready: Promise<unknown>,
-	sourceUrl: string,
+	backingBytes: Promise<ArrayBuffer>,
 	onLevel: (level: number) => void,
 	onFinished: () => void
 ): Promise<OverdubSession> {
@@ -89,12 +89,7 @@ export async function startOverdub(
 
 		const [micStream, backing] = await Promise.all([
 			navigator.mediaDevices.getUserMedia({ audio: voiceConstraints(), video: false }),
-			fetch(sourceUrl)
-				.then((res) => {
-					if (!res.ok) throw new Error('Kunne ikke hente optagelsen.');
-					return res.arrayBuffer();
-				})
-				.then((bytes) => ctx.decodeAudioData(bytes))
+			backingBytes.then((bytes) => ctx.decodeAudioData(bytes.slice(0)))
 		]);
 		stream = micStream;
 
