@@ -40,11 +40,12 @@
 		colorForCategory as paletteColorForCategory,
 		hasSameCategoryColors
 	} from '$lib/categoryColors';
-	import { tick } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import { browser } from '$app/environment';
 	import { songPlayBar } from '$lib/songPlayBar.svelte';
 	import { songRecordBar } from '$lib/songRecordBar.svelte';
 	import { startSongRecording, type RecordingSession } from '$lib/recordAudio';
+	import { startOverdub, type OverdubSession } from '$lib/overdub';
 	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
 		BassLines,
@@ -53,6 +54,7 @@
 		CollapsedSections,
 		SongDoc,
 		SongRecording,
+		SongRecordingPrevious,
 		YoutubeLink
 	} from '$lib/types';
 
@@ -343,6 +345,7 @@
 			await saveSongRecordings(song.id, recordings, authState.user.uid).catch(() => undefined);
 		}
 		if (take?.path) deleteSongRecordingFile(take.path).catch(() => undefined);
+		if (take?.previous?.path) deleteSongRecordingFile(take.previous.path).catch(() => undefined);
 	}
 
 	const CHART_MAX_BYTES = 15 * 1024 * 1024;
@@ -484,7 +487,9 @@
 		await deleteSong(
 			song.id,
 			chordChartPath,
-			recordings.map((take) => take.path)
+			recordings.flatMap((take) =>
+				[take.path, take.previous?.path].filter((path): path is string => !!path)
+			)
 		);
 		goto('/songbook');
 	}
@@ -725,6 +730,15 @@
 	let recTimer: ReturnType<typeof setInterval> | null = null;
 	let recStartedAt = 0;
 	let recWake: WakeLockSentinel | null = null;
+	let dubSession: OverdubSession | null = null;
+	let dubTimer: ReturnType<typeof setInterval> | null = null;
+	let dubStartedAt = 0;
+	let dubGone = false;
+	let dubTakeId = $state<string | null>(null);
+	let dubPhase = $state<'idle' | 'arming' | 'recording' | 'saving'>('idle');
+	let dubElapsed = $state('0:00');
+	let dubLevel = $state(0);
+	let dubError = $state<string | null>(null);
 
 	function recMessage(err: unknown): string {
 		const name = err instanceof DOMException ? err.name : '';
@@ -732,6 +746,7 @@
 			return 'Tillad mikrofonen for at optage.';
 		}
 		if (name === 'NotFoundError') return 'Ingen mikrofon fundet.';
+		if (name === 'EncodingError') return 'Kunne ikke læse optagelsen i den her browser.';
 		return err instanceof Error ? err.message : 'Kunne ikke optage.';
 	}
 
@@ -749,7 +764,7 @@
 	}
 
 	async function startRecord() {
-		if (!song || !authState.user || recSession) return;
+		if (!song || !authState.user || recSession || dubSession || dubPhase !== 'idle') return;
 		songRecordBar.error = null;
 		songRecordBar.phase = 'busy';
 		try {
@@ -821,6 +836,7 @@
 	}
 
 	function toggleRecord() {
+		if (dubPhase !== 'idle') return;
 		if (songRecordBar.phase === 'recording') {
 			void finishRecord();
 			return;
@@ -847,6 +863,182 @@
 			songRecordBar.error = null;
 		};
 	});
+
+	onDestroy(() => {
+		dubGone = true;
+		clearDubTimer();
+		if (dubSession) {
+			const session = dubSession;
+			dubSession = null;
+			void session.stop().catch(() => undefined);
+		}
+	});
+
+	function snapshotPrevious(take: SongRecording): SongRecordingPrevious {
+		return {
+			url: take.url,
+			path: take.path,
+			createdAt: take.createdAt,
+			...(take.durationMs != null ? { durationMs: take.durationMs } : {}),
+			...(take.mimeType ? { mimeType: take.mimeType } : {})
+		};
+	}
+
+	function clearDubTimer() {
+		if (dubTimer) clearInterval(dubTimer);
+		dubTimer = null;
+		dubElapsed = '0:00';
+		dubLevel = 0;
+	}
+
+	function onOverdub(take: SongRecording) {
+		if (dubPhase === 'recording' && dubTakeId === take.id) {
+			void finishOverdub();
+			return;
+		}
+		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
+		void beginOverdub(take);
+	}
+
+	async function beginOverdub(take: SongRecording) {
+		if (!song || !authState.user || dubSession) return;
+		let ctx: AudioContext;
+		try {
+			ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: 48000 });
+		} catch {
+			ctx = new AudioContext({ latencyHint: 'interactive' });
+		}
+		const ready = ctx.resume();
+		dubError = null;
+		dubTakeId = take.id;
+		dubPhase = 'arming';
+		try {
+			if (playing) stopPlay();
+			dubSession = await startOverdub(
+				ctx,
+				ready,
+				take.url,
+				(level) => {
+					dubLevel = level;
+				},
+				() => {
+					void finishOverdub();
+				}
+			);
+			if (dubGone) {
+				const session = dubSession;
+				dubSession = null;
+				if (session) await session.stop().catch(() => undefined);
+				return;
+			}
+			dubStartedAt = Date.now();
+			dubPhase = 'recording';
+			dubElapsed = '0:00';
+			dubTimer = setInterval(() => {
+				dubElapsed = formatElapsed(Date.now() - dubStartedAt);
+			}, 250);
+			try {
+				recWake = await navigator.wakeLock?.request('screen');
+			} catch {
+				recWake = null;
+			}
+		} catch (err) {
+			dubSession = null;
+			clearDubTimer();
+			dubPhase = 'idle';
+			dubError = recMessage(err);
+		}
+	}
+
+	async function finishOverdub() {
+		const session = dubSession;
+		if (!session || dubPhase === 'saving') return;
+		dubSession = null;
+		clearDubTimer();
+		const takeId = dubTakeId;
+		dubPhase = 'saving';
+		try {
+			const mix = await session.stop();
+			await releaseRecWake();
+			if (mix.blob.size > 40 * 1024 * 1024) {
+				throw new Error('Optagelsen er for lang til at gemme.');
+			}
+			if (!song || !authState.user || !takeId) {
+				dubPhase = 'idle';
+				return;
+			}
+			const current = recordings.find((item) => item.id === takeId);
+			if (!current) {
+				dubPhase = 'idle';
+				return;
+			}
+			const uploaded = await uploadSongRecording(song.id, mix.blob, authState.user.uid, {
+				extension: mix.extension,
+				mimeType: mix.mimeType,
+				recordingId: `${current.id}-dub-${Date.now()}`
+			});
+			const displaced = current.previous?.path;
+			const next: SongRecording = {
+				...current,
+				url: uploaded.url,
+				path: uploaded.path,
+				durationMs: mix.durationMs,
+				mimeType: mix.mimeType,
+				previous: snapshotPrevious(current)
+			};
+			const previousList = recordings;
+			recordings = recordings.map((item) => (item.id === takeId ? next : item));
+			try {
+				await saveSongRecordings(song.id, recordings, authState.user.uid);
+			} catch (err) {
+				recordings = previousList;
+				deleteSongRecordingFile(uploaded.path).catch(() => undefined);
+				throw err;
+			}
+			if (displaced && displaced !== current.path) {
+				deleteSongRecordingFile(displaced).catch(() => undefined);
+			}
+			dubPhase = 'idle';
+			dubTakeId = null;
+			dubError = null;
+		} catch (err) {
+			await releaseRecWake();
+			dubPhase = 'idle';
+			dubError = recMessage(err);
+		}
+	}
+
+	async function revertRecording(id: string) {
+		if (dubPhase !== 'idle' || !song || !authState.user) return;
+		const take = recordings.find((item) => item.id === id);
+		const prev = take?.previous;
+		if (!take || !prev) return;
+		const mixPath = take.path;
+		const restored: SongRecording = {
+			id: take.id,
+			title: take.title,
+			url: prev.url,
+			path: prev.path,
+			createdAt: prev.createdAt,
+			...(take.createdBy ? { createdBy: take.createdBy } : {}),
+			...(prev.durationMs != null ? { durationMs: prev.durationMs } : {}),
+			...(prev.mimeType ? { mimeType: prev.mimeType } : {})
+		};
+		const previousList = recordings;
+		recordings = recordings.map((item) => (item.id === id ? restored : item));
+		dubError = null;
+		try {
+			await saveSongRecordings(song.id, recordings, authState.user.uid);
+			if (mixPath && mixPath !== prev.path) {
+				deleteSongRecordingFile(mixPath).catch(() => undefined);
+			}
+			dubTakeId = null;
+		} catch (err) {
+			recordings = previousList;
+			dubTakeId = id;
+			dubError = recMessage(err);
+		}
+	}
 
 	$effect(() => {
 		if (!playing) return;
@@ -1177,6 +1369,13 @@
 								<SongRecordings
 									{recordings}
 									onRemove={removeRecording}
+									onOverdub={onOverdub}
+									onRevert={revertRecording}
+									overdubId={dubTakeId}
+									overdubPhase={dubPhase}
+									overdubElapsed={dubElapsed}
+									overdubLevel={dubLevel}
+									overdubError={dubError}
 									readOnly={!canEdit}
 								/>
 								{#if !chordChartUrl}

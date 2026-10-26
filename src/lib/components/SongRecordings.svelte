@@ -4,12 +4,41 @@
 	interface Props {
 		recordings: SongRecording[];
 		onRemove: (id: string) => void;
+		onOverdub?: (take: SongRecording) => void;
+		onRevert?: (id: string) => void;
+		overdubId?: string | null;
+		overdubPhase?: 'idle' | 'arming' | 'recording' | 'saving';
+		overdubElapsed?: string;
+		overdubLevel?: number;
+		overdubError?: string | null;
 		readOnly?: boolean;
 	}
 
-	const { recordings, onRemove, readOnly = false }: Props = $props();
+	const {
+		recordings,
+		onRemove,
+		onOverdub,
+		onRevert,
+		overdubId = null,
+		overdubPhase = 'idle',
+		overdubElapsed = '0:00',
+		overdubLevel = 0,
+		overdubError = null,
+		readOnly = false
+	}: Props = $props();
 
 	let playingId = $state<string | null>(null);
+
+	$effect(() => {
+		if (overdubId) playingId = null;
+	});
+
+	function overdubLabel(id: string): string {
+		if (overdubId !== id || overdubPhase === 'idle') return 'Overdub';
+		if (overdubPhase === 'recording') return overdubElapsed;
+		if (overdubPhase === 'saving') return 'Gemmer';
+		return 'Starter';
+	}
 
 	function durationLabel(ms: number | undefined): string {
 		if (!ms || ms < 1000) return '';
@@ -40,15 +69,46 @@
 							{/if}
 						</div>
 						{#if !readOnly}
-							<button
-								type="button"
-								class="rec-remove"
-								title="Fjern"
-								aria-label="Fjern {take.title}"
-								onclick={() => onRemove(take.id)}
-							>
-								×
-							</button>
+							<div class="rec-actions">
+								<button
+									type="button"
+									class="rec-action"
+									class:is-live={overdubId === take.id && overdubPhase === 'recording'}
+									disabled={(overdubPhase !== 'idle' && overdubId !== take.id) ||
+										(overdubId === take.id &&
+											(overdubPhase === 'arming' || overdubPhase === 'saving'))}
+									title="Læg en stemme ovenpå. Høretelefoner er bedst."
+									onclick={() => onOverdub?.(take)}
+								>
+									{#if overdubId === take.id && overdubPhase === 'recording'}
+										<span class="rec-dot" style:transform={`scale(${0.8 + overdubLevel * 0.45})`}></span>
+									{/if}
+									{overdubLabel(take.id)}
+								</button>
+								{#if take.previous && overdubId !== take.id}
+									<button
+										type="button"
+										class="rec-action"
+										disabled={overdubPhase !== 'idle'}
+										onclick={() => onRevert?.(take.id)}
+									>
+										Sidste take
+									</button>
+								{/if}
+								<button
+									type="button"
+									class="rec-remove"
+									title="Fjern"
+									aria-label="Fjern {take.title}"
+									disabled={overdubId === take.id}
+									onclick={() => onRemove(take.id)}
+								>
+									×
+								</button>
+							</div>
+						{/if}
+						{#if overdubError && overdubId === take.id}
+							<p class="rec-error">{overdubError}</p>
 						{/if}
 						{#if playingId === take.id}
 							<audio class="rec-player" src={take.url} controls autoplay playsinline></audio>
@@ -106,6 +166,52 @@
 		font-size: var(--type-xs);
 		font-variant-numeric: tabular-nums;
 	}
+	.rec-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.rec-action {
+		appearance: none;
+		display: inline-grid;
+		grid-auto-flow: column;
+		align-items: center;
+		gap: 0.35rem;
+		border: none;
+		background: transparent;
+		padding: 0;
+		font-size: var(--type-label);
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--color-ink-faint);
+		cursor: pointer;
+	}
+	.rec-action:hover:not(:disabled) {
+		color: var(--color-ink);
+	}
+	.rec-action:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+	.rec-action.is-live {
+		color: #b91c1c;
+		letter-spacing: 0;
+		text-transform: none;
+		font-variant-numeric: tabular-nums;
+	}
+	.rec-dot {
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 999px;
+		background: #dc2626;
+	}
+	.rec-error {
+		grid-column: 1 / -1;
+		margin: 0;
+		color: var(--color-error);
+		font-size: var(--type-xs);
+	}
 	.rec-remove {
 		appearance: none;
 		border: none;
@@ -115,6 +221,10 @@
 		line-height: 1;
 		color: var(--color-ink-faint);
 		cursor: pointer;
+	}
+	.rec-remove:disabled {
+		opacity: 0.35;
+		cursor: default;
 	}
 	.rec-remove:hover {
 		color: var(--color-ink);

@@ -62,6 +62,15 @@ export interface YoutubeLink {
 	url: string;
 }
 
+/** Ét skridt tilbage efter overdub. Selve listen viser stadig kun den aktuelle optagelse. */
+export interface SongRecordingPrevious {
+	url: string;
+	path: string;
+	createdAt: number;
+	durationMs?: number;
+	mimeType?: string;
+}
+
 export interface SongRecording {
 	id: string;
 	title: string;
@@ -71,6 +80,7 @@ export interface SongRecording {
 	durationMs?: number;
 	mimeType?: string;
 	createdBy?: string;
+	previous?: SongRecordingPrevious;
 }
 
 export interface SongDoc {
