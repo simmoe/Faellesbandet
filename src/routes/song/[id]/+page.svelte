@@ -53,6 +53,14 @@
 		writeMicDeviceId,
 		type MicDevice
 	} from '$lib/micChoice';
+	import {
+		listPlaybackDevices,
+		openPlaybackTap,
+		primePlaybackSink,
+		readSinkId,
+		writeSinkId,
+		type PlaybackDevice
+	} from '$lib/playbackSink';
 	import { recordingAudioBytes } from '$lib/firebase/recordings';
 	import { formatElapsed, recordingTitle } from '$lib/recordingTitle';
 	import type {
@@ -758,10 +766,17 @@
 	let tempoOn = $state(false);
 	let tempoReady = false;
 	let tempoBeat = $state(0);
-	let tempoPreview: { ctx: AudioContext; timers: ReturnType<typeof setTimeout>[] } | null = null;
 	let micId = $state(browser ? readMicDeviceId() : '');
 	let mics = $state<MicDevice[]>([]);
 	let micStandardLabel = $state('Browserens standard');
+	let sinkId = $state(browser ? readSinkId() : '');
+	let sinks = $state<PlaybackDevice[]>([]);
+	let sinkStandardLabel = $state('Standard');
+	let tempoPreview: {
+		ctx: AudioContext;
+		timers: ReturnType<typeof setTimeout>[];
+		closeTap: () => void;
+	} | null = null;
 
 	$effect(() => {
 		if (!browser || dubLatencyReady) return;
@@ -800,6 +815,7 @@
 		tempoPreview = null;
 		if (!preview) return;
 		for (const timer of preview.timers) clearTimeout(timer);
+		preview.closeTap();
 		void preview.ctx.close();
 		tempoBeat = 0;
 	}
@@ -816,11 +832,28 @@
 		} catch {
 			/* permission denied or no input — Standard stays available */
 		}
+		try {
+			const outs = await listPlaybackDevices();
+			sinks = outs.devices;
+			sinkStandardLabel = outs.standardLabel;
+			if (outs.labeled && sinkId && !outs.devices.some((device) => device.deviceId === sinkId)) {
+				sinkId = '';
+				writeSinkId('');
+			}
+		} catch {
+			/* output list can stay on Standard */
+		}
 	}
 
 	function chooseMic(id: string) {
 		micId = id;
 		writeMicDeviceId(id);
+	}
+
+	async function chooseSink(id: string) {
+		sinkId = id;
+		writeSinkId(id);
+		await primePlaybackSink(id);
 	}
 
 	$effect(() => {
@@ -831,16 +864,17 @@
 		return () => navigator.mediaDevices?.removeEventListener('devicechange', onChange);
 	});
 
-	function playFourBeats() {
+	async function playFourBeats() {
 		if (dubPhase !== 'idle' || songRecordBar.phase !== 'idle') return;
 		stopTempoPreview();
 		const ctx = new AudioContext();
-		void ctx.resume();
+		await ctx.resume();
+		const playback = await openPlaybackTap(ctx);
 		const beat = 60 / tempoBpm;
 		const t0 = ctx.currentTime + 0.08;
 		const timers: ReturnType<typeof setTimeout>[] = [];
 		for (let i = 0; i < 4; i++) {
-			scheduleClick(ctx, t0 + i * beat, i === 0);
+			scheduleClick(ctx, t0 + i * beat, i === 0, playback.node);
 			timers.push(
 				setTimeout(() => {
 					tempoBeat = i + 1;
@@ -850,11 +884,12 @@
 		timers.push(
 			setTimeout(() => {
 				tempoBeat = 0;
+				playback.close();
 				void ctx.close();
 				tempoPreview = null;
 			}, (t0 + 4 * beat + 0.2 - ctx.currentTime) * 1000)
 		);
-		tempoPreview = { ctx, timers };
+		tempoPreview = { ctx, timers, closeTap: () => playback.close() };
 	}
 
 	function newDubContext(): AudioContext {
@@ -1514,6 +1549,22 @@
 											<option value="">{micStandardLabel}</option>
 											{#each mics as mic (mic.deviceId)}
 												<option value={mic.deviceId}>{mic.label}</option>
+											{/each}
+										</select>
+									</div>
+									<div class="info-field">
+										<span>Afspilning</span>
+										<select
+											class="mic-select"
+											value={sinkId}
+											aria-label="Afspilning"
+											disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
+											onpointerdown={() => void refreshMics(true)}
+											onchange={(event) => void chooseSink(event.currentTarget.value)}
+										>
+											<option value="">{sinkStandardLabel}</option>
+											{#each sinks as device (device.deviceId)}
+												<option value={device.deviceId}>{device.label}</option>
 											{/each}
 										</select>
 									</div>

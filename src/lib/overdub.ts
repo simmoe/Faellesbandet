@@ -7,6 +7,8 @@
  */
 import { scheduleClick } from './click';
 import { applyMicDevice } from './micChoice';
+import { openPlaybackTap, type PlaybackTap } from './playbackSink';
+import { centerMono } from './recordAudio';
 import type { RecordingSession, SongTake } from './recordAudio';
 
 export type OverdubSession = RecordingSession;
@@ -91,7 +93,8 @@ registerProcessor('clap-probe', ClapProbe);
 async function clapMeasure(
 	ctx: AudioContext,
 	mic: AudioNode,
-	onCue: () => void
+	onCue: () => void,
+	out: AudioNode
 ): Promise<{ latency: number; songAt: number }> {
 	const rate = ctx.sampleRate;
 	const chunks: { t: number; data: Float32Array }[] = [];
@@ -115,14 +118,14 @@ async function clapMeasure(
 	sink.gain.value = 0;
 	mic.connect(probe);
 	probe.connect(sink);
-	sink.connect(ctx.destination);
+	sink.connect(out);
 
 	const beat = COUNT_BEAT;
 	const beat1 = ctx.currentTime + 0.35;
 	const until = beat1 + 4 * beat;
-	scheduleClick(ctx, beat1);
-	scheduleClick(ctx, beat1 + beat);
-	scheduleClick(ctx, beat1 + 2 * beat);
+	scheduleClick(ctx, beat1, false, out);
+	scheduleClick(ctx, beat1 + beat, false, out);
+	scheduleClick(ctx, beat1 + 2 * beat, false, out);
 	onCue();
 
 	try {
@@ -175,8 +178,13 @@ export async function measureLatency(
 		if (ctx.state === 'suspended') await ctx.resume();
 		stream = await navigator.mediaDevices.getUserMedia({ audio: voiceConstraints(), video: false });
 		const mic = ctx.createMediaStreamSource(stream);
-		const { latency } = await clapMeasure(ctx, mic, onCue);
-		return latency;
+		const playback = await openPlaybackTap(ctx);
+		try {
+			const { latency } = await clapMeasure(ctx, mic, onCue, playback.node);
+			return latency;
+		} finally {
+			playback.close();
+		}
 	} finally {
 		for (const track of stream?.getTracks() ?? []) track.stop();
 		void ctx.close();
@@ -187,14 +195,15 @@ export async function measureLatency(
 function scheduleCountIn(
 	ctx: AudioContext,
 	bpm: number,
-	onBeat: (beat: number) => void
+	onBeat: (beat: number) => void,
+	out: AudioNode
 ): { songAt: number; timers: ReturnType<typeof setTimeout>[] } {
 	const beat = 60 / bpm;
 	const t0 = ctx.currentTime + 0.3;
 	const timers: ReturnType<typeof setTimeout>[] = [];
 	for (let i = 0; i < 4; i++) {
 		const at = t0 + i * beat;
-		scheduleClick(ctx, at, i === 0);
+		scheduleClick(ctx, at, i === 0, out);
 		timers.push(setTimeout(() => onBeat(i + 1), Math.max(0, (at - ctx.currentTime) * 1000)));
 	}
 	return { songAt: t0 + 4 * beat, timers };
@@ -274,6 +283,7 @@ export async function startOverdub(
 	const onCue = options.onCue ?? (() => {});
 	const { mimeType, extension } = pickMimeType();
 	let stream: MediaStream | null = null;
+	let playback: PlaybackTap | null = null;
 	try {
 		await ready;
 		if (ctx.state === 'suspended') await ctx.resume();
@@ -284,6 +294,8 @@ export async function startOverdub(
 		]);
 		stream = micStream;
 		const mic = ctx.createMediaStreamSource(micStream);
+		playback = await openPlaybackTap(ctx);
+		const monitor = playback.node;
 
 		const rumble = ctx.createBiquadFilter();
 		rumble.type = 'highpass';
@@ -355,8 +367,8 @@ export async function startOverdub(
 		const plateMonitor = ctx.createGain();
 		plateMonitor.gain.value = 0;
 		tailLp.connect(plateMonitor);
-		voiceMonitor.connect(ctx.destination);
-		plateMonitor.connect(ctx.destination);
+		voiceMonitor.connect(monitor);
+		plateMonitor.connect(monitor);
 
 		const heard = ctx.createGain();
 		heard.gain.value = 0.88;
@@ -370,7 +382,7 @@ export async function startOverdub(
 		backingSrc.connect(heard);
 		backingSrc.connect(align);
 		align.connect(printed);
-		heard.connect(ctx.destination);
+		heard.connect(monitor);
 
 		const mix = ctx.createGain();
 		mix.gain.value = 1;
@@ -401,7 +413,7 @@ export async function startOverdub(
 		const dest = ctx.createMediaStreamDestination();
 		mix.connect(glue);
 		glue.connect(limit);
-		limit.connect(dest);
+		centerMono(ctx, limit).connect(dest);
 		vocal.connect(analyser);
 
 		const chunks: BlobPart[] = [];
@@ -451,6 +463,7 @@ export async function startOverdub(
 				// already ended
 			}
 			for (const track of micStream.getTracks()) track.stop();
+			playback?.close();
 			void ctx.close();
 		};
 
@@ -493,12 +506,12 @@ export async function startOverdub(
 		let latency = options.latency;
 		let songAt: number;
 		if (latency == null) {
-			const measured = await clapMeasure(ctx, mic, () => onCue('clap', 4));
+			const measured = await clapMeasure(ctx, mic, () => onCue('clap', 4), monitor);
 			latency = measured.latency;
 			songAt = measured.songAt;
 			options.onMeasured?.(latency);
 		} else {
-			const counted = scheduleCountIn(ctx, bpm, (beat) => onCue('count', beat));
+			const counted = scheduleCountIn(ctx, bpm, (beat) => onCue('count', beat), monitor);
 			songAt = counted.songAt;
 			countTimers = counted.timers;
 			const wait = (songAt - ctx.currentTime - 0.08) * 1000;
@@ -519,7 +532,7 @@ export async function startOverdub(
 			const schedule = () => {
 				while (next < ctx.currentTime + 0.6) {
 					const index = Math.round((next - startAt) / beat);
-					scheduleClick(ctx, next, index % 4 === 0);
+					scheduleClick(ctx, next, index % 4 === 0, monitor);
 					next += beat;
 				}
 			};
@@ -535,6 +548,7 @@ export async function startOverdub(
 		return { stop };
 	} catch (err) {
 		for (const track of stream?.getTracks() ?? []) track.stop();
+		playback?.close();
 		void ctx.close();
 		throw err;
 	}

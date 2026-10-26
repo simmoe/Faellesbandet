@@ -13,7 +13,12 @@ function noise(ctx: AudioContext): AudioBuffer {
 	return buffer;
 }
 
-export function scheduleClick(ctx: AudioContext, time: number, accent = false) {
+export function scheduleClick(
+	ctx: AudioContext,
+	time: number,
+	accent = false,
+	out: AudioNode = ctx.destination
+) {
 	const source = ctx.createBufferSource();
 	source.buffer = noise(ctx);
 	const band = ctx.createBiquadFilter();
@@ -25,7 +30,7 @@ export function scheduleClick(ctx: AudioContext, time: number, accent = false) {
 	gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.016);
 	source.connect(band);
 	band.connect(gain);
-	gain.connect(ctx.destination);
+	gain.connect(out);
 	source.start(time);
 	source.stop(time + 0.03);
 }

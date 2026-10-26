@@ -1,5 +1,6 @@
 import { scheduleClick } from './click';
 import { applyMicDevice } from './micChoice';
+import { openPlaybackTap } from './playbackSink';
 
 /**
  * Capture a rehearsal take through Web Audio instead of a raw MediaRecorder
@@ -98,6 +99,16 @@ function connectMusicChain(ctx: AudioContext, source: MediaStreamAudioSourceNode
 	return limit;
 }
 
+/** Copy one mic channel into both ears. Safari otherwise stores the mono take on the right only. */
+export function centerMono(ctx: AudioContext, input: AudioNode): ChannelMergerNode {
+	const split = ctx.createChannelSplitter(2);
+	const merge = ctx.createChannelMerger(2);
+	input.connect(split);
+	split.connect(merge, 0, 0);
+	split.connect(merge, 0, 1);
+	return merge;
+}
+
 export async function startSongRecording(
 	onLevel: (level: number) => void,
 	metronome?: { bpm: number }
@@ -115,6 +126,7 @@ export async function startSongRecording(
 		ctx = new AudioContext({ latencyHint: 'interactive' });
 	}
 	if (ctx.state === 'suspended') await ctx.resume();
+	const playback = await openPlaybackTap(ctx);
 
 	const source = ctx.createMediaStreamSource(stream);
 	const chain = connectMusicChain(ctx, source);
@@ -122,13 +134,13 @@ export async function startSongRecording(
 	analyser.fftSize = 2048;
 	analyser.smoothingTimeConstant = 0.55;
 	const dest = ctx.createMediaStreamDestination();
+	centerMono(ctx, chain).connect(dest);
 	const silent = ctx.createGain();
 	silent.gain.value = 0;
 
 	chain.connect(analyser);
-	chain.connect(dest);
 	chain.connect(silent);
-	silent.connect(ctx.destination);
+	silent.connect(playback.node);
 
 	const chunks: BlobPart[] = [];
 	let recorder: MediaRecorder;
@@ -172,7 +184,7 @@ export async function startSongRecording(
 		const schedule = () => {
 			while (next < ctx.currentTime + 0.6) {
 				const index = Math.round((next - startAt) / beat);
-				scheduleClick(ctx, next, index % 4 === 0);
+				scheduleClick(ctx, next, index % 4 === 0, playback.node);
 				next += beat;
 			}
 		};
@@ -189,6 +201,7 @@ export async function startSongRecording(
 				const teardown = () => {
 					cancelAnimationFrame(raf);
 					if (metroTimer) clearInterval(metroTimer);
+					playback.close();
 					onLevel(0);
 					for (const track of stream.getTracks()) track.stop();
 					void ctx.close();
