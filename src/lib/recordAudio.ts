@@ -99,13 +99,19 @@ function connectMusicChain(ctx: AudioContext, source: MediaStreamAudioSourceNode
 	return limit;
 }
 
-/** Copy one mic channel into both ears. Safari otherwise stores the mono take on the right only. */
+/**
+ * Put the mic in both ears. A headset plug often carries the signal on only
+ * one side; keeping just the left channel writes a silent file.
+ */
 export function centerMono(ctx: AudioContext, input: AudioNode): ChannelMergerNode {
 	const split = ctx.createChannelSplitter(2);
+	const sum = ctx.createGain();
 	const merge = ctx.createChannelMerger(2);
 	input.connect(split);
-	split.connect(merge, 0, 0);
-	split.connect(merge, 0, 1);
+	split.connect(sum, 0);
+	split.connect(sum, 1);
+	sum.connect(merge, 0, 0);
+	sum.connect(merge, 0, 1);
 	return merge;
 }
 
