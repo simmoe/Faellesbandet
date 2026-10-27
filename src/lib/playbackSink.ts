@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'faellesbandet.sink-id';
+const LABEL_KEY = 'faellesbandet.sink-label';
 
 export type PlaybackDevice = {
 	deviceId: string;
@@ -18,8 +19,34 @@ export function readSinkId(): string {
 	return localStorage.getItem(STORAGE_KEY) ?? '';
 }
 
-export function writeSinkId(id: string) {
+export function writeSinkId(id: string, label = '') {
 	localStorage.setItem(STORAGE_KEY, id);
+	localStorage.setItem(LABEL_KEY, id ? label : '');
+}
+
+export function readSinkLabel(): string {
+	if (typeof localStorage === 'undefined') return '';
+	return localStorage.getItem(LABEL_KEY) ?? '';
+}
+
+export function isIOS(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	return (
+		/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+		(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+	);
+}
+
+/**
+ * iOS couples a Bluetooth headset's output and mic: playing to it makes it the input too.
+ * The phone's own speaker and receiver do not.
+ */
+export function isHeadsetSink(id: string, label: string): boolean {
+	return !!id && !/speaker|højttaler|receiver|iphone|ipad/i.test(label);
+}
+
+export function sinkTakesMic(): boolean {
+	return isIOS() && isHeadsetSink(readSinkId(), readSinkLabel());
 }
 
 function realOutputs(devices: MediaDeviceInfo[]) {

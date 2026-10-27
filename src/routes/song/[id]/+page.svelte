@@ -54,10 +54,13 @@
 		type MicDevice
 	} from '$lib/micChoice';
 	import {
+		isHeadsetSink,
+		isIOS,
 		listPlaybackDevices,
 		openPlaybackTap,
 		primePlaybackSink,
 		readSinkId,
+		readSinkLabel,
 		writeSinkId,
 		type PlaybackDevice
 	} from '$lib/playbackSink';
@@ -772,6 +775,9 @@
 	let sinkId = $state(browser ? readSinkId() : '');
 	let sinks = $state<PlaybackDevice[]>([]);
 	let sinkStandardLabel = $state('Standard');
+	let sinkLabel = $state(browser ? readSinkLabel() : '');
+	const onIOS = browser && isIOS();
+	const micFollowsSink = $derived(onIOS && isHeadsetSink(sinkId, sinkLabel));
 	let tempoPreview: {
 		ctx: AudioContext;
 		timers: ReturnType<typeof setTimeout>[];
@@ -836,9 +842,14 @@
 			const outs = await listPlaybackDevices();
 			sinks = outs.devices;
 			sinkStandardLabel = outs.standardLabel;
-			if (outs.labeled && sinkId && !outs.devices.some((device) => device.deviceId === sinkId)) {
+			const current = outs.devices.find((device) => device.deviceId === sinkId);
+			if (outs.labeled && sinkId && !current) {
 				sinkId = '';
+				sinkLabel = '';
 				writeSinkId('');
+			} else if (current && current.label !== sinkLabel) {
+				sinkLabel = current.label;
+				writeSinkId(sinkId, current.label);
 			}
 		} catch {
 			/* output list can stay on Standard */
@@ -852,7 +863,8 @@
 
 	async function chooseSink(id: string) {
 		sinkId = id;
-		writeSinkId(id);
+		sinkLabel = sinks.find((device) => device.deviceId === id)?.label ?? '';
+		writeSinkId(id, sinkLabel);
 		await primePlaybackSink(id);
 	}
 
@@ -1540,16 +1552,22 @@
 										<span>Mikrofon</span>
 										<select
 											class="mic-select"
-											value={micId}
+											value={micFollowsSink ? '' : micId}
 											aria-label="Mikrofon"
-											disabled={dubPhase !== 'idle' || songRecordBar.phase !== 'idle'}
+											disabled={micFollowsSink ||
+												dubPhase !== 'idle' ||
+												songRecordBar.phase !== 'idle'}
 											onpointerdown={() => void refreshMics(true)}
 											onchange={(event) => chooseMic(event.currentTarget.value)}
 										>
-											<option value="">{micStandardLabel}</option>
-											{#each mics as mic (mic.deviceId)}
-												<option value={mic.deviceId}>{mic.label}</option>
-											{/each}
+											{#if micFollowsSink}
+												<option value="">{sinkLabel || 'Headsettet'}</option>
+											{:else}
+												<option value="">{micStandardLabel}</option>
+												{#each mics as mic (mic.deviceId)}
+													<option value={mic.deviceId}>{mic.label}</option>
+												{/each}
+											{/if}
 										</select>
 									</div>
 									<div class="info-field">

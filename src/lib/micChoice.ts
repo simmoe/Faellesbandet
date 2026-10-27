@@ -1,3 +1,5 @@
+import { sinkTakesMic } from './playbackSink';
+
 const STORAGE_KEY = 'faellesbandet.mic-id';
 
 export type MicDevice = {
@@ -17,7 +19,7 @@ export function writeMicDeviceId(id: string) {
 /** Pin capture to the chosen input. Empty id keeps the browser default. */
 export function applyMicDevice(constraints: MediaTrackConstraints): MediaTrackConstraints {
 	const id = readMicDeviceId();
-	if (!id) return constraints;
+	if (!id || sinkTakesMic()) return constraints;
 	return { ...constraints, deviceId: { exact: id } };
 }
 
